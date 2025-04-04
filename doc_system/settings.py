@@ -31,10 +31,6 @@ EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = "smtp.zoho.com"
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-# EMAIL_HOST_USER = "faith.osebi@transnetcloud.com"  # Replace with your Zoho email
-# EMAIL_HOST_PASSWORD = "Osebi_transnet1"  # Use an app password if needed
-# EMAIL_HOST_USER = "soch.nwaoga@transnetcloud.com"  # Replace with your Zoho email
-# EMAIL_HOST_PASSWORD = "WorkWork24"  # Use an app password if needed
 EMAIL_HOST_USER = ""
 EMAIL_HOST_PASSWORD = ""
 
