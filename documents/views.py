@@ -1,38 +1,34 @@
-from django.shortcuts import render, redirect
-from .forms import DocumentForm, SignUpForm
-from .models import Document, CustomUser
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.models import User
-from django.contrib.auth import login
+from django.contrib.auth import login, get_user_model
 from django.contrib.auth.signals import user_logged_in
+from django.core.mail import send_mail, EmailMessage, get_connection
+from django.dispatch import receiver
+from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
+from django.conf import settings
+from django.db.models import Q
+from .forms import DocumentForm, SignUpForm
+from .models import Document, CustomUser, Role
+from .placeholders import replace_placeholders
 from docx import Document as DocxDocument
 from comtypes import CoInitialize, CoUninitialize
 from comtypes.client import CreateObject
 import pdfkit
-from django.conf import settings
 from doc_system import settings
 import os
-from django.http import HttpResponse, HttpResponseForbidden
 from docx2txt import process
 from datetime import datetime
-from .placeholders import replace_placeholders
-from django.shortcuts import get_object_or_404, redirect
-from django.contrib.auth import get_user_model
-from django.core.mail import send_mail, EmailMessage, get_connection
-from django.dispatch import receiver
 import smtplib
+
 
 pdf_config = pdfkit.configuration(wkhtmltopdf=r"C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe")  # Set full path
 
 User = get_user_model()
 
-from django.contrib.auth.signals import user_logged_in
-from django.dispatch import receiver
-from django.conf import settings
-
 def send_approval_request(document):
     # Get all BDM emails
-    bdm_emails = User.objects.filter(role="BDM").values_list("email", flat=True)
+    bdm_emails = User.objects.filter(position="BDM").values_list("email", flat=True)
 
     # Ensure there are BDMs to notify
     if not bdm_emails:
@@ -118,7 +114,7 @@ def create_document(request):
             # Save Word doc
             word_dir = os.path.join(settings.MEDIA_ROOT, "documents/word")
             os.makedirs(word_dir, exist_ok=True)
-            word_filename = f"{document.company_name}_approval.docx" if document.document_type == "approval" else f"{document.company_name}_sla.docx"
+            word_filename = f"{document.company_name}_{document.document_type}.docx"
             word_path = os.path.join(word_dir, word_filename)
             doc.save(word_path)
             document.word_file = word_path
@@ -127,27 +123,27 @@ def create_document(request):
             ## Send approval request email
             send_approval_request(document)
 
-            # Convert to PDF using Word COM
-            pdf_dir = os.path.join(settings.MEDIA_ROOT, "documents/pdf")
-            os.makedirs(pdf_dir, exist_ok=True)
-            pdf_path = os.path.join(pdf_dir, word_filename.replace(".docx", ".pdf"))
+            # Relative path
+            pdf_filename = word_filename.replace(".docx", ".pdf")
+            relative_pdf_path = os.path.join("documents/pdf", pdf_filename)
+            absolute_pdf_path = os.path.join(settings.MEDIA_ROOT, relative_pdf_path)
 
+            # Save the PDF
             try:
-                # Initialize COM
-                CoInitialize()  # Add this line
+                CoInitialize()
                 word = CreateObject("Word.Application")
-                word.Visible = False  # Run in background
+                word.Visible = False
                 doc = word.Documents.Open(os.path.abspath(word_path))
-                # 17 is the wdFormatPDF constant
-                doc.SaveAs(os.path.abspath(pdf_path), FileFormat=17)
+                doc.SaveAs(os.path.abspath(absolute_pdf_path), FileFormat=17)
                 doc.Close()
                 word.Quit()
-                # Cleanup COM
-                CoUninitialize()  # Add this line
-                document.pdf_file = pdf_path
+                CoUninitialize()
+
+                # ✅ Save the relative path to the FileField
+                document.pdf_file.name = relative_pdf_path
                 document.save()
+
             except Exception as e:
-                # Ensure COM is uninitialized even if an error occurs
                 try:
                     CoUninitialize()
                 except:
@@ -175,8 +171,53 @@ def register(request):
 
 @login_required
 def document_list(request):
+    # Start with all documents
     documents = Document.objects.all()
-    return render(request, "documents/document_list.html", {"documents": documents})
+
+    # Get filter parameters from the request
+    company = request.GET.get('company', '')
+    doc_type = request.GET.get('type', '')
+    status = request.GET.get('status', '')
+    created = request.GET.get('created', '')
+    created_by = request.GET.get('created_by', '')
+    approved_by = request.GET.get('approved_by', '')
+    send_email = request.GET.get('send_email', '')
+
+    # Apply filters if parameters are provided
+    if company:
+        documents = documents.filter(company_name__iexact=company)
+    if doc_type:
+        documents = documents.filter(document_type__icontains=doc_type)
+    if status:
+        documents = documents.filter(status__iexact=status)
+    if created:
+        documents = documents.filter(created_at__date=created)
+    if created_by:
+        documents = documents.filter(created_by__username__icontains=created_by)
+    if approved_by:
+        documents = documents.filter(approved_by__username__icontains=approved_by)
+    if send_email:
+        documents = documents.filter(email_sent=(send_email.lower() == 'sent'))
+
+    distinct_companies = Document.objects.values_list('company_name', flat=True).distinct()
+    distinct_created_by = User.objects.filter(id__in=Document.objects.values_list('created_by', flat=True).distinct())
+    distinct_approved_by = User.objects.filter(id__in=Document.objects.values_list('approved_by', flat=True).distinct())
+
+    return render(request, "documents/document_list.html", {
+        "documents": documents,
+        "filter_params": {
+            'company': company,
+            'type': doc_type,
+            'status': status,
+            'created': created,
+            'created_by': created_by,
+            'approved_by': approved_by,
+            'send_email': send_email,
+        },
+        "distinct_companies": distinct_companies,
+        "distinct_created_by": distinct_created_by,
+        "distinct_approved_by": distinct_approved_by
+    })
 
 def home(request):
     return render(request, "documents/home.html")
@@ -187,7 +228,7 @@ def approve_document(request, document_id):
     document = get_object_or_404(Document, id=document_id)
 
     # Restrict only BDMs from approving
-    if request.user.role != "BDM":
+    if request.user.position != "BDM":
         return HttpResponseForbidden("You are not allowed to approve this document.")
 
     document.status = "approved"
@@ -228,6 +269,15 @@ def approve_document(request, document_id):
 # def get_sr_email(document, sales_rep):
 #     return CustomUser.objects.filter(fullname={document.sales_rep}).values_list("email", flat=True)
 
+def autocomplete_sales_rep(request):
+    if 'term' in request.GET:
+        qs = User.objects.filter(
+            roles__name='Sales Rep',
+            username__icontains=request.GET.get('term')
+        ).distinct()
+        names = list(qs.values_list('username', flat=True))
+        return JsonResponse(names, safe=False)
+
 
 def send_approved_email(request, document_id):
     document = get_object_or_404(Document, id=document_id)
@@ -252,14 +302,19 @@ def send_approved_email(request, document_id):
         return HttpResponseForbidden("Your email credentials are missing. Contact admin.")
     
     # Define recipient, CC, and attachment
-    # recipient = [document.contact_person_email]  # Main recipient
 
-    # sales_rep_email = User.objects.filter(first_name={document.sales_rep.split(" ")[0]}, last_name={document.sales_rep.split(" ")[1]}).values_list("email", flat=True)
-    # bdm_emails = User.objects.filter(role="BDM").values_list("email", flat=True)
-    # print(bdm_emails)
-    # cc_list = [sales_rep_email, bdm_emails]
+    # Main recipient
+    recipient = [document.contact_person_email]
 
-    # cc_list = [document.sales_rep, document.bdm_email]  # CC Sales Rep & BDM
+    # Get Sales Rep email
+    sales_rep_email = User.objects.filter(username=document.sales_rep).values_list("email", flat=True)
+
+    # Get all BDM emails
+    bdm_emails = User.objects.filter(position="BDM").values_list("email", flat=True)
+
+    # Combine into a single list
+    cc_list = list(sales_rep_email) + list(bdm_emails)
+
 
     # Configure SMTP settings dynamically
     connection = get_connection(
@@ -331,7 +386,7 @@ def send_approved_email(request, document_id):
         """
 
     # Create email with attachment
-    email = EmailMessage(subject, message, sender_email, [document.contact_person_email],connection=connection)
+    email = EmailMessage(subject, message, sender_email, recipient, cc=cc_list, connection=connection)
     email.attach_file(document.pdf_file.path)  # Attach the PDF
     email.send()
 

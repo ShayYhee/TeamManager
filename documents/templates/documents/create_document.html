@@ -7,4 +7,32 @@
     {{ form.as_p }}
     <button type="submit">Generate</button>
 </form>
+
+<!-- jQuery UI CSS (autocomplete styling) -->
+<link rel="stylesheet" href="https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
+
+<!-- jQuery and jQuery UI -->
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
+
+<script>
+  $(function () {
+    $("#id_sales_rep").autocomplete({
+      source: function (request, response) {
+        $.ajax({
+          url: "{% url 'autocomplete_sales_rep' %}",
+          dataType: "json",
+          data: {
+            term: request.term
+          },
+          success: function (data) {
+            response(data);
+          }
+        });
+      },
+      minLength: 2,
+    });
+  });
+</script>
+
 {% endblock %}
