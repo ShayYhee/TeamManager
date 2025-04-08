@@ -33,12 +33,20 @@ class Document(models.Model):
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 
+class Role(models.Model):
+    name = models.CharField(max_length=50, unique=True)
+
+    def __str__(self):
+        return self.name
+
 class CustomUser(AbstractUser):
-    ROLE_CHOICES = [
+    POSITION_CHOICES = [
         ("BDA", "Business Development Assistant"),
         ("BDM", "Business Development Manager"),
     ]
-    role = models.CharField(max_length=3, choices=ROLE_CHOICES, default="BDA")
+    
+    position = models.CharField(max_length=3, choices=POSITION_CHOICES, blank=True, null=True)
+    roles = models.ManyToManyField(Role, blank=True)
     phone_number = models.CharField(max_length=15, blank=True, null=True)  # New phone number field
     smtp_email = models.EmailField(blank=True, null=True)  # SMTP Email for Sending
     smtp_password = models.CharField(max_length=255, blank=True, null=True)  # SMTP Password

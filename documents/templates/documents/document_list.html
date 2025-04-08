@@ -6,6 +6,60 @@
 <!-- Button to create a new document -->
 <a href="{% url 'create_document' %}" class="btn btn-primary">Create New Document</a>
 
+<!-- Filter Form -->
+<form method="GET" class="mt-3">
+    <div class="row">
+        <div class="col">
+            <select name="company" class="form-control text-xs">
+                <option value="">Filter by Company</option>
+                {% for company in distinct_companies %}
+                    <option value="{{ company }}" {% if filter_params.company == company %}selected{% endif %}>{{ company }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col">
+            <input type="text" name="type" class="form-control text-xs" placeholder="Filter by Type" value="{{ filter_params.type }}">
+        </div>
+        <div class="col">
+            <select name="status" class="form-control text-xs">
+                <option value="">Filter by Status</option>
+                <option value="pending" {% if filter_params.status == "pending" %}selected{% endif %}>Pending</option>
+                <option value="approved" {% if filter_params.status == "approved" %}selected{% endif %}>Approved</option>
+            </select>
+        </div>
+        <div class="col">
+            <input type="date" name="created" class="form-control" value="{{ filter_params.created }}">
+        </div>
+        <div class="col">
+            <select name="created_by" class="form-control text-xxs">
+                <option value="">Filter by Created By</option>
+                {% for username in distinct_created_by %}
+                    <option value="{{ username }}" {% if filter_params.created_by == username %}selected{% endif %}>{{ username }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col">
+            <select name="approved_by" class="form-control text-xxs">
+                <option value="">Filter by Approved By</option>
+                {% for username in distinct_approved_by %}
+                    <option value="{{ username }}" {% if filter_params.approved_by == username %}selected{% endif %}>{{ username }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col">
+            <select name="send_email" class="form-control text-xs">
+                <option value="">Filter by Email Status</option>
+                <option value="sent" {% if filter_params.send_email == "sent" %}selected{% endif %}>Sent</option>
+                <option value="not_sent" {% if filter_params.send_email == "not_sent" %}selected{% endif %}>Not Sent</option>
+            </select>
+        </div>
+        <div class="col">
+            <button type="submit" class="btn btn-primary">Apply Filters</button>
+            <a href="{% url 'document_list' %}" class="btn btn-secondary">Reset Filters</a>
+        </div>
+    </div>
+</form>
+
 <table class="table mt-3">
     <tr>
         <th>Company</th>
@@ -23,7 +77,7 @@
         <td>{{ document.document_type }}</td>
         <td>{{ document.status }}</td>
         <td>{{ document.created_at }}</td>
-        <td>{{ document.created_by }}
+        <td>{{ document.created_by.username }}</td>
         <td>
             {% if document.pdf_file %}
                 <button class="view-btn" onclick="viewDocument('{{ document.pdf_file.url }}'); console.log('Button clicked')">View</button>
@@ -33,10 +87,14 @@
             {% endif %}
         </td>
         <td>
-            {% if user.role == "BDM" and document.status == "pending" %}
+            {% if document.status == "pending" and user.position == "BDM" %}
                 <a href="{% url 'approve_document' document.id %}" class="btn btn-primary">Approve</a>
             {% elif document.status == "approved" %}
-                {{document.approved_by}}
+                {% if document.approved_by == user %}
+                    You
+                {% else %}
+                    {{ document.approved_by.username|default:"N/A" }}
+                {% endif %}
             {% endif %}
         </td>
         <td>
@@ -57,7 +115,6 @@
                 </a>
             {% endif %}
         </td>
-                
     </tr>
     {% endfor %}
 </table>
@@ -65,7 +122,7 @@
 <!-- PDF Preview Modal -->
 <div id="pdfModal" class="modal">
     <div class="modal-content">
-        <span class="close" onclick="closeModal()">&times;</span>
+        <span class="close" onclick="closeModal()">×</span>
         <iframe id="pdfViewer" width="100%" height="500px"></iframe>
     </div>
 </div>
@@ -119,6 +176,5 @@
         document.getElementById('pdfModal').style.display = 'none';
     }
 </script>
-
 
 {% endblock %}
