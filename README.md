@@ -42,5 +42,5 @@ A Django-based internal web application for Business Development teams to stream
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/yourusername/document-automation.git
-cd document-automation
+git clone https://github.com/ShayYhee/DocSystem.git
+cd doc_system
