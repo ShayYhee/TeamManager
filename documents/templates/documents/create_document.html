@@ -1,38 +1,248 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h2>Generate Document</h2>
-<form method="POST">
+<h2>Generate Documents</h2>
+
+{% if formset.errors %}
+    <div class="alert alert-danger">
+        <ul>
+            {% for form in formset %}
+                {% for error in form.errors %}
+                    <li>{{ error }}</li>
+                {% endfor %}
+            {% endfor %}
+            {% for error in formset.non_form_errors %}
+                <li>{{ error }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+{% endif %}
+
+<form method="POST" id="document-formset" enctype="multipart/form-data">
     {% csrf_token %}
-    {{ form.as_p }}
-    <button type="submit">Generate</button>
+    {{ formset.management_form }}
+    
+    <div id="form-container">
+        {% for form in formset %}
+            <div class="form-instance">
+                <div class="row">
+                    <div class="col-md-4">
+                        {{ form.creation_method }}
+                        {{ form.creation_method.errors }}
+                    </div>
+                    <div class="col-md-4 template-field">
+                        {{ form.document_type }}
+                        {{ form.document_type.errors }}
+                    </div>
+                    <div class="col-md-4 upload-field">
+                        {{ form.uploaded_file }}
+                        {{ form.uploaded_file.errors }}
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-4"><p>Company Name:</p>{{ form.company_name }} {{ form.company_name.errors }}</div>
+                    <div class="col-md-4"><p>Contact Person Name:</p>{{ form.contact_person_name }} {{ form.contact_person_name.errors }}</div>
+                    <div class="col-md-4"><p>Contact Person Email:</p>{{ form.contact_person_email }} {{ form.contact_person_email.errors }}</div>
+                </div>
+                <div class="row">
+                    <div class="col-md-4"><p>Contact Person Designation:</p>{{ form.contact_person_designation }} {{ form.contact_person_designation.errors }}</div>
+                    <div class="col-md-4"><p>Sales Rep:</p>{{ form.sales_rep }} {{ form.sales_rep.errors }}</div>
+                    <div class="col-md-4"></div>
+                </div>
+                <div class="row">
+                    <div class="col-md-12"><p>Company Address:</p>{{ form.company_address }} {{ form.company_address.errors }}</div>
+                </div>
+                <button type="button" class="btn btn-danger remove-form">Remove</button>
+            </div>
+        {% endfor %}
+    </div>
+    
+    <button type="button" id="add-form" class="btn btn-primary">Add More</button>
+    <button type="submit" class="btn btn-success">Generate All</button>
 </form>
 
-<!-- jQuery UI CSS (autocomplete styling) -->
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
-
-<!-- jQuery and jQuery UI -->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
 
 <script>
-  $(function () {
-    $("#id_sales_rep").autocomplete({
-      source: function (request, response) {
-        $.ajax({
-          url: "{% url 'autocomplete_sales_rep' %}",
-          dataType: "json",
-          data: {
-            term: request.term
-          },
-          success: function (data) {
-            response(data);
-          }
+$(document).ready(function() {
+    console.log("jQuery loaded and ready");
+
+    // Toggle fields based on creation method
+    function toggleFields() {
+        $('.form-instance').each(function() {
+            var creationMethod = $(this).find('select[name$="creation_method"]').val();
+            var $templateField = $(this).find('.template-field');
+            var $uploadField = $(this).find('.upload-field');
+            
+            if (creationMethod === 'upload') {
+                $templateField.hide();
+                $uploadField.show();
+                // Clear document_type for upload
+                $templateField.find('select[name$="document_type"]').val('');
+            } else {
+                $templateField.show();
+                $uploadField.hide();
+                // Clear uploaded_file for template
+                $uploadField.find('input[name$="uploaded_file"]').val('');
+            }
         });
-      },
-      minLength: 2,
-    });
+    }
+
+    // Run on page load
+    toggleFields();
+    // Run when creation_method changes
+    $(document).on('change', 'select[name$="creation_method"]', toggleFields);
+
+    // Autocomplete for sales_rep fields
+    function setupAutocomplete() {
+      $(".sales-rep-field").autocomplete({
+        source: function (request, response) {
+          $.ajax({
+            url: "{% url 'autocomplete_sales_rep' %}",
+            dataType: "json",
+            data: {
+              term: request.term
+            },
+            success: function (data) {
+              response(data);
+            },
+            error: function(xhr, status, error) {
+              console.error("Autocomplete error:", error);
+            }
+          });
+        },
+        minLength: 2,
+      });
+    }
+
+    // Initial setupAutocomplete
+    setupAutocomplete();
+
+    // Add new form
+    $("#add-form").click(function () {
+      let formCount = parseInt($('#id_form-TOTAL_FORMS').val());
+      let emptyForm = $('.form-instance:first').clone();
+  
+      // Update names and IDs uniquely
+      emptyForm.find(':input').each(function () {
+          let nameAttr = $(this).attr('name');
+          let idAttr = $(this).attr('id');
+  
+          if (nameAttr) {
+              let newName = nameAttr.replace(/-\d+-/, '-' + formCount + '-');
+              $(this).attr('name', newName);
+          }
+  
+          if (idAttr) {
+              let newId = idAttr.replace(/-\d+-/, '-' + formCount + '-');
+              $(this).attr('id', newId);
+          }
+  
+          $(this).val('');
+      });
+  
+      // Remove autocomplete artifacts
+      emptyForm.find(".ui-autocomplete-input").removeClass("ui-autocomplete-input").removeAttr("aria-autocomplete");
+  
+      // Append to container
+      $('#form-container').append(emptyForm);
+      $('#id_form-TOTAL_FORMS').val(formCount + 1);
+
+      toggleFields();
+  
+      // Apply autocomplete only to the new input
+      emptyForm.find(".sales-rep-field").autocomplete({
+          source: function (request, response) {
+              $.ajax({
+                  url: "{% url 'autocomplete_sales_rep' %}",
+                  dataType: "json",
+                  data: {
+                      term: request.term
+                  },
+                  success: function (data) {
+                      response(data);
+                  }
+              });
+          },
+          minLength: 2
+      });
   });
+
+    // Remove form
+    $(document).on('click', '.remove-form', function () {
+      if ($('.form-instance').length > 1) {
+          $(this).closest('.form-instance').remove();
+          // Decrease the TOTAL_FORMS count
+          let count = parseInt($('#id_form-TOTAL_FORMS').val());
+          $('#id_form-TOTAL_FORMS').val(count - 1);
+      } else {
+          alert("You must have at least one form.");
+      }
+    });
+
+    $(document).on('change', '.document-type-select', function() {
+      const selected = $(this).val();
+      const formInstance = $(this).closest('.form-instance');
+      const uploadField = formInstance.find('.upload-field');
+  
+      if (selected === 'upload') {
+          uploadField.show();
+      } else {
+          uploadField.hide();
+          uploadField.find('input[type="file"]').val(''); // clear file if switching away
+      }
+    });
+
+    $("#document-formset").on("submit", function(e) {
+      console.log("Form submitted");
+      console.log("Form data:", $(this).serialize());
+    });
+
+  });
+
 </script>
+
+<style>
+  .form-instance {
+      border: 1px solid #ddd;
+      padding: 10px;
+      margin-bottom: 10px;
+  }
+  button {
+      margin: 5px;
+  }
+
+  .form-fields {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px; /* Space between fields */
+    {% comment %} margin: 1; {% endcomment %}
+  }
+  .form-fields select, .form-fields input[type="text"], .form-fields input[type="email"] {
+      flex: 1 1 300px; /* Flexible width with a base of 300px */
+      max-width: 300px; /* Maximum width */
+      max-height: 50px;
+  }
+
+  .upload-field {
+    display: none; /* Hidden by default */
+  }
+
+  p {
+    margin-bottom: 2px;
+    margin-top: 5px;
+  }
+
+  .alert {
+    margin-bottom: 20px;
+  }
+  {% comment %} .compact-field {
+    width: 300px; /* Set a fixed width */
+    display: inline-block; /* Prevents full-width stretching */
+  } {% endcomment %}
+</style>
 
 {% endblock %}

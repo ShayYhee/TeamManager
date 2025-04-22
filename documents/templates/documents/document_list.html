@@ -18,7 +18,12 @@
             </select>
         </div>
         <div class="col">
-            <input type="text" name="type" class="form-control text-xs" placeholder="Filter by Type" value="{{ filter_params.type }}">
+            <select name="type" class="form-control text-xs">
+                <option value="">Filter by Type</option>
+                {% for type in distinct_type %}
+                    <option value="{{ type }}" {% if filter_params.type == type %}selected{% endif %}>{{ type }}</option>
+                {% endfor %}
+            </select>
         </div>
         <div class="col">
             <select name="status" class="form-control text-xs">
