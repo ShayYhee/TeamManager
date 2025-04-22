@@ -7,6 +7,7 @@ from django.core.mail import send_mail, EmailMessage, get_connection
 from django.dispatch import receiver
 from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
 from django.conf import settings
+from django.forms import formset_factory
 from django.db.models import Q
 from .forms import DocumentForm, SignUpForm
 from .models import Document, CustomUser, Role
@@ -14,6 +15,7 @@ from .placeholders import replace_placeholders
 from docx import Document as DocxDocument
 from comtypes import CoInitialize, CoUninitialize
 from comtypes.client import CreateObject
+# from win32com.client import Dispatch, constants, gencache
 import pdfkit
 from doc_system import settings
 import os
@@ -73,88 +75,122 @@ def send_approval_request(document):
 
 @login_required
 def create_document(request):
+    DocumentFormSet = formset_factory(DocumentForm, extra=1)
+    
     if request.method == "POST":
-        form = DocumentForm(request.POST)
-        if form.is_valid():
-            document = form.save(commit=False)
-            document.created_by = request.user
-            document.save()
+        print("POST request received")
+        formset = DocumentFormSet(request.POST, request.FILES)
+        print("Formset data:", request.POST)
+        print("Files:", request.FILES)
 
-            # Template setup
-            template_filename = "Approval Letter Template.docx" if document.document_type == "approval" else "SLA Template.docx"
-            template_path = os.path.join(settings.BASE_DIR, "documents/templates/docx_templates", template_filename)
-            if not os.path.exists(template_path):
-                return HttpResponse(f"Error: Template not found at {template_path}", status=500)
+        if formset.is_valid():
+            print("Formset is valid")
+            for form in formset:
+                if form.has_changed():
+                    print("Processing form:", form.cleaned_data)
+                    document = form.save(commit=False)
+                    document.created_by = request.user
+                    document.save()
+
+                    creation_method = form.cleaned_data['creation_method']
+                    word_dir = os.path.join(settings.MEDIA_ROOT, "documents/word")
+                    pdf_dir = os.path.join(settings.MEDIA_ROOT, "documents/pdf")
+                    os.makedirs(word_dir, exist_ok=True)
+                    os.makedirs(pdf_dir, exist_ok=True)
+
+                    base_filename = f"{document.company_name}_{document.id}"
+
+                    if creation_method == 'template':
+                        template_filename = "Approval Letter Template.docx" if document.document_type == "approval" else "SLA Template.docx"
+                        template_path = os.path.join(settings.BASE_DIR, "documents/templates/docx_templates", template_filename)
+                        if not os.path.exists(template_path):
+                            print(f"Template not found: {template_path}")
+                            return HttpResponse(f"Error: Template not found at {template_path}", status=500)
+                        
+                        today = datetime.today()
+                        if document.document_type == "approval":
+                            day = today.day
+                            suffix = "th" if 11 <= day <= 13 else {1: "st", 2: "nd", 3: "rd"}.get(day % 10, "th")
+                            formatted_date = today.strftime("%d") + suffix + " " + today.strftime("%d %B, %Y")
+                        else:
+                            formatted_date = today.strftime("%m/%d/%Y")
+
+                        doc = DocxDocument(template_path)
+                        replacements = {
+                            "{{Company Name}}": document.company_name,
+                            "{{Company Address}}": document.company_address,
+                            "{{Contact Person Name}}": document.contact_person_name,
+                            "{{Contact Person Email}}": document.contact_person_email,
+                            "{{Contact Person Designation}}": document.contact_person_designation + ",",
+                            "{{Sales Rep}}": document.sales_rep,
+                            "{{Date}}": formatted_date,
+                        }
+                        doc = replace_placeholders(doc, replacements, document.document_type)
+
+                        word_filename = f"{base_filename}.docx"
+                        word_path = os.path.join(word_dir, word_filename)
+                        doc.save(word_path)
+                        document.word_file = os.path.join("documents/word", word_filename)
+                    else:
+                        uploaded_file = form.cleaned_data['uploaded_file']
+                        file_extension = uploaded_file.name.lower().split('.')[-1]
+
+                        if file_extension == 'docx':
+                            word_filename = f"{base_filename}.docx"
+                            word_path = os.path.join(word_dir, word_filename)
+                            with open(word_path, 'wb') as f:
+                                for chunk in uploaded_file.chunks():
+                                    f.write(chunk)
+                            document.word_file = os.path.join("documents/word", word_filename)
+                        elif file_extension == 'pdf':
+                            pdf_filename = f"{base_filename}.pdf"
+                            pdf_path = os.path.join(pdf_dir, pdf_filename)
+                            with open(pdf_path, 'wb') as f:
+                                for chunk in uploaded_file.chunks():
+                                    f.write(chunk)
+                            document.pdf_file = os.path.join("documents/pdf", pdf_filename)
+                            document.save()
+                            print("Sending email for uploaded PDF")
+                            send_approval_request(document)
+                            continue
+
+                    pdf_filename = f"{base_filename}.pdf"
+                    relative_pdf_path = os.path.join("documents/pdf", pdf_filename)
+                    absolute_pdf_path = os.path.join(settings.MEDIA_ROOT, relative_pdf_path)
+
+                    try:
+                        print("Starting PDF conversion")
+                        CoInitialize()
+                        word = CreateObject("Word.Application")
+                        word.Visible = False
+                        doc = word.Documents.Open(os.path.abspath(word_path))
+                        doc.SaveAs(os.path.abspath(absolute_pdf_path), FileFormat=17)
+                        doc.Close()
+                        word.Quit()
+                        CoUninitialize()
+                        document.pdf_file = relative_pdf_path
+                        document.save()
+                    except Exception as e:
+                        print(f"PDF conversion error: {e}")
+                        try:
+                            CoUninitialize()
+                        except:
+                            pass
+                        return HttpResponse(f"Error converting to PDF: {e}", status=500)
+
+                    print("Sending email")
+                    send_approval_request(document)
             
-            # Get the current date
-            today = datetime.today()
-
-            # Format date based on document type
-            if document.document_type == "approval":
-                day = today.day
-                suffix = "th" if 11 <= day <= 13 else {1: "st", 2: "nd", 3: "rd"}.get(day % 10, "th")
-                formatted_date = today.strftime("%d") + suffix + " " + today.strftime("%d %B, %Y")  # Example: 25th March, 2025
-            else:
-                formatted_date = today.strftime("%m/%d/%Y")  # Example: 03/25/2025
-
-            # Edit Word doc
-            doc = DocxDocument(template_path)
-            replacements = {
-                "{{Company Name}}": document.company_name,
-                "{{Company Address}}": document.company_address,
-                "{{Contact Person Name}}": document.contact_person_name,
-                "{{Contact Person Email}}": document.contact_person_email,
-                "{{Contact Person Designation}}": document.contact_person_designation + ",",
-                "{{Sales Rep}}": document.sales_rep,
-                "{{Date}}": formatted_date,
-            }
-            doc = replace_placeholders(doc, replacements, document.document_type)
-
-
-            # Save Word doc
-            word_dir = os.path.join(settings.MEDIA_ROOT, "documents/word")
-            os.makedirs(word_dir, exist_ok=True)
-            word_filename = f"{document.company_name}_{document.document_type}.docx"
-            word_path = os.path.join(word_dir, word_filename)
-            doc.save(word_path)
-            document.word_file = word_path
-            document.save()
-
-            ## Send approval request email
-            send_approval_request(document)
-
-            # Relative path
-            pdf_filename = word_filename.replace(".docx", ".pdf")
-            relative_pdf_path = os.path.join("documents/pdf", pdf_filename)
-            absolute_pdf_path = os.path.join(settings.MEDIA_ROOT, relative_pdf_path)
-
-            # Save the PDF
-            try:
-                CoInitialize()
-                word = CreateObject("Word.Application")
-                word.Visible = False
-                doc = word.Documents.Open(os.path.abspath(word_path))
-                doc.SaveAs(os.path.abspath(absolute_pdf_path), FileFormat=17)
-                doc.Close()
-                word.Quit()
-                CoUninitialize()
-
-                # ✅ Save the relative path to the FileField
-                document.pdf_file.name = relative_pdf_path
-                document.save()
-
-            except Exception as e:
-                try:
-                    CoUninitialize()
-                except:
-                    pass
-                return HttpResponse(f"Error converting to PDF: {e}", status=500)
-
+            print("Redirecting to document_list")
             return redirect("document_list")
+        else:
+            print("Formset errors:", formset.errors)
+            print("Non-form errors:", formset.non_form_errors())
     else:
-        form = DocumentForm()
-    return render(request, "documents/create_document.html", {"form": form})
-
+        print("GET request received")
+        formset = DocumentFormSet()
+    
+    return render(request, "documents/create_document.html", {"formset": formset})
 
 def register(request):
     if request.method == "POST":
@@ -200,6 +236,7 @@ def document_list(request):
         documents = documents.filter(email_sent=(send_email.lower() == 'sent'))
 
     distinct_companies = Document.objects.values_list('company_name', flat=True).distinct()
+    distinct_type = Document.objects.values_list('document_type', flat=True).distinct()
     distinct_created_by = User.objects.filter(id__in=Document.objects.values_list('created_by', flat=True).distinct())
     distinct_approved_by = User.objects.filter(id__in=Document.objects.values_list('approved_by', flat=True).distinct())
 
@@ -215,6 +252,7 @@ def document_list(request):
             'send_email': send_email,
         },
         "distinct_companies": distinct_companies,
+        "distinct_type": distinct_type,
         "distinct_created_by": distinct_created_by,
         "distinct_approved_by": distinct_approved_by
     })
@@ -304,7 +342,10 @@ def send_approved_email(request, document_id):
     # Define recipient, CC, and attachment
 
     # Main recipient
-    recipient = [document.contact_person_email]
+    raw_recipients = document.contact_person_email  # e.g., "email1@example.com, email2@example.com"
+    recipient = [email.strip() for email in raw_recipients.split(",") if email.strip()] # in case of multiple emails
+
+    # recipient = [document.contact_person_email]
 
     # Get Sales Rep email
     sales_rep_email = User.objects.filter(username=document.sales_rep).values_list("email", flat=True)

@@ -8,7 +8,13 @@ class Document(models.Model):
         ('approved', 'Approved'),
     ]
 
-    document_type = models.CharField(max_length=20, choices=[('approval', 'Approval Letter'), ('sla', 'SLA Document')])
+    DOCUMENT_TYPE_CHOICES = [
+        ('approval', 'Approval Letter'),
+        ('sla', 'SLA Document'),
+        ('Uploaded', 'Uploaded Document'),
+    ]
+
+    document_type = models.CharField(max_length=20, choices=DOCUMENT_TYPE_CHOICES)
     company_name = models.CharField(max_length=255)
     company_address = models.TextField()
     contact_person_name = models.CharField(max_length=255)
@@ -23,6 +29,7 @@ class Document(models.Model):
 
     word_file = models.FileField(upload_to="documents/word/")
     pdf_file = models.FileField(upload_to="documents/pdf/", null=True, blank=True)
+    # uploaded_file = models.FileField(upload_to='documents/', blank=True, null=True)
 
     email_sent = models.BooleanField(default=False)  # Track if email was sent
 
