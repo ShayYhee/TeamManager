@@ -9,7 +9,8 @@ from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
 from django.conf import settings
 from django.forms import formset_factory
 from django.db.models import Q
-from .forms import DocumentForm, SignUpForm
+from django.utils.text import slugify
+from .forms import DocumentForm, SignUpForm, CreateDocumentForm
 from .models import Document, CustomUser, Role
 from .placeholders import replace_placeholders
 from docx import Document as DocxDocument
@@ -18,6 +19,7 @@ from comtypes.client import CreateObject
 # from win32com.client import Dispatch, constants, gencache
 import pdfkit
 from doc_system import settings
+from html2docx import html2docx
 import os
 from docx2txt import process
 from datetime import datetime
@@ -452,3 +454,160 @@ def delete_document(request, document_id):
 
     document.delete()
     return redirect("document_list")  # Redirect back to the list
+
+from docx import Document as DocxDocument
+from docx.shared import Pt, Inches
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from bs4 import BeautifulSoup
+from django.shortcuts import render, redirect
+from django.http import HttpResponse
+from django.conf import settings
+from django.utils.text import slugify
+import os
+import requests
+import io
+import urllib.parse
+
+# def create_from_editor(request):
+#     if request.method == "POST":
+#         form = CreateDocumentForm(request.POST)
+#         if form.is_valid():
+#             title = form.cleaned_data["title"]
+#             content = form.cleaned_data["content"]
+
+#             # Create a .docx file
+#             doc = DocxDocument()
+#             doc.add_paragraph(content)
+
+#             word_dir = os.path.join(settings.MEDIA_ROOT, "documents/word")
+#             pdf_dir = os.path.join(settings.MEDIA_ROOT, "documents/pdf")
+#             os.makedirs(word_dir, exist_ok=True)
+#             os.makedirs(pdf_dir, exist_ok=True)
+
+#             word_filename = f"{slugify(title)}.docx"
+#             word_path = os.path.join(word_dir, word_filename)
+#             doc.save(word_path)
+
+#             # Create a .pdf file
+#             # pdf_filename = word_filename.replace('.docx', ".pdf")
+#             # pdf_path = os.path.join(pdf_dir, pdf_filename)
+#             # pdfkit.from_file(word_path, pdf_path)
+
+#             try:
+#                 # doc = HTML2DOCX()
+#                 doc = html2docx(content=content, title=title)
+#                 # doc.add(content,title=title)
+#                 # new_doc.add_html_to_document(content, doc)
+#                 # doc.add_html
+#                 doc.save(word_path)
+#             except Exception as e:
+#                 return HttpResponse(f"Error creating .docx: {e}", status=500)
+#             # Save to database
+#             # ...
+
+#             return redirect("document_list")
+#         else:
+#             print("Form errors:", form.errors)  # Debug
+#     else:
+#         form = CreateDocumentForm()
+#     return render(request, 'documents/create_from_editor.html', {'form': form})
+
+def add_formatted_content(doc, soup, word_dir):
+    """Parse HTML and add formatted content and images to the .docx document."""
+    for element in soup.recursiveChildGenerator():
+        if element.name == 'h1':
+            paragraph = doc.add_heading(element.get_text(), level=1)
+        elif element.name == 'h2':
+            paragraph = doc.add_heading(element.get_text(), level=2)
+        elif element.name == 'p':
+            paragraph = doc.add_paragraph(element.get_text())
+        elif element.name == 'strong':
+            paragraph = doc.add_paragraph()
+            run = paragraph.add_run(element.get_text())
+            run.bold = True
+        elif element.name == 'em':
+            paragraph = doc.add_paragraph()
+            run = paragraph.add_run(element.get_text())
+            run.italic = True
+        elif element.name == 'ul':
+            for li in element.find_all('li'):
+                paragraph = doc.add_paragraph(li.get_text(), style='ListBullet')
+        elif element.name == 'ol':
+            for li in element.find_all('li'):
+                paragraph = doc.add_paragraph(li.get_text(), style='ListNumber')
+        elif element.name == 'img':
+            img_src = element.get('src')
+            if img_src:
+                try:
+                    # Normalize the image URL
+                    parsed_src = urllib.parse.urlparse(img_src)
+                    if parsed_src.scheme in ('http', 'https'):
+                        # Handle remote images
+                        print(f"Downloading remote image: {img_src}")
+                        response = requests.get(img_src, timeout=5)
+                        if response.status_code == 200:
+                            img_data = io.BytesIO(response.content)
+                            doc.add_picture(img_data, width=Inches(4.0))
+                        else:
+                            print(f"Failed to download image: {img_src} (Status: {response.status_code})")
+                    else:
+                        # Handle local images
+                        # Remove leading slashes and normalize path
+                        clean_src = img_src.lstrip('/')
+                        img_path = os.path.join(settings.MEDIA_ROOT, clean_src)
+                        img_path = os.path.normpath(img_path)  # Normalize path for the OS
+                        print(f"Attempting to add local image: {img_path}")
+                        if os.path.exists(img_path):
+                            doc.add_picture(img_path, width=Inches(4.0))
+                        else:
+                            print(f"Local image not found: {img_path}")
+                except Exception as e:
+                    print(f"Error adding image {img_src}: {e}")
+
+def create_from_editor(request):
+    if request.method == "POST":
+        form = CreateDocumentForm(request.POST)
+        if form.is_valid():
+            title = form.cleaned_data["title"]
+            content = form.cleaned_data["content"]
+
+            # Create a .docx file
+            doc = DocxDocument()
+            
+            # Parse HTML content using BeautifulSoup
+            soup = BeautifulSoup(content, 'html.parser')
+
+            # Define file paths
+            word_dir = os.path.join(settings.MEDIA_ROOT, "documents/word")
+            pdf_dir = os.path.join(settings.MEDIA_ROOT, "documents/pdf")
+            os.makedirs(word_dir, exist_ok=True)
+            os.makedirs(pdf_dir, exist_ok=True)
+
+            # Add title as heading
+            # doc.add_heading(title, level=1)
+
+            # Add formatted content and images
+            add_formatted_content(doc, soup, word_dir)
+
+            # Save the .docx file
+            word_filename = f"{slugify(title)}.docx"
+            word_path = os.path.join(word_dir, word_filename)
+            try:
+                doc.save(word_path)
+            except Exception as e:
+                return HttpResponse(f"Error creating .docx: {e}", status=500)
+
+            # Optionally, create a .pdf file (uncomment if needed)
+            # pdf_filename = word_filename.replace('.docx', ".pdf")
+            # pdf_path = os.path.join(pdf_dir, pdf_filename)
+            # pdfkit.from_file(word_path, pdf_path)
+
+            # Save to database (implement as needed)
+            # ...
+
+            return redirect("document_list")
+        else:
+            print("Form errors:", form.errors)  # Debug
+    else:
+        form = CreateDocumentForm()
+    return render(request, 'documents/create_from_editor.html', {'form': form})

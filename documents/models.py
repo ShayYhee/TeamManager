@@ -14,6 +14,12 @@ class Document(models.Model):
         ('Uploaded', 'Uploaded Document'),
     ]
 
+    DOCUMENT_SOURCE_CHOICES = [
+        ('template', 'Use Template'),
+        ('upload', 'Upload Document'),
+        ('editor', 'Created in Editor'),
+    ]
+
     document_type = models.CharField(max_length=20, choices=DOCUMENT_TYPE_CHOICES)
     company_name = models.CharField(max_length=255)
     company_address = models.TextField()
@@ -30,6 +36,8 @@ class Document(models.Model):
     word_file = models.FileField(upload_to="documents/word/")
     pdf_file = models.FileField(upload_to="documents/pdf/", null=True, blank=True)
     # uploaded_file = models.FileField(upload_to='documents/', blank=True, null=True)
+
+    document_source = models.CharField(max_length=20, choices=DOCUMENT_SOURCE_CHOICES, default='template')
 
     email_sent = models.BooleanField(default=False)  # Track if email was sent
 

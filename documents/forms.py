@@ -1,5 +1,7 @@
 from django import forms
 from .models import Document, User, CustomUser
+from ckeditor.widgets import CKEditorWidget
+from ckeditor_uploader.widgets import CKEditorUploadingWidget
 
 class DocumentForm(forms.ModelForm):
     creation_method = forms.ChoiceField(
@@ -71,7 +73,17 @@ class DocumentForm(forms.ModelForm):
             instance.save()
         return instance
 
-
+class CreateDocumentForm(forms.Form):
+    title = forms.CharField(
+        max_length=255,
+        required=True,
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Enter Document Title'})
+    )
+    content = forms.CharField(
+        widget=CKEditorUploadingWidget(config_name='custom_toolbar'),
+        required=True
+    )
+    
 class SignUpForm(forms.ModelForm):
     password = forms.CharField(widget=forms.PasswordInput(attrs={"class": "form-control"}))
     password_confirm = forms.CharField(widget=forms.PasswordInput(attrs={"class": "form-control"}))

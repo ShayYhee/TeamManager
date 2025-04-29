@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+    <div class="container mt-4">
+        <h1>New Document</h1>
+
+        {% if form.errors %}
+            <div class="alert alert-danger">
+                <ul>
+                    {% for field, errors in form.errors.items %}
+                        <li>{{ field }}: {{ errors }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        {% endif %}
+
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <div class="mb-3">
+                {{ form.title.label_tag }}
+                {{ form.title }}
+                {{ form.title.errors }}
+            </div>
+            <div class="mb-3">
+                {{ form.content.label_tag }}<br>
+                {{ form.content }}
+                {{ form.content.errors }}
+            </div>
+            <button type="submit" class="btn btn-primary">Save Document</button>
+        </form>
+    </div>
+
+    <!-- Ensure CKEditor scripts are loaded -->
+    <script src="{% static 'ckeditor/ckeditor-init.js' %}"></script>
+    <script src="{% static 'ckeditor/ckeditor/ckeditor.js' %}"></script>
+
+    <!-- Debug CKEditor initialization -->
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('CKEditor script loaded:', typeof CKEDITOR !== 'undefined');
+        if (typeof CKEDITOR === 'undefined') {
+            console.error('CKEditor not loaded');
+        } else {
+            console.log('CKEditor version:', CKEDITOR.version);
+        }
+    });
+    </script>
+
+{% endblock %}
