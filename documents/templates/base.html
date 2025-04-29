@@ -5,7 +5,7 @@
 {% endif %} {% endcomment %}
 
 
-<!DOCTYPE html>
+{% comment %} <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -35,5 +35,108 @@
     <div class="mt-4">
         {% block content %}{% endblock %}
     </div>
+</body>
+</html> {% endcomment %}
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Document System{% endblock %}</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+        .sidebar {
+            height: 100vh;
+            width: 250px;
+            position: fixed;
+            top: 0;
+            left: 0;
+            background-color: #343a40;
+            padding-top: 20px;
+            transition: all 0.3s;
+            overflow-x: hidden;
+        }
+        .sidebar.closed {
+            width: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+        .sidebar a {
+            color: white;
+            display: block;
+            padding: 10px 20px;
+            text-decoration: none;
+        }
+        .sidebar a:hover {
+            background-color: #495057;
+            border-radius: 5px;
+        }
+        .main-content {
+            margin-left: 260px;
+            padding: 20px;
+            transition: margin-left 0.3s;
+        }
+        .main-content.expanded {
+            margin-left: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+        <h4 class="text-white text-center mb-4">Doc System</h4>
+        <a href="{% url 'document_list' %}">📄 Document List</a>
+        <a href="{% url 'create_document' %}">⚡ Generate Document</a>
+        <a href="{% url 'create_from_editor' %}">📝 Document Editor</a>
+        {% comment %} <a href="{% url 'my_folder' %}">📁 My Folder</a> {% endcomment %}
+    </div>
+
+    <!-- Navbar -->
+    <nav class="navbar navbar-light bg-light" style="margin-left: 250px;" id="navbar">
+        <div class="container-fluid">
+            <button class="btn btn-outline-primary" onclick="toggleSidebar()">☰</button>
+            <a class="navbar-brand ms-3" href="/">Document Automation</a>
+            <div>
+                {% if user.is_authenticated %}
+                    <span>Welcome, {{ user.username }} |</span>
+                    <form action="{% url 'logout' %}" method="post" style="display: inline;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-link" style="padding: 0; border: none; background: none; color: blue; cursor: pointer;">
+                            Logout
+                        </button>
+                    </form>
+                {% else %}
+                    <a href="{% url 'login' %}">Login</a>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="main-content" id="main-content">
+        {% block content %}
+        {% endblock %}
+    </div>
+
+    <script>
+        function toggleSidebar() {
+            var sidebar = document.getElementById("sidebar");
+            var mainContent = document.getElementById("main-content");
+            var navbar = document.getElementById("navbar");
+
+            sidebar.classList.toggle("closed");
+            mainContent.classList.toggle("expanded");
+            navbar.style.marginLeft = sidebar.classList.contains("closed") ? "10px" : "250px";
+        }
+    </script>
+
 </body>
 </html>

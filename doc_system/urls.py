@@ -30,6 +30,7 @@ urlpatterns = [
     path("", home_redirect, name="home"),
     path("documents/", include("documents.urls")),
     path("accounts/", include("django.contrib.auth.urls")),  # Built-in auth views
+    path('ckeditor/', include('ckeditor_uploader.urls')),
     # path("register/", register, name="register"),  # Custom signup
     path("approve/<int:document_id>/", approve_document, name="approve_document"),
     path("send-email/<int:document_id>/", send_approved_email, name="send_approved_email"),
@@ -39,3 +40,4 @@ urlpatterns = [
 # Serve media files in development
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

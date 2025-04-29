@@ -19,6 +19,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = os.path.join(BASE_DIR, "media")
+
 LOGIN_REDIRECT_URL = "document_list"  # Redirect to dashboard after login
 LOGOUT_REDIRECT_URL = "login"  # Redirect to login after logout
 PDFKIT_CONFIG = {
@@ -59,6 +60,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',  # API support
     'documents',  # Our app
+    'ckeditor',
+    'ckeditor_uploader',
 ]
 
 MIDDLEWARE = [
@@ -106,6 +109,39 @@ DATABASES = {
     }
 }
 
+# CKEditor upload path
+CKEDITOR_UPLOAD_PATH = "Uploads/"
+# CKEDITOR_IMAGE_BACKEND = "pillow"
+
+CKEDITOR_CONFIGS = {
+    'default': {
+        'toolbar': 'Basic',
+    },
+    'custom_toolbar': {
+        'toolbar': 'Custom',
+        'toolbar_Custom': [
+            ['Bold', 'Italic', 'Underline', 'Strike', '-', 'RemoveFormat'],
+            ['FontSize', 'Font', 'TextColor', 'BGColor'],
+            ['NumberedList', 'BulletedList', '-', 'Blockquote'],
+            ['JustifyLeft', 'JustifyCenter', 'JustifyRight'],
+            ['Link', 'Unlink', 'Image', 'Embed'],
+            ['Format', 'Styles'],
+            ['Source']
+        ],
+        'height': 400,
+        'width': 'auto',
+        'extraPlugins': ','.join([
+            'uploadimage',  # upload images
+            'embed',        # media embeds
+            'autoembed',
+        ]),
+        'filebrowserUploadUrl': '/ckeditor/upload/',
+        'removePlugins': 'stylesheetparser',
+    },
+}
+
+
+
 
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
@@ -142,6 +178,10 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, 'static'),
+]
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
