@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>{{ task.title }}</h2>
+
+<p><strong>Description:</strong></p>
+<div>{{ task.description|linebreaks }}</div>
+
+<p><strong>Status:</strong> {{ task.get_status_display }}</p>
+<p><strong>Assigned To:</strong> {{ task.assigned_to|default:"Unassigned" }}</p>
+<p><strong>Due Date:</strong> {{ task.due_date|date:"M d, Y" }}</p>
+<p><strong>Folder:</strong> {{ task.folder }}</p>
+
+{% if task.documents.exists %}
+    <p><strong>Attached Documents:</strong></p>
+    <ul>
+        {% for doc in task.documents.all %}
+            <li>{{ doc.company_name }} - <a href="{{ doc.pdf_file.url }}" target="_blank">View PDF</a></li>
+        {% endfor %}
+    </ul>
+{% endif %}
+
+<a href="{% url 'task_list' %}" class="btn btn-secondary">Back to Tasks</a>
+{% endblock %}

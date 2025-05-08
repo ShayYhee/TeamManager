@@ -1,0 +1,115 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>🗂 Task Board </h2> {% comment %} (Kanban) {% endcomment %}
+<a href="{% url 'create_task' %}" class="btn btn-primary mb-3">+ New Task</a>
+
+<style>
+.kanban-column {
+  min-height: 300px;
+  background: #f9f9f9;
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+}
+.task-card {
+  background: white;
+  padding: 10px;
+  margin-bottom: 10px;
+  border-left: 5px solid #007bff;
+  border-radius: 4px;
+  cursor: move;
+}
+.task-card.completed { border-left-color: #28a745; }
+.task-card.on_hold { border-left-color: #ffc107; }
+.task-card.cancelled { border-left-color: #dc3545; }
+.task-card.in_progress { border-left-color: #17a2b8; }
+</style>
+
+<div class="row">
+  {% comment %} {% for status, label in [('pending', 'Pending'), ('in_progress', 'In Progress'), ('on_hold', 'On Hold'), ('completed', 'Completed'), ('cancelled', 'Cancelled')] %} {% endcomment %}
+  {% for pair in status_labels %}
+    {% with status=pair.0 label=pair.1 %}
+      <div class="col-md-2">
+        <div class="card mb-4">
+          <div class="card-header text-center bg-light">
+            <strong>{{ label }}</strong>
+          </div>
+          <div class="kanban-column" data-status="{{ status }}">
+            {% for task in tasks|dictsort:'due_date' %}
+              {% if task.status == status %}
+              <div class="task-card {{ task.status }}" draggable="true" data-id="{{ task.id }}">
+                <strong>{{ task.title }}</strong><br>
+                <small>Due: {{ task.due_date|date:"M d" }}</small><br>
+                <small>{{ task.assigned_to|default:"Unassigned" }}</small><br>
+                <a href="{% url 'task_detail' task.id %}" class="btn btn-sm btn-outline-secondary mt-1">View</a>
+              </div>
+              {% endif %}
+            {% endfor %}
+          </div>
+        </div>
+     </div>
+    {% endwith %}
+  {% endfor %}
+</div>
+
+<script>
+  let dragged;
+  document.querySelectorAll('.task-card').forEach(card => {
+    card.addEventListener('dragstart', (e) => {
+      dragged = card;
+      e.dataTransfer.effectAllowed = 'move';
+    });
+  });
+
+  document.querySelectorAll('.kanban-column').forEach(column => {
+    column.addEventListener('dragover', (e) => {
+      e.preventDefault();
+    });
+    column.addEventListener('drop', (e) => {
+      e.preventDefault();
+      if (dragged) {
+        column.appendChild(dragged);
+        const taskId = dragged.getAttribute('data-id');
+        const newStatus = column.dataset.status;
+
+        fetch(`/documents/tasks/${taskId}/update-status/`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken')
+          },
+          body: JSON.stringify({ status: newStatus })
+        })
+        .then(response => {
+          if (!response.ok) throw new Error('Failed to update task');
+          return response.json();
+        })
+        .then(data => {
+          console.log("Status updated:", data);
+        })
+        .catch(error => {
+          alert("Error updating task status.");
+          console.error(error);
+        });
+      }
+    });
+  });
+
+  function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+      const cookies = document.cookie.split(';');
+      for (let i = 0; i < cookies.length; i++) {
+        const cookie = cookies[i].trim();
+        if (cookie.substring(0, name.length + 1) === (name + '=')) {
+          cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+          break;
+        }
+      }
+    }
+    return cookieValue;
+  }
+</script>
+
+{% endblock %}

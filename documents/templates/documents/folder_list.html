@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>📁 {{ parent.name|default:"My Folders" }}</h2>
+
+<!-- Subfolders -->
+<div class="mb-4">
+  <h5>Subfolders</h5>
+  <ul>
+    {% for folder in folders %}
+      <li>
+        <a href="{% url 'folder_list' folder.id %}">{{ folder.name }}</a>
+      </li>
+    {% empty %}
+      <li>No folders here.</li>
+    {% endfor %}
+  </ul>
+</div>
+
+<!-- Files in Folder -->
+<div class="mb-4">
+  <h5>Files</h5>
+  <ul>
+    {% for file in files %}
+      <li>
+        <a href="{{ file.file.url }}" target="_blank">{{ file.original_name }}</a>
+      </li>
+    {% empty %}
+      <li>No files uploaded yet.</li>
+    {% endfor %}
+  </ul>
+</div>
+
+<!-- New Folder Form -->
+<div class="mb-4">
+  <h5>Create New Folder</h5>
+  <form method="post" action="{% url 'create_folder' %}">
+    {% csrf_token %}
+    {{ folder_form.as_p }}
+    <button type="submit" class="btn btn-primary">Create Folder</button>
+  </form>
+</div>
+
+<!-- File Upload Form -->
+<div class="mb-4">
+  <h5>Upload File</h5>
+  <form method="post" action="{% url 'upload_file' %}" enctype="multipart/form-data">
+    {% csrf_token %}
+    <input type="hidden" name="folder" value="{{ parent.id }}">
+    <div class="mb-2">
+      {{ file_form.file.label_tag }}
+      {{ file_form.file }}
+    </div>
+    <button type="submit" class="btn btn-success">Upload</button>
+  </form>
+</div>
+
+
+<!-- Back to parent -->
+{% if parent.parent %}
+  <a href="{% url 'folder_list' parent.parent.id %}" class="btn btn-link">⬅️ Back to {{ parent.parent.name }}</a>
+{% elif parent %}
+  <a href="{% url 'folder_list' %}" class="btn btn-link">⬅️ Back to Root</a>
+{% endif %}
+
+{% endblock %}

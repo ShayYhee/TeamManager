@@ -10,8 +10,8 @@ from django.conf import settings
 from django.forms import formset_factory
 from django.db.models import Q
 from django.utils.text import slugify
-from .forms import DocumentForm, SignUpForm, CreateDocumentForm
-from .models import Document, CustomUser, Role
+from .forms import DocumentForm, SignUpForm, CreateDocumentForm, FileUploadForm, FolderForm, TaskForm
+from .models import Document, CustomUser, Role, File, Folder, Task
 from .placeholders import replace_placeholders
 from docx import Document as DocxDocument
 from comtypes import CoInitialize, CoUninitialize
@@ -611,3 +611,95 @@ def create_from_editor(request):
     else:
         form = CreateDocumentForm()
     return render(request, 'documents/create_from_editor.html', {'form': form})
+
+
+@login_required
+def folder_list(request, parent_id=None):
+    parent = None
+    if parent_id:
+        parent = get_object_or_404(Folder, id=parent_id, created_by=request.user)
+
+    folders = Folder.objects.filter(created_by=request.user, parent=parent)
+    files = File.objects.filter(folder=parent, uploaded_by=request.user)
+
+    folder_form = FolderForm(initial={'parent': parent})
+    file_form = FileUploadForm()
+
+    return render(request, 'documents/folder_list.html', {
+        'parent': parent,
+        'folders': folders,
+        'files': files,
+        'folder_form': folder_form,
+        'file_form': file_form,
+    })
+
+@login_required
+def create_folder(request):
+    if request.method == 'POST':
+        form = FolderForm(request.POST)
+        if form.is_valid():
+            folder = form.save(commit=False)
+            folder.created_by = request.user
+            folder.save()
+    return redirect(request.META.get('HTTP_REFERER', 'folder_list'))
+
+@login_required
+def upload_file(request):
+    if request.method == 'POST':
+        form = FileUploadForm(request.POST, request.FILES)
+        if form.is_valid():
+            uploaded_file = form.save(commit=False)
+            uploaded_file.uploaded_by = request.user
+            uploaded_file.original_name = request.FILES['file'].name
+            uploaded_file.save()
+    return redirect(request.META.get('HTTP_REFERER', 'folder_list'))
+
+@login_required
+def create_task(request):
+    if request.method == 'POST':
+        form = TaskForm(request.POST)
+        if form.is_valid():
+            task = form.save(commit=False)
+            task.created_by = request.user
+            task.save()
+            form.save_m2m()  # Save documents relationship
+            return redirect('task_list')  # You will define this page later
+    else:
+        form = TaskForm()
+    return render(request, 'documents/create_task.html', {'form': form})
+
+@login_required
+def task_list(request):
+    tasks = Task.objects.all()
+    status_labels = [
+        ('pending', 'Pending'),
+        ('in_progress', 'In Progress'),
+        ('on_hold', 'On Hold'),
+        ('completed', 'Completed'),
+        ('cancelled', 'Cancelled'),
+    ]
+    return render(request, 'documents/task_list.html', {'tasks': tasks, 'status_labels': status_labels})
+
+@login_required
+def task_detail(request, task_id):
+    task = get_object_or_404(Task, id=task_id)
+    return render(request, 'documents/task_detail.html', {'task': task})
+
+
+
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+import json
+
+@csrf_exempt
+@login_required
+def update_task_status(request, task_id):
+    if request.method == 'POST':
+        task = get_object_or_404(Task, id=task_id)
+        data = json.loads(request.body)
+        new_status = data.get('status')
+        if new_status in dict(Task.STATUS_CHOICES):
+            task.status = new_status
+            task.save()
+            return JsonResponse({'success': True, 'status': task.status})
+    return JsonResponse({'error': 'Invalid request'}, status=400)
