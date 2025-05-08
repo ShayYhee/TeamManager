@@ -1,5 +1,5 @@
 from django import forms
-from .models import Document, User, CustomUser
+from .models import Document, User, CustomUser, Folder, File, Task
 from ckeditor.widgets import CKEditorWidget
 from ckeditor_uploader.widgets import CKEditorUploadingWidget
 
@@ -104,3 +104,36 @@ class UserForm(forms.ModelForm):
     class Meta:
         model = CustomUser
         fields = ["username", "email", "phone_number", "roles", "position"]
+
+
+class FolderForm(forms.ModelForm):
+    class Meta:
+        model = Folder
+        fields = ['name', 'parent']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'parent': forms.HiddenInput(),
+        }
+
+class FileUploadForm(forms.ModelForm):
+    class Meta:
+        model = File
+        fields = ['folder', 'file']
+        widgets = {
+            'folder': forms.HiddenInput(),
+        }
+
+
+class TaskForm(forms.ModelForm):
+    class Meta:
+        model = Task
+        fields = ['title', 'description', 'documents', 'folder', 'assigned_to', 'due_date', 'status']
+        widgets = {
+            'title': forms.TextInput(attrs={'class': 'form-control'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 5}),
+            'documents': forms.SelectMultiple(attrs={'class': 'form-control'}),
+            'folder': forms.Select(attrs={'class': 'form-control'}),
+            'assigned_to': forms.Select(attrs={'class': 'form-control'}),
+            'due_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+            'status': forms.Select(attrs={'class': 'form-control'}),
+        }
