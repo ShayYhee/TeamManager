@@ -10,7 +10,7 @@ from django.conf import settings
 from django.forms import formset_factory
 from django.db.models import Q
 from django.utils.text import slugify
-from .forms import DocumentForm, SignUpForm, CreateDocumentForm, FileUploadForm, FolderForm, TaskForm
+from .forms import DocumentForm, SignUpForm, CreateDocumentForm, FileUploadForm, FolderForm, TaskForm, ReassignTaskForm
 from .models import Document, CustomUser, Role, File, Folder, Task
 from .placeholders import replace_placeholders
 from docx import Document as DocxDocument
@@ -22,7 +22,7 @@ from doc_system import settings
 from html2docx import html2docx
 import os
 from docx2txt import process
-from datetime import datetime
+from datetime import datetime, date
 import smtplib
 
 
@@ -671,14 +671,23 @@ def create_task(request):
 @login_required
 def task_list(request):
     tasks = Task.objects.all()
-    status_labels = [
-        ('pending', 'Pending'),
-        ('in_progress', 'In Progress'),
-        ('on_hold', 'On Hold'),
-        ('completed', 'Completed'),
-        ('cancelled', 'Cancelled'),
-    ]
-    return render(request, 'documents/task_list.html', {'tasks': tasks, 'status_labels': status_labels})
+    users = User.objects.all()
+    status_labels = Task.STATUS_CHOICES
+    context = {
+        'tasks': tasks,
+        'status_labels': status_labels,
+        'today': date.today(),
+        'user': request.user,
+        'users': users,
+    }
+    # status_labels = [
+    #     ('pending', 'Pending'),
+    #     ('in_progress', 'In Progress'),
+    #     ('on_hold', 'On Hold'),
+    #     ('completed', 'Completed'),
+    #     ('cancelled', 'Cancelled'),
+    # ]
+    return render(request, 'documents/task_list.html', context)
 
 @login_required
 def task_detail(request, task_id):
@@ -703,3 +712,24 @@ def update_task_status(request, task_id):
             task.save()
             return JsonResponse({'success': True, 'status': task.status})
     return JsonResponse({'error': 'Invalid request'}, status=400)
+
+
+@login_required
+def reassign_task(request, task_id):
+    task = get_object_or_404(Task, id=task_id)
+    if request.method == 'POST':
+        form = ReassignTaskForm(request.POST, instance=task)
+        if form.is_valid():
+            form.save()
+            return redirect('task_list')
+    else:
+        form = ReassignTaskForm(instance=task)
+    return render(request, 'documents/reassign_task.html', {'form': form, 'task': task})
+
+@login_required
+def delete_task(request, task_id):
+    task = get_object_or_404(Task, id=task_id)
+    if request.method == 'POST':
+        task.delete()
+        return redirect('task_list')
+    return render(request, 'documents/confirm_delete.html', {'task': task})
