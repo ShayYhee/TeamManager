@@ -7,7 +7,20 @@
 <div>{{ task.description|linebreaks }}</div>
 
 <p><strong>Status:</strong> {{ task.get_status_display }}</p>
-<p><strong>Assigned To:</strong> {{ task.assigned_to|default:"Unassigned" }}</p>
+<p><strong>Created By:</strong>
+    {% if task.created_by == user %}
+        You
+    {% else %}
+        {{ task.created_by|default:"N/A" }}
+    {% endif %}
+</p>
+<p><strong>Assigned To:</strong> 
+    {% if task.assigned_to == user %}
+        You
+    {% else %}
+        {{ task.assigned_to|default:"Unassigned" }}
+    {% endif %}
+</p>
 <p><strong>Due Date:</strong> {{ task.due_date|date:"M d, Y" }}</p>
 <p><strong>Folder:</strong> {{ task.folder }}</p>
 

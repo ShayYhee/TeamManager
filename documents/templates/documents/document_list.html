@@ -82,7 +82,14 @@
         <td>{{ document.document_type }}</td>
         <td>{{ document.status }}</td>
         <td>{{ document.created_at }}</td>
-        <td>{{ document.created_by.username }}</td>
+        {% comment %} <td>{{ document.created_by.username }}</td> {% endcomment %}
+        <td>
+            {% if document.created_by == user %}
+                You
+            {% else %}
+                {{ document.created_by.username|default:"N/A" }}
+            {% endif %}
+        </td>
         <td>
             {% if document.pdf_file %}
                 <button class="view-btn" onclick="viewDocument('{{ document.pdf_file.url }}'); console.log('Button clicked')">View</button>

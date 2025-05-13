@@ -2,6 +2,9 @@ from django import forms
 from .models import Document, User, CustomUser, Folder, File, Task
 from ckeditor.widgets import CKEditorWidget
 from ckeditor_uploader.widgets import CKEditorUploadingWidget
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
 
 class DocumentForm(forms.ModelForm):
     creation_method = forms.ChoiceField(
@@ -136,4 +139,13 @@ class TaskForm(forms.ModelForm):
             'assigned_to': forms.Select(attrs={'class': 'form-control'}),
             'due_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
             'status': forms.Select(attrs={'class': 'form-control'}),
+        }
+
+class ReassignTaskForm(forms.ModelForm):
+    class Meta:
+        model = Task
+        fields = ['assigned_to', 'due_date']
+        widgets = {
+            'assigned_to': forms.Select(attrs={'class': 'form-control'}),
+            'due_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'},)
         }
