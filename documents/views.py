@@ -3,6 +3,7 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.models import User
 from django.contrib.auth import login, get_user_model
 from django.contrib.auth.signals import user_logged_in
+from django.contrib import messages
 from django.core.mail import send_mail, EmailMessage, get_connection
 from django.dispatch import receiver
 from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
@@ -10,8 +11,8 @@ from django.conf import settings
 from django.forms import formset_factory
 from django.db.models import Q
 from django.utils.text import slugify
-from .forms import DocumentForm, SignUpForm, CreateDocumentForm, FileUploadForm, FolderForm, TaskForm, ReassignTaskForm
-from .models import Document, CustomUser, Role, File, Folder, Task
+from .forms import DocumentForm, SignUpForm, CreateDocumentForm, FileUploadForm, FolderForm, TaskForm, ReassignTaskForm, StaffProfileForm
+from .models import Document, CustomUser, Role, File, Folder, Task, StaffProfile
 from .placeholders import replace_placeholders
 from docx import Document as DocxDocument
 from comtypes import CoInitialize, CoUninitialize
@@ -20,11 +21,18 @@ from comtypes.client import CreateObject
 import pdfkit
 from doc_system import settings
 from html2docx import html2docx
-import os
 from docx2txt import process
 from datetime import datetime, date
 import smtplib
-
+from docx import Document as DocxDocument
+from docx.shared import Pt, Inches
+from docx.enum.text import WD_ALIGN_PARAGRAPH
+from bs4 import BeautifulSoup
+from django.http import HttpResponse
+import os
+import requests
+import io
+import urllib.parse
 
 pdf_config = pdfkit.configuration(wkhtmltopdf=r"C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe")  # Set full path
 
@@ -455,18 +463,6 @@ def delete_document(request, document_id):
     document.delete()
     return redirect("document_list")  # Redirect back to the list
 
-from docx import Document as DocxDocument
-from docx.shared import Pt, Inches
-from docx.enum.text import WD_ALIGN_PARAGRAPH
-from bs4 import BeautifulSoup
-from django.shortcuts import render, redirect
-from django.http import HttpResponse
-from django.conf import settings
-from django.utils.text import slugify
-import os
-import requests
-import io
-import urllib.parse
 
 # def create_from_editor(request):
 #     if request.method == "POST":
@@ -733,3 +729,80 @@ def delete_task(request, task_id):
         task.delete()
         return redirect('task_list')
     return render(request, 'documents/confirm_delete.html', {'task': task})
+
+@login_required
+def view_my_profile(request):
+    profile, created = StaffProfile.objects.get_or_create(user=request.user)
+    visible_fields = [
+            "photo",
+            "first_name", "last_name", "middle_name", "email", "phone_number", "sex", "date_of_birth", "home_address",
+            "state_of_origin", "lga", "religion",
+            "institution", "course", "degree", "graduation_year",
+            "account_number", "bank_name", "account_name",
+            "location", "employment_date",
+            "organization", "department", "team", "designation", "official_email",
+            "emergency_name", "emergency_relationship", "emergency_phone",
+            "emergency_address", "emergency_email",
+        ]
+    return render(request, "documents/my_profile.html", {"profile": profile, "visible_fields": visible_fields})
+
+
+@login_required
+def edit_my_profile(request):
+    profile, created = StaffProfile.objects.get_or_create(user=request.user)
+    if request.method == "POST":
+        form = StaffProfileForm(request.POST, request.FILES, instance=profile)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Your profile has been updated.")
+            return redirect("view_my_profile")
+    else:
+        form = StaffProfileForm(instance=profile)
+    return render(request, "documents/edit_profile.html", {"form": form})
+
+
+@login_required
+@user_passes_test(is_admin)
+def staff_directory(request):
+    profiles = StaffProfile.objects.select_related("user", "organization").prefetch_related("team", "department").all()
+    print(f"Profiles found: {profiles.count()}")  # Debug: Verify profiles
+    
+    grouped = {}
+    for profile in profiles:
+        org = profile.organization.name if profile.organization else "Unassigned"
+        depts = profile.department.all()
+        if not depts:  # Handle profiles with no departments
+            depts = [None]
+        for dept in depts:
+            dept_name = dept.name if dept else "Unassigned"
+            teams = profile.team.all()
+            if not teams:  # Handle profiles with no teams
+                teams = [None]
+            for team in teams:
+                team_name = team.name if team else "No Team"
+                grouped.setdefault(org, {}).setdefault(dept_name, {}).setdefault(team_name, []).append(profile)
+    
+    print(f"Grouped dictionary: {grouped}")  # Debug: Inspect grouped structure
+    return render(request, "documents/staff_directory.html", {"grouped": grouped})
+
+
+@login_required
+def view_staff_profile(request, user_id):
+    profile = get_object_or_404(StaffProfile, user_id=user_id)
+    viewer = StaffProfile.objects.filter(user=request.user).first()
+    visible_fields = [
+        "photo", "full_name", "phone_number", "official_email", "sex", "religion", "designation"
+    ]
+
+    if viewer and profile.organization == viewer.organization:
+        visible_fields += ["organization", "department"]
+        if profile.department == viewer.department:
+            shared_teams = set(profile.team.values_list("id", flat=True)) & set(viewer.team.values_list("id", flat=True))
+            if shared_teams:
+                visible_fields += ["team"]
+
+    return render(request, "documents/view_staff_profile.html", {
+        "profile": profile,
+        "viewer": viewer,
+        "visible_fields": visible_fields,
+    })

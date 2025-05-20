@@ -1,10 +1,37 @@
 
 {% extends "base.html" %}
 {% block content %}
-<h2>Login</h2>
-<form method="POST">
-    {% csrf_token %}
-    {{ form.as_p }}
-    <button type="submit">Login</button>
-</form>
+<div class="login-page">
+    <div class="login">
+        <h2>Login</h2>
+        <form method="POST">
+            {% csrf_token %}
+            {{ form.as_p }}
+            <button type="submit">Login</button>
+        </form>
+    </div>
+</div>
+
+
+<style>
+    .login-page{
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: vw - 250px;
+
+    }
+
+    .login {
+        width: 600px;
+        text-align: center;
+        margin: 0 auto;
+        padding: 20px;
+        border: 1px solid #000000;
+        border-radius: 5px;
+        {% comment %} display: flex;
+        justify-content: center;
+        align-items: center; {% endcomment %}
+    }
+</style>
 {% endblock %}

@@ -38,6 +38,7 @@
 </body>
 </html> {% endcomment %}
 
+{% load static %}
 
 <!DOCTYPE html>
 <html lang="en">
@@ -46,11 +47,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}Document System{% endblock %}</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <style>
         body {
             margin: 0;
             padding: 0;
+            {% comment %} background-color: #9cf2b0; {% endcomment %}
+            font-family: Georgia, Times, "Times New Roman", serif;
         }
         .sidebar {
             height: 100vh;
@@ -86,6 +90,21 @@
         .main-content.expanded {
             margin-left: 10px;
         }
+        ul.profile-details, ul.team-list {
+            list-style: none; /* Remove bullet points */
+            padding: 0; /* Remove default padding */
+            margin: 0; /* Remove default margin */
+        }
+        ul.profile-details li, ul.team-list li {
+            margin-bottom: 10px; /* Add spacing between items */
+        }
+        ul.team-list {
+            margin-left: 20px; /* Indent nested team list for clarity */
+        }
+        #logo {
+            width: 50px;
+            height: 50px;
+        }
     </style>
 </head>
 <body>
@@ -97,7 +116,9 @@
         <a href="{% url 'create_document' %}">⚡ Generate Document</a>
         <a href="{% url 'create_from_editor' %}">📝 Document Editor</a>
         <a href="{% url 'folder_list' %}">📁 Folders</a>
-        <a href="{% url 'task_list' %}">🗂 Tasks</a>
+        <a href="{% url 'task_list' %}"><i class="fa fa-tasks" style="color: #3498db;"></i> Tasks</a>
+        <a href="{% url 'staff_directory' %}">👥 Staff Directory</a>
+        <a href="{% url 'view_my_profile' %}">👤 My Profile</a>
         {% comment %} <a href="{% url 'my_folder' %}">📁 My Folder</a> {% endcomment %}
     </div>
 
@@ -105,7 +126,7 @@
     <nav class="navbar navbar-light bg-light" style="margin-left: 250px;" id="navbar">
         <div class="container-fluid">
             <button class="btn btn-outline-primary" onclick="toggleSidebar()">☰</button>
-            <a class="navbar-brand ms-3" href="/">Document Automation</a>
+            <a class="navbar-brand ms-3" href="/"><img src="{% static 'raadaa/raadaa_logo.jpeg' %}" alt="Logo" id="logo"> Document Automation</a>
             <div>
                 {% if user.is_authenticated %}
                     <span>Welcome, {{ user.username }} |</span>
