@@ -107,3 +107,105 @@ class Task(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class Organization(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+
+    def __str__(self):
+        return self.name
+    
+class Department(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+
+    def __str__(self):
+        return self.name
+    
+class Team(models.Model):
+    name = models.CharField(max_length=255, unique=True)
+
+    def __str__(self):
+        return self.name
+    
+class StaffProfile(models.Model):
+    RELIGION_CHOICES=[
+        ('islam', 'Islam'),
+        ('christianity', 'Christianity'),
+        ('other', 'Other'),
+    ]
+
+    SEX_CHOICES=[
+        ('male', 'Male'),
+        ('female', 'Female'),
+    ]
+
+    EMERGENCY_RELATIONSHIP_CHOICES=[
+        ('husband', 'Husband'),
+        ('wife', 'Wife'),
+        ('father', 'Father'),
+        ('mother', 'Mother'),
+        ('brother', 'Brother'),
+        ('sister', 'Sister'),
+        ('son', 'Son'),
+        ('daughter', 'Daughter'),
+    ]
+
+    MARITAL_STATUS_CHOICES=[
+        ('single', 'Single'),
+        ('married', 'Married'),
+        ('divorced', 'Divorced'),
+        ('widowed', 'Widowed'),
+    ]
+
+    # User
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="staff_profile")
+
+    # Personal Info
+    photo = models.ImageField(upload_to='staff_photos/', null=True, blank=True)
+    first_name = models.CharField(max_length=255)
+    last_name = models.CharField(max_length=255)
+    middle_name = models.CharField(max_length=255, null=True, blank=True)
+    phone_number = models.CharField(max_length=15, null=True, blank=True)
+    email = models.EmailField(null=True, blank=True)
+    date_of_birth = models.DateField(null=True, blank=True)
+    home_address = models.CharField(max_length=255, null=True, blank=True)
+    sex = models.CharField(max_length=10, choices=SEX_CHOICES, null=True, blank=True)
+    religion = models.CharField(max_length=15, choices=RELIGION_CHOICES, null=True, blank=True)
+    state_of_origin = models.CharField(max_length=255, null=True, blank=True)
+    lga = models.CharField(max_length=255, null=True, blank=True)
+    marital_status = models.CharField(max_length=255, null=True, blank=True)
+
+    # Education
+    institution = models.CharField(max_length=255, null=True, blank=True)
+    course = models.CharField(max_length=255, null=True, blank=True)
+    degree = models.CharField(max_length=100, null=True, blank=True)
+    graduation_year = models.DateField(null=True, blank=True)
+
+    # Account Info
+    account_number = models.CharField(max_length=20, null=True, blank=True)
+    bank_name = models.CharField(max_length=100, null=True, blank=True)
+    account_name = models.CharField(max_length=100, null=True, blank=True)
+
+    # Employment Info
+    designation = models.CharField(max_length=100, null=True, blank=True)
+    location = models.CharField(max_length=100, null=True, blank=True)
+    employment_date = models.DateField(null=True, blank=True)
+    official_email = models.EmailField(null=True, blank=True)
+    organization = models.ForeignKey(Organization, on_delete=models.SET_NULL, null=True, blank=True)
+    department = models.ManyToManyField(Department, blank=True)
+    team = models.ManyToManyField(Team, blank=True)
+    designation = models.CharField(max_length=100)
+
+    # Emergency Contact
+    emergency_name = models.CharField(max_length=100, null=True, blank=True)
+    emergency_relationship = models.CharField(max_length=20, choices=EMERGENCY_RELATIONSHIP_CHOICES, null=True, blank=True)
+    emergency_phone = models.CharField(max_length=20, null=True, blank=True)
+    emergency_address = models.TextField(null=True, blank=True)
+    emergency_email = models.EmailField(null=True, blank=True)
+
+    def __str__(self):
+        return f"{self.first_name} {self.last_name} ({self.user})"
+
+    @property
+    def full_name(self):
+        return f"{self.first_name} {self.last_name}".strip()

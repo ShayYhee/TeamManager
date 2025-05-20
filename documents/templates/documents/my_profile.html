@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>My Profile</h2>
+{% include 'documents/profile_detail.html' with profile=profile %}
+<hr>
+<a href="{% url 'edit_my_profile' %}" class="btn btn-warning">Edit Profile</a>
+
+{% endblock%}

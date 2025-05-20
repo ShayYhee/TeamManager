@@ -1,5 +1,5 @@
 from django import forms
-from .models import Document, User, CustomUser, Folder, File, Task
+from .models import Document, User, CustomUser, Folder, File, Task, StaffProfile
 from ckeditor.widgets import CKEditorWidget
 from ckeditor_uploader.widgets import CKEditorUploadingWidget
 from django.contrib.auth import get_user_model
@@ -148,4 +148,27 @@ class ReassignTaskForm(forms.ModelForm):
         widgets = {
             'assigned_to': forms.Select(attrs={'class': 'form-control'}),
             'due_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'},)
+        }
+
+class StaffProfileForm(forms.ModelForm):
+    class Meta:
+        model = StaffProfile
+        fields = [
+            "photo",
+            "first_name", "last_name", "middle_name", "email", "phone_number", "sex", "date_of_birth", "home_address",
+            "state_of_origin", "lga", "religion",
+            "institution", "course", "degree", "graduation_year",
+            "account_number", "bank_name", "account_name",
+            "location", "employment_date",
+            "organization", "department", "team", "designation", "official_email",
+            "emergency_name", "emergency_relationship", "emergency_phone",
+            "emergency_address", "emergency_email",
+        ]
+        widgets = {
+            "date_of_birth": forms.DateInput(attrs={"type": "date"}),
+            "graduation_year": forms.DateInput(attrs={"type": "date"}),
+            "employment_date": forms.DateInput(attrs={"type": "date"}),
+            "home_address": forms.Textarea(attrs={"rows": 2}),
+            "emergency_address": forms.Textarea(attrs={"rows": 2}),
+            "team": forms.SelectMultiple(attrs={"class": "form-control"})
         }

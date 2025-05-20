@@ -1,0 +1,90 @@
+{% load static %}
+<div class=profile>
+    <div class="profile-photo">
+        {% if 'photo' in visible_fields and profile.photo %}
+            <img src="{{ profile.photo.url }}" width="150" class="pfp"/>
+        {% else %}
+            <img src="{% static 'raadaa/no_photo.jpeg' %}" class="pfp">
+        {% endif %}
+    </div>
+
+    <div class="profile-details">
+        <ul class="profile-details">
+            {% if 'full_name' in visible_fields %}
+                <li><strong>Name:</strong> {{ profile.first_name }} {{ profile.middle_name|default:"" }} {{ profile.last_name }}</li>
+            {% endif %}
+            {% if 'phone_number' in visible_fields %}
+                <li><strong>Phone:</strong> {{ profile.phone_number|default:"Not provided" }}</li>
+            {% endif %}
+            {% if 'official_email' in visible_fields %}
+                <li><strong>Email:</strong> {{ profile.official_email|default:"Not provided" }}</li>
+            {% endif %}
+            {% if 'sex' in visible_fields %}
+                <li><strong>Sex:</strong> {{ profile.sex|default:"Not provided" }}</li>
+            {% endif %}
+            {% if 'religion' in visible_fields %}
+                <li><strong>Religion:</strong> {{ profile.religion|default:"Not provided" }}</li>
+            {% endif %}
+            {% if 'designation' in visible_fields %}
+                <li><strong>Position:</strong> {{ profile.designation|default:"Not provided" }}</li>
+            {% endif %}
+            {% if 'organization' in visible_fields %}
+                <li><strong>Organization:</strong> {{ profile.organization.name|default:"Unassigned" }}</li>
+            {% endif %}
+            {% if 'department' in visible_fields %}
+                <li><strong>Department:</strong> 
+                    {% if profile.department.exists %}
+                        {{ profile.department.all|join:", " }}
+                    {% else %}
+                        Unassigned
+                    {% endif %}
+                </li>
+            {% endif %}
+            {% if 'team' in visible_fields %}
+                <li><strong>Teams:</strong>
+                    {% if profile.team.exists %}
+                        <ul class="team-list">
+                            {% for team in profile.team.all %}
+                                <li>{{ team.name }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        No Team
+                    {% endif %}
+                </li>
+            {% endif %}
+        </ul>
+    </div>
+</div>
+
+<style>
+    .pfp {
+        width: 200px;
+        height: 200px;
+        border: 3px solid #000000;
+        border-radius: 50%;
+    }
+
+    .profile {
+        {% comment %} display: flex;
+        align-items: center; {% endcomment %}
+        text-align: center;
+    }
+
+    .profile-photo {
+        {% comment %} justify-content: center; {% endcomment %}
+
+        margin-bottom: 20px;
+    }
+
+    div.profile-details {
+        {% comment %} justify-content: center; {% endcomment %}
+        padding: 20px;
+        margin: 0 auto;
+        border: 1px solid #000000;
+        border-radius: 5px;
+        width: 600px;
+        text-align: left;
+        {% comment %} height: 500px; {% endcomment %}
+    }
+</style>

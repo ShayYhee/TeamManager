@@ -19,7 +19,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.urls import path
 from django.urls import path, include
-from documents.views import register, home, approve_document, send_approved_email, delete_document
+from documents.views import register, home, approve_document, send_approved_email, delete_document, view_my_profile, edit_my_profile, staff_directory, view_staff_profile
 from django.shortcuts import redirect
 
 def home_redirect(request):
@@ -27,7 +27,8 @@ def home_redirect(request):
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path("", home_redirect, name="home"),
+    # path("", home_redirect, name="home"),
+    path("", home, name="home"),
     path("documents/", include("documents.urls")),
     path("accounts/", include("django.contrib.auth.urls")),  # Built-in auth views
     path('ckeditor/', include('ckeditor_uploader.urls')),
@@ -35,6 +36,10 @@ urlpatterns = [
     path("approve/<int:document_id>/", approve_document, name="approve_document"),
     path("send-email/<int:document_id>/", send_approved_email, name="send_approved_email"),
     path("delete/<int:document_id>/", delete_document, name="delete_document"),
+    path("staff/", staff_directory, name="staff_directory"),
+    path("staff/my-profile/", view_my_profile, name="view_my_profile"),
+    path("staff/edit-profile/", edit_my_profile, name="edit_my_profile"),
+    path("staff/<int:user_id>/", view_staff_profile, name="view_staff_profile"),
 ]
 
 # Serve media files in development
