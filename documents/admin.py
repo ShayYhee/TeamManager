@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from .models import CustomUser, Role, Organization, Department, Team, StaffProfile
+from .models import CustomUser, Role, Organization, Department, Team, StaffProfile, Notification
 
 class CustomUserAdmin(UserAdmin):
     model = CustomUser
@@ -19,3 +19,7 @@ admin.site.register(Organization)
 admin.site.register(Department)
 admin.site.register(Team)
 admin.site.register(StaffProfile)
+@admin.register(Notification)
+class NotificationAdmin(admin.ModelAdmin):
+    list_display = ('title', 'type', 'created_at', 'expires_at', 'is_active')
+    list_filter = ('type', 'is_active')

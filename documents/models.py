@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 from doc_system import settings
+from django.utils import timezone
 
 class Document(models.Model):
     STATUS_CHOICES = [
@@ -194,7 +195,7 @@ class StaffProfile(models.Model):
     organization = models.ForeignKey(Organization, on_delete=models.SET_NULL, null=True, blank=True)
     department = models.ManyToManyField(Department, blank=True)
     team = models.ManyToManyField(Team, blank=True)
-    designation = models.CharField(max_length=100)
+    # designation = models.CharField(max_length=100)
 
     # Emergency Contact
     emergency_name = models.CharField(max_length=100, null=True, blank=True)
@@ -209,3 +210,36 @@ class StaffProfile(models.Model):
     @property
     def full_name(self):
         return f"{self.first_name} {self.last_name}".strip()
+
+
+class Notification(models.Model):
+    title = models.CharField(max_length=255)
+    message = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+    # today = models.DateField(auto_now_add=True)
+    is_active = models.BooleanField(default=True)
+
+    class NotificationType(models.TextChoices):
+        NEWS = 'news', 'News'
+        BIRTHDAY = 'birthday', 'Birthday'
+        ALERT = 'alert', 'Alert'
+
+    type = models.CharField(max_length=20, choices=NotificationType.choices, default=NotificationType.NEWS)
+
+    def is_visible(self):
+        now = timezone.now()
+        return self.is_active and (not self.expires_at or self.expires_at > now)
+
+    def __str__(self):
+        return f"{self.get_type_display()}: {self.title}"
+    
+
+class UserNotification(models.Model):
+    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    notification = models.ForeignKey(Notification, on_delete=models.CASCADE)
+    dismissed = models.BooleanField(default=False)
+    seen_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('user', 'notification')
