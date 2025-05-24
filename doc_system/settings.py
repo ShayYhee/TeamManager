@@ -62,6 +62,7 @@ INSTALLED_APPS = [
     'documents',  # Our app
     'ckeditor',
     'ckeditor_uploader',
+    'django_cron',
 ]
 
 MIDDLEWARE = [
@@ -92,8 +93,15 @@ TEMPLATES = [
     },
 ]
 
+TEMPLATES[0]['OPTIONS']['context_processors'] += [
+    'documents.context_processors.notification_bar',
+]
+
 WSGI_APPLICATION = 'doc_system.wsgi.application'
 
+CRON_CLASSES = [
+    "documents.cron.BirthdayNotificationCronJob",
+]
 
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases

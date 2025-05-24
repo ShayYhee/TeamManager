@@ -5,14 +5,16 @@ from django.contrib.auth import login, get_user_model
 from django.contrib.auth.signals import user_logged_in
 from django.contrib import messages
 from django.core.mail import send_mail, EmailMessage, get_connection
-from django.dispatch import receiver
-from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
 from django.conf import settings
-from django.forms import formset_factory
 from django.db.models import Q
+from django.dispatch import receiver
+from django.forms import formset_factory
+from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
 from django.utils.text import slugify
+from django.utils.timezone import now
+from django.views.decorators.http import require_POST
 from .forms import DocumentForm, SignUpForm, CreateDocumentForm, FileUploadForm, FolderForm, TaskForm, ReassignTaskForm, StaffProfileForm
-from .models import Document, CustomUser, Role, File, Folder, Task, StaffProfile
+from .models import Document, CustomUser, Role, File, Folder, Task, StaffProfile, Notification, UserNotification
 from .placeholders import replace_placeholders
 from docx import Document as DocxDocument
 from comtypes import CoInitialize, CoUninitialize
@@ -447,7 +449,13 @@ def send_approved_email(request, document_id):
 
     return redirect("document_list")  # Redirect to the document list
 def is_admin(user):
-    return user.is_staff
+    # Check if the user is an admin
+
+    for role in user.roles.all():
+        if role.name == "Admin":
+            return True
+
+    # return user.is_staff
 
 @login_required
 @user_passes_test(is_admin)
@@ -806,3 +814,60 @@ def view_staff_profile(request, user_id):
         "viewer": viewer,
         "visible_fields": visible_fields,
     })
+
+def staff_list(request):
+    profiles = StaffProfile.objects.all()
+    return render(request, "documents/staff_list.html", {"profiles": profiles})
+
+from django.shortcuts import render, redirect
+from django.contrib.auth.decorators import login_required
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
+from .models import Notification, UserNotification
+from django.utils.timezone import now
+
+@login_required
+def notifications_view(request):
+    # Get all active notifications
+    all_notifications = Notification.objects.filter(
+        is_active=True
+    ).order_by('-created_at')
+
+    # Ensure UserNotification exists for each active notification
+    active_notifications = []
+    for notification in all_notifications:
+        user_notification, created = UserNotification.objects.get_or_create(
+            user=request.user,
+            notification=notification,
+            defaults={'seen_at': now(), 'dismissed': False}
+        )
+        if not user_notification.dismissed:
+            active_notifications.append(user_notification)
+
+    # Get dismissed notifications
+    dismissed_notifications = UserNotification.objects.filter(
+        user=request.user,
+        dismissed=True
+    ).select_related('notification').order_by('-seen_at')
+
+    return render(request, 'documents/notifications.html', {
+        'active_notifications': active_notifications,
+        'dismissed_notifications': dismissed_notifications
+    })
+
+@require_POST
+@login_required
+def dismiss_notification(request):
+    notification_id = request.POST.get('notification_id')
+    try:
+        notification = Notification.objects.get(id=notification_id)
+        user_notification, created = UserNotification.objects.get_or_create(
+            user=request.user,
+            notification=notification,
+            defaults={'seen_at': now()}
+        )
+        user_notification.dismissed = True
+        user_notification.save()
+        return JsonResponse({'status': 'success'})
+    except Notification.DoesNotExist:
+        return JsonResponse({'status': 'error', 'message': 'Notification not found'}, status=404)
