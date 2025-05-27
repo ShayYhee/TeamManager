@@ -17,8 +17,9 @@ from .forms import DocumentForm, SignUpForm, CreateDocumentForm, FileUploadForm,
 from .models import Document, CustomUser, Role, File, Folder, Task, StaffProfile, Notification, UserNotification
 from .placeholders import replace_placeholders
 from docx import Document as DocxDocument
-from comtypes import CoInitialize, CoUninitialize
-from comtypes.client import CreateObject
+import subprocess
+# from comtypes import CoInitialize, CoUninitialize
+# from comtypes.client import CreateObject
 # from win32com.client import Dispatch, constants, gencache
 import pdfkit
 from raadaa import settings
@@ -170,25 +171,58 @@ def create_document(request):
                     relative_pdf_path = os.path.join("documents/pdf", pdf_filename)
                     absolute_pdf_path = os.path.join(settings.MEDIA_ROOT, relative_pdf_path)
 
+                    # try:
+                    #     print("Starting PDF conversion")
+                    #     CoInitialize()
+                    #     word = CreateObject("Word.Application")
+                    #     word.Visible = False
+                    #     doc = word.Documents.Open(os.path.abspath(word_path))
+                    #     doc.SaveAs(os.path.abspath(absolute_pdf_path), FileFormat=17)
+                    #     doc.Close()
+                    #     word.Quit()
+                    #     CoUninitialize()
+                    #     document.pdf_file = relative_pdf_path
+                    #     document.save()
+                    # except Exception as e:
+                    #     print(f"PDF conversion error: {e}")
+                    #     try:
+                    #         CoUninitialize()
+                    #     except:
+                    #         pass
+                    #     return HttpResponse(f"Error converting to PDF: {e}", status=500)
+
                     try:
-                        print("Starting PDF conversion")
-                        CoInitialize()
-                        word = CreateObject("Word.Application")
-                        word.Visible = False
-                        doc = word.Documents.Open(os.path.abspath(word_path))
-                        doc.SaveAs(os.path.abspath(absolute_pdf_path), FileFormat=17)
-                        doc.Close()
-                        word.Quit()
-                        CoUninitialize()
-                        document.pdf_file = relative_pdf_path
-                        document.save()
-                    except Exception as e:
-                        print(f"PDF conversion error: {e}")
-                        try:
-                            CoUninitialize()
-                        except:
-                            pass
-                        return HttpResponse(f"Error converting to PDF: {e}", status=500)
+                        print("Starting PDF conversion with LibreOffice")
+                        
+                        # Ensure paths are absolute
+                        abs_word_path = os.path.abspath(word_path)
+                        abs_output_dir = os.path.dirname(os.path.abspath(absolute_pdf_path))
+
+                        # Run LibreOffice to convert .docx to .pdf
+                        result = subprocess.run(
+                            ["libreoffice", "--headless", "--convert-to", "pdf", "--outdir", abs_output_dir, abs_word_path],
+                            stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE,
+                            check=True
+                        )
+
+                        print("LibreOffice stdout:", result.stdout.decode())
+                        print("LibreOffice stderr:", result.stderr.decode())
+
+                        # Confirm output PDF file path
+                        if os.path.exists(absolute_pdf_path):
+                            document.pdf_file = relative_pdf_path
+                            document.save()
+                        else:
+                            return HttpResponse("PDF file was not generated.", status=500)
+
+                except subprocess.CalledProcessError as e:
+                            print(f"LibreOffice conversion error: {e.stderr.decode()}")
+                            return HttpResponse(f"Error converting to PDF: {e.stderr.decode()}", status=500)
+
+                except Exception as e:
+                            print(f"Unexpected error: {e}")
+                            return HttpResponse(f"Unexpected error converting to PDF: {e}", status=500)
 
                     print("Sending email")
                     send_approval_request(document)
