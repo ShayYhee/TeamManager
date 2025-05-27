@@ -14,7 +14,19 @@ COPY requirements.txt /app/
 # Install dependencies
 RUN pip install --upgrade pip && pip install -r requirements.txt
 
-RUN apt-get update && apt-get install -y libreoffice
+RUN apt-get update && apt-get install -y \
+    libreoffice\
+    wkhtmltopdf \
+    build-essential \
+    libssl-dev \
+    libffi-dev \
+    libxrender1 \
+    libxext6 \
+    libx11-dev \
+    libjpeg-dev \
+    zlib1g-dev \
+    libpng-dev \
+    && apt-get clean
 
 # Copy the rest of your Django project into the container
 COPY . /app/
