@@ -1,5 +1,5 @@
-# DocSystem
-## 📄 Document Automation System
+# Raadaa
+## 📄 Document Automation & Workflow Management System
 
 A Django-based internal web application for Business Development teams to streamline the generation, approval, and distribution of business documents like Approval Letters and SLA Agreements.
 
