@@ -216,13 +216,19 @@ def create_document(request):
                         else:
                             return HttpResponse("PDF file was not generated.", status=500)
 
-                except subprocess.CalledProcessError as e:
-                            print(f"LibreOffice conversion error: {e.stderr.decode()}")
-                            return HttpResponse(f"Error converting to PDF: {e.stderr.decode()}", status=500)
+                    except subprocess.CalledProcessError as e:
+                        print(f"LibreOffice conversion error: {e.stderr.decode()}")
+                        return HttpResponse(f"Error converting to PDF: {e.stderr.decode()}", status=500)
 
-                except Exception as e:
-                            print(f"Unexpected error: {e}")
-                            return HttpResponse(f"Unexpected error converting to PDF: {e}", status=500)
+                    except Exception as e:
+                        print(f"Unexpected error: {e}")
+                        return HttpResponse(f"Unexpected error converting to PDF: {e}", status=500)
+
+                    print("Sending email")
+                    send_approval_request(document)
+
+                    print("Redirecting to document_list")
+                    return redirect("document_list")
 
                     print("Sending email")
                     send_approval_request(document)
