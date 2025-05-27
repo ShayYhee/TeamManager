@@ -3,6 +3,7 @@ FROM python:3.11-slim
 # System dependencies
 RUN apt-get update && apt-get install -y \
     libreoffice \
+    wkhtmltopdf \
     wget \
     gnupg \
     software-properties-common \
@@ -25,9 +26,9 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Install wkhtmltopdf
-RUN wget -q https://github.com/wkhtmltopdf/wkhtmltopdf/releases/download/0.12.6-1/wkhtmltox_0.12.6-1.bionic_amd64.deb && \
-    apt install -y ./wkhtmltox_0.12.6-1.bionic_amd64.deb && \
-    rm ./wkhtmltox_0.12.6-1.bionic_amd64.deb
+# RUN wget -q https://github.com/wkhtmltopdf/wkhtmltopdf/releases/download/0.12.6-1/wkhtmltox_0.12.6-1.bionic_amd64.deb && \
+#     apt install -y ./wkhtmltox_0.12.6-1.bionic_amd64.deb && \
+#     rm ./wkhtmltox_0.12.6-1.bionic_amd64.deb
 
 # Set workdir
 WORKDIR /app
