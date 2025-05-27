@@ -84,11 +84,18 @@
         <a href="{% url 'notifications' %}"><i class="fa fa-bell" style="color: #3498db;"></i> Notifications</a>
         {% for role in user.roles.all %}
         {% if role.name == "Admin" %}
-        <a href="{% url 'staff_directory' %}">👥 Staff Directory</a>
+            <a href="{% url 'staff_directory' %}">👥 Staff Directory</a>
         {% endif %}
         {% endfor %}
         <a href="{% url 'view_my_profile' %}">👤 My Profile</a>
         <a href="{% url 'staff_list' %}">👤 Staff List</a>
+        {% for role in user.roles.all %}
+        {% if role.name == "Admin" %}
+            <a href="{% url 'admin:index' %}">
+                🔑 Go to Admin Panel
+            </a>
+        {% endif %}
+        {% endfor %}
     </div>
 
     <!-- Navbar -->

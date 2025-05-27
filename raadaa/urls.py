@@ -1,5 +1,5 @@
 """
-URL configuration for doc_system project.
+URL configuration for raadaa project.
 
 The `urlpatterns` list routes URLs to views. For more information please see:
     https://docs.djangoproject.com/en/5.1/topics/http/urls/
@@ -43,6 +43,7 @@ urlpatterns = [
     path("staff/list", staff_list, name="staff_list"),
     path('notifications/', notifications_view, name='notifications'),
     path('notifications/dismiss/', dismiss_notification, name='dismiss_notification'),
+    # path("admin-access/", admin_access_page, name="admin-access"),
 ]
 
 # Serve media files in development
