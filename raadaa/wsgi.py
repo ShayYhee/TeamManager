@@ -1,5 +1,5 @@
 """
-WSGI config for doc_system project.
+WSGI config for raadaa project.
 
 It exposes the WSGI callable as a module-level variable named ``application``.
 
@@ -11,6 +11,6 @@ import os
 
 from django.core.wsgi import get_wsgi_application
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'doc_system.settings')
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'raadaa.settings')
 
 application = get_wsgi_application()

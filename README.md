@@ -43,4 +43,4 @@ A Django-based internal web application for Business Development teams to stream
 ### 1. Clone the Repository
 ```bash
 git clone https://github.com/ShayYhee/DocSystem.git
-cd doc_system
+cd raadaa
