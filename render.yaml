@@ -15,8 +15,7 @@ services:
     name: Raadaa
     env: docker
     dockerfilePath: ./Dockerfile
-    envVars:
-      - key: WKHTMLTOPDF_PATH
-        value: /usr/bin/wkhtmltopdf
-      - key: DJANGO_SETTINGS_MODULE
-        value: raadaa.settings
+    plan: free
+    # envVars:
+    #     - key: DJANGO_SETTINGS_MODULE
+    #     value: raadaa.settings
