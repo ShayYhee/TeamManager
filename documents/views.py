@@ -21,7 +21,7 @@ from comtypes import CoInitialize, CoUninitialize
 from comtypes.client import CreateObject
 # from win32com.client import Dispatch, constants, gencache
 import pdfkit
-from doc_system import settings
+from raadaa import settings
 from html2docx import html2docx
 from docx2txt import process
 from datetime import datetime, date

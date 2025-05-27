@@ -1,6 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
-from doc_system import settings
+from raadaa import settings
 from django.utils import timezone
 
 class Document(models.Model):

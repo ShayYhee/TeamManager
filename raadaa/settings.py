@@ -12,7 +12,21 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 
 from pathlib import Path
 import os
+from dotenv import load_dotenv
 
+dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
+load_dotenv(dotenv_path)
+
+SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'insecure-key-for-dev-only')
+DEBUG = os.getenv('DJANGO_DEBUG', 'False') == 'True'
+# ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', 'localhost').split(',')
+ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "*").split(",")
+WKHTMLTOPDF_PATH = os.getenv('WKHTMLTOPDF_PATH', '/usr/local/bin/wkhtmltopdf')
+
+PDFKIT_CONFIG = {
+    'wkhtmltopdf': WKHTMLTOPDF_PATH
+}
+print(SECRET_KEY)
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 # BASE_DIR = Path(__file__).resolve().parent.parent
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -22,9 +36,9 @@ MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 
 LOGIN_REDIRECT_URL = "document_list"  # Redirect to dashboard after login
 LOGOUT_REDIRECT_URL = "login"  # Redirect to login after logout
-PDFKIT_CONFIG = {
-    'wkhtmltopdf': r"C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe"
-}
+# PDFKIT_CONFIG = {
+#     'wkhtmltopdf': r"C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe"
+# }
 AUTH_USER_MODEL = "documents.CustomUser"
 
 # Zoho email settings
@@ -40,13 +54,13 @@ X_FRAME_OPTIONS = 'SAMEORIGIN'
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-e0nt-wx^4!^!r1#rn!*g@6@!bp%q=j2m94o8s105%5+ctbzf*0'
+# # SECURITY WARNING: keep the secret key used in production secret!
+# SECRET_KEY = 'django-insecure-e0nt-wx^4!^!r1#rn!*g@6@!bp%q=j2m94o8s105%5+ctbzf*0'
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# # SECURITY WARNING: don't run with debug turned on in production!
+# DEBUG = True
 
-ALLOWED_HOSTS = []
+# ALLOWED_HOSTS = []
 
 
 # Application definition
@@ -185,10 +199,10 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
-STATIC_URL = 'staticfiles/'
-# STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATIC_URL = 'static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 STATICFILES_DIRS = [
-    os.path.join(BASE_DIR, 'staticfiles'),
+    os.path.join(BASE_DIR, 'static'),
 ]
 
 # Default primary key field type
