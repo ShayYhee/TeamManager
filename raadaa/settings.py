@@ -159,18 +159,34 @@ CRON_CLASSES = [
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
 
+# DATABASES = {
+#     # 'default': {
+#     #     'ENGINE': 'django.db.backends.postgresql',
+#     #     'NAME': 'TransnetDocSystem',
+#     #     'USER': 'postgres',
+#     #     'PASSWORD': 'password',
+#     #     'HOST': 'localhost',
+#     #     'PORT': '5432',
+#     # }
+#     'default': dj_database_url.config(
+#         default=os.getenv("DATABASE_URL")
+#     )
+# }
+
+# Database
+# if os.getenv("DATABASE_URL"):
+#     DATABASES = {
+#         "default": dj_database_url.config(
+#             default=os.getenv("DATABASE_URL"),
+#             conn_max_age=600
+#         )
+#     }
+# else:
 DATABASES = {
-    # 'default': {
-    #     'ENGINE': 'django.db.backends.postgresql',
-    #     'NAME': 'TransnetDocSystem',
-    #     'USER': 'postgres',
-    #     'PASSWORD': 'password',
-    #     'HOST': 'localhost',
-    #     'PORT': '5432',
-    # }
-    'default': dj_database_url.config(
-        default=os.getenv("DATABASE_URL")
-    )
+    "default": {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": os.path.join(BASE_DIR, "db.sqlite3"),
+    }
 }
 
 # CKEditor upload path
