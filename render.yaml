@@ -7,13 +7,13 @@ services:
     startCommand: |
       python manage.py migrate &&
       python manage.py collectstatic --noinput &&
-      gunicorn raadaa.wsgi:application --bind 0.0.0.0:8000 --timeout 120
+      gunicorn raadaa.wsgi:application --bind 0.0.0.0:8000 --timeout 120 --workers 2
     envVars:
       - key: DJANGO_SETTINGS_MODULE
         value: raadaa.settings
       - key: DEBUG
-        value: "True"
+        value: "True"  # Keep True for debugging
       - key: SECRET_KEY
-        value: 5p7f1c&0+s(y05#z2)@3r&i4s8$&#1_%#s9!1x(+8&(!i#c4w2
+        value: 5p7f1c&0+s(y05#z2)@3r&i4s8$_%#s9!1x(+8&(!i#c4w2
       - key: ALLOWED_HOSTS
         value: raadaa.onrender.com,www.raadaa.onrender.com,localhost
