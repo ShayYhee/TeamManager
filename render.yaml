@@ -1,21 +1,19 @@
-# services:
-#   - type: web
-#     name: Raadaa
-#     env: python
-#     buildCommand: |
-#       apt-get update
-#       apt-get install -y wget gnupg software-properties-common
-#       wget -q https://github.com/wkhtmltopdf/wkhtmltopdf/releases/download/0.12.6-1/wkhtmltox_0.12.6-1.bionic_amd64.deb
-#       apt install -y ./wkhtmltox_0.12.6-1.bionic_amd64.deb
-#       pip install -r requirements.txt
-#     startCommand: gunicorn raadaa.wsgi
-
 services:
   - type: web
     name: Raadaa
     env: docker
     dockerfilePath: ./Dockerfile
     plan: free
-    # envVars:
-    #     - key: DJANGO_SETTINGS_MODULE
-    #     value: raadaa.settings
+    startCommand: |
+      python manage.py migrate &&
+      python manage.py collectstatic --noinput &&
+      gunicorn raadaa.wsgi
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: raadaa.settings
+      - key: DEBUG
+        value: "False"
+      - key: SECRET_KEY
+        value: your-secret-key
+      - key: ALLOWED_HOSTS
+        value: raadaa.onrender.com
