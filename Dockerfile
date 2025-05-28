@@ -25,13 +25,11 @@ RUN apt-get update && apt-get install -y \
     libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Install wkhtmltopdf
-# RUN wget -q https://github.com/wkhtmltopdf/wkhtmltopdf/releases/download/0.12.6-1/wkhtmltox_0.12.6-1.bionic_amd64.deb && \
-#     apt install -y ./wkhtmltox_0.12.6-1.bionic_amd64.deb && \
-#     rm ./wkhtmltox_0.12.6-1.bionic_amd64.deb
-
 # Set workdir
 WORKDIR /app
+
+# Copy project
+COPY . .
 
 # Copy files
 COPY . /app
@@ -40,10 +38,11 @@ COPY . /app
 RUN pip install --upgrade pip && pip install -r requirements.txt
 
 # Set environment variables
-ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
 
 # Collect static files if needed
-# RUN python manage.py collectstatic --noinput
+RUN python manage.py collectstatic --noinput
 
 # Expose port
 EXPOSE 8000
