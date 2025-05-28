@@ -37,8 +37,6 @@ import requests
 import io
 import urllib.parse
 
-# pdf_config = pdfkit.configuration(wkhtmltopdf=r"C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe")  # Set full path
-# pdf_config = pdfkit.configuration(wkhtmltopdf=settings.WKHTMLTOPDF_PATH)
 pdf_config = pdfkit.configuration()
 
 User = get_user_model()
