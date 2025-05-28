@@ -32,7 +32,7 @@ WORKDIR /app
 COPY . .
 
 # Copy files
-COPY . /app
+# COPY . /app
 
 # Install Python dependencies
 RUN pip install --upgrade pip && pip install -r requirements.txt
@@ -40,9 +40,6 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
-
-# Collect static files if needed
-RUN python manage.py collectstatic --noinput
 
 # Expose port
 EXPOSE 8000
