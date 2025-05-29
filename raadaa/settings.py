@@ -23,7 +23,7 @@ DEBUG = os.getenv('DJANGO_DEBUG', 'False') == 'True'
 # ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', 'localhost').split(',')
 # ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "*").split(",")
 # ALLOWED_HOSTS = ['https://raadaa.onrender.com']
-ALLOWED_HOSTS = ['raadaa.onrender.com', 'www.raadaa.onrender.com', 'localhost']
+ALLOWED_HOSTS = ['raadaa.onrender.com', 'www.raadaa.onrender.com', 'localhost', '127.0.0.1:8000', '127.0.0.1']
 # WKHTMLTOPDF_PATH = os.environ.get("WKHTMLTOPDF_PATH", "/usr/bin/wkhtmltopdf")
 
 # PDFKIT_CONFIG = {
@@ -40,7 +40,7 @@ MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'static'),
@@ -123,6 +123,8 @@ MIDDLEWARE = [
 CSRF_TRUSTED_ORIGINS = [
     "https://raadaa.onrender.com",
     "https://*.onrender.com",  # For subdomains, if needed
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
 ]
 
 CSRF_COOKIE_SECURE = True
@@ -258,5 +260,5 @@ USE_TZ = True
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-SECURE_SSL_REDIRECT = True  # Redirect HTTP to HTTPS
+# SECURE_SSL_REDIRECT = True  # Redirect HTTP to HTTPS
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
