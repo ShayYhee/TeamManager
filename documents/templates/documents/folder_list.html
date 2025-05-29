@@ -1,5 +1,9 @@
-<title>Folders - Raadaa</title>
+{% extends 'base.html' %}
 
+{% block title %}Folder List - Raadaa{% endblock %}
+
+
+{% block content %}
 <style>
     .folder-card, .file-card {
         text-align: center;
@@ -32,8 +36,6 @@
     }
 </style>
 
-{% extends 'base.html' %}
-{% block content %}
 <div class="container mt-4">
     <h2><i class="fas fa-folder"></i> {{ parent.name|default:"My Folders" }}</h2>
 

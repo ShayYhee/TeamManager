@@ -1,6 +1,9 @@
-<title>{{ profile.user.username }}'s Profile - Raadaa</title>
+{% extends 'base.html' %}
 
-{% load static %}
+{% block title %}{{profile.user.username}}'s Profile - Raadaa{% endblock %}
+
+{% block content%}
+
 <div class=profile>
     <div class="profile-photo">
         {% if 'photo' in visible_fields and profile.photo %}
@@ -90,3 +93,5 @@
         {% comment %} height: 500px; {% endcomment %}
     }
 </style>
+
+{% endblock %}

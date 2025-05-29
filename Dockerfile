@@ -34,6 +34,9 @@ COPY . .
 # Install Python dependencies
 RUN pip install --upgrade pip && pip install -r requirements.txt
 
+# Run collectstatic
+RUN python manage.py collectstatic --noinput
+
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
