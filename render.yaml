@@ -17,9 +17,9 @@ services:
       - key: ALLOWED_HOSTS
         value: raadaa.onrender.com,www.raadaa.onrender.com,localhost
       - key: DJANGO_SUPERUSER_USERNAME
-        value: admin
+        value: admin1
       - key: DJANGO_SUPERUSER_EMAIL
-        value: admin@raadaa.com
+        value: admin1@raadaa.com
       - key: DJANGO_SUPERUSER_PASSWORD
         value: Admin@raadaa_1
       - key: DATABASE_URL
