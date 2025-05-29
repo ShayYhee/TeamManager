@@ -6,6 +6,7 @@ services:
     plan: free
     startCommand: |
       python manage.py migrate &&
+      python manage.py createsuperuser --noinput --username admin --password admin@raadaa &&
       gunicorn raadaa.wsgi:application --bind 0.0.0.0:8000 --timeout 120 --workers 2
     envVars:
       - key: DJANGO_SETTINGS_MODULE
