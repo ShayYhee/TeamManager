@@ -41,6 +41,9 @@ RUN python manage.py collectstatic --noinput
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 
+# Ensure build.sh is executable
+RUN chmod +x build.sh
+
 # Expose port
 EXPOSE 8000
 
