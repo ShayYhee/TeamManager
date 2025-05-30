@@ -289,8 +289,11 @@ $(document).ready(function() {
     // Dark mode chart adjustments
     if ($('body').hasClass('dark-mode')) {
         Chart.defaults.color = '#e2e8f0';
-        Chart.defaults.borderColor = '#4a5568';
+        Chart.defaults.borderColor = '#4a5568';        
     }
+
+    // Check if body has dark mode
+    const isDarkMode = $('body').hasClass('dark-mode');
 
     // Initialize Completion Percentage Doughnut Chart
     const completionCtx = document.getElementById('completionChart').getContext('2d');
@@ -312,7 +315,7 @@ $(document).ready(function() {
                 legend: {
                     position: 'bottom',
                     labels: {
-                        color: '#2d3748'
+                        color: isDarkMode? '#e2e8f0' : '#2d3748'
                     }
                 },
                 tooltip: {

@@ -2,3 +2,5 @@
 *.pyc
 documents/migrations/
 media/
+db.sqlite3
+terminal.txt

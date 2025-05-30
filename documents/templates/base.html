@@ -194,21 +194,34 @@
             align-items: center;
             gap: 10px;
         }
+        .close-sidebar {
+            {% comment %} text-align: right; {% endcomment %}
+            margin-left: 3px;
+            padding: 12px 20px;
+        }
+        .fa-window-close {
+            color: #2d3748 !important;
+            {% comment %} background-color: #f2f3f5; {% endcomment %}
+            background-color:  #007bff;
+            padding: 5px;
+            border-radius: 4px;
+            display: inline-block;
+        }
         @media (max-width: 768px) {
             .sidebar {
                 {% comment %} width: 0;
                 padding: 0;
                 overflow: hidden; {% endcomment %}
                 position: fixed;
-                margin-top: 30px;
+                {% comment %} margin-top: 30px; {% endcomment %}
                 left: 0;
-                height: calc(100vh - 30px);
+                height: calc(100vh);
                 width: 250px;
                 padding-top: 20px;
                 transition: all 0.3s ease;
                 overflow-x: hidden;
                 box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
-                z-index: 1000; /* Ensure sidebar is above main content */
+                z-index: 10000; /* Ensure sidebar is above main content */
                 transform: translateX(-100%); /* Hide sidebar by default */
             }
             .sidebar.active {
@@ -254,6 +267,22 @@
             .navbar.no-tenant .auth-section {
                 flex-direction: column;
                 gap: 10px;
+            }
+            .theme-toggle-btn {
+                position: absolute;
+                background: none;
+                border: none;
+                color: #2d3748;
+                font-size: 1.2rem;
+                cursor: pointer;
+                padding: 0 10px;
+                margin-left: 300px
+            }
+            body.dark-mode .theme-toggle-btn {
+                color: #e2e8f0;
+            }
+            .theme-toggle-btn:hover {
+                color: #319795;
             }
         }
         .modal-content {
@@ -364,46 +393,20 @@
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
     {% if user.is_authenticated %}
     <div class="sidebar" id="sidebar">
-        <h4 class="text-white text-center mb-4"><i class="fas fa-briefcase mr-2"></i> {{ tenant.name|default:"Team Manager" }}</h4>
+        {% comment %} <h4 class="text-white text-center mb-4"><i class="fas fa-briefcase mr-2"></i> {{ tenant.name|default:"Team Manager" }}</h4> {% endcomment %}
         {% if user.is_superuser %}
+            <div class="close-sidebar" id="close-sidebar" onclick="toggleSidebar()">
+                <i class="fa fa-window-close"></i>
+            </div>
             <a href="{% url 'superuser_dashboard' %}" {% if request.path == '/tenants/dashboard/' %}class="active"{% endif %}><i class="fas fa-user-shield"></i>Dashboard</a>
             <a href="{% url 'all_users_list' %}" {% if request.path == '/tenants/users/list/' %}class="active"{% endif %}><i class="fas fa-user-shield"></i>All Users</a>
             <a href="{% url 'tenant_applications' %}" {% if request.path == '/tenants/tenant-applications/'%}class="active"{% endif %}><i class="fas fa-user-shield"></i>Tenant Applications</a>
             <a href="{% url 'tenant_list' %}" {% if request.path == '/tenants/list/' %}class="active"{% endif %}><i class="fas fa-user-shield"></i>Tenants</a>
             <a href="{% url 'admin:index' %}" {% if request.path|slice:":7" == '/admin/' %}class="active"{% endif %}><i class="fas fa-key"></i> Admin Panel</a>
-        {% elif user.tenant.slug == "raadaa" or user.tenant.slug == "transnet-cloud" %}
-            <a href="{% url 'calendar' %}" {% if request.path == '/calendar/' %}class="active"{% endif %}><i class="fas fa-calendar"></i> Calendar</a>
-            <a href="{% url 'contact_list' %}" {% if request.path == '/dashboard/contacts/' %}class="active"{% endif %}><i class="fas fa-address-book"></i> Contacts</a>
-            <a href="{% url 'email_list' %}" {% if request.path == '/dashboard/emails/' %}class="active"{% endif %}><i class="fas fa-envelope"></i> Emails</a>
-            <a href="{% url 'view_my_profile' %}" {% if request.path == '/dashboard/my-profile/' %}class="active"{% endif %}><i class="fas fa-user"></i> My Profile</a>
-            <a href="{% url 'staff_list' %}" {% if request.path == '/staff/list/' %}class="active"{% endif %}><i class="fas fa-user-friends"></i> Staff List</a>
-            <a href="{% url 'view_company_profile' %}" {% if request.path == '/company-profile/' %}class="active"{% endif %}><i class="fas fa-building"></i> Company Profile</a>
-            <a href="{% url 'task_list' %}" {% if request.path == '/tasks/' %}class="active"{% endif %}><i class="fas fa-tasks"></i> Tasks</a>
-            <a href="{% url 'document_list' %}" {% if request.path == '/documents/list/' %}class="active"{% endif %}><i class="fas fa-file-alt"></i> Document List</a>
-            <a href="{% url 'create_document' %}" {% if request.path == '/documents/create/' %}class="active"{% endif %}><i class="fas fa-bolt"></i> Generate Document</a>
-            <a href="{% url 'create_from_editor' %}" {% if request.path == '/documents/create-editor/' %}class="active"{% endif %}><i class="fas fa-edit"></i> Document Editor</a>
-            <a href="{% url 'folder_view' %}" {% if request.path == '/folders/' %}class="active"{% endif %}><i class="fas fa-folder"></i> My Folders</a>
-            <a href="{% url 'performance_dashboard' %}" {% if request.path == '/dashboard/performance-dashboard/' %}class="active"{% endif %}><i class="fas fa-chart-line" style="color: #ffffff;"></i> Performance</a>
-            {% for role in user.roles.all %}
-                {% if role.name == "HOD" %}
-                    <a href="{% url 'hod_performance_dashboard' %}" {% if request.path == '/dashboard/hod-performance-dashboard/' %}class="active"{% endif %}><i class="fas fa-chart-bar"></i> Department Performance</a>
-                {% endif %}
-            {% endfor %}
-            <a href="{% url 'notifications' %}" {% if request.path == '/notifications/' %}class="active"{% endif %}><i class="fas fa-bell"></i> Notifications</a>
-            {% for role in user.roles.all %}
-                {% if role.name == "Admin" %}
-                    <a href="{% url 'staff_directory' %}" {% if request.path == '/staff/' %}class="active"{% endif %}><i class="fas fa-users"></i> Staff Directory</a>
-                {% endif %}
-            {% endfor %}
-            <a href="{% url 'email_config' %}" {% if request.path == '/dashboard/email-config/' %}class="active"{% endif %}><i class="fas fa-cog"></i> Settings</a>
-            {% for role in user.roles.all %}
-                {% if role.name == "Admin" %}
-                    {% comment %} <a href="{% url 'users_list' %}" {% if request.path == '/users/' %}class="active"{% endif %}><i class="fas fa-user-shield"></i> Users</a> {% endcomment %}
-                    <a href="{% url 'admin_dashboard' %}" {% if request.path == '/admins/dashboard/' %}class="active"{% endif %}><i class="fas fa-key"></i> Admin Dashboard</a>
-                {% endif %}
-            {% endfor %}
-            <a href="{% url 'contact_support' %}" {% if request.path == '/contact-support/' %}class="active"{% endif %}><i class="fa fa-question-circle" aria-hidden="true"></i>Contact Support</a>
         {% else %}
+            <div class="close-sidebar" id="close-sidebar" onclick="toggleSidebar()">
+                <i class="fa fa-window-close"></i>
+            </div>
             <a href="{% url 'calendar' %}" {% if request.path == '/calendar/' %}class="active"{% endif %}><i class="fas fa-calendar"></i> Calendar</a>
             <a href="{% url 'contact_list' %}" {% if request.path == '/dashboard/contacts/' %}class="active"{% endif %}><i class="fas fa-address-book"></i> Contacts</a>
             <a href="{% url 'email_list' %}" {% if request.path == '/dashboard/emails/' %}class="active"{% endif %}><i class="fas fa-envelope"></i> Emails</a>
@@ -412,6 +415,9 @@
             <a href="{% url 'view_company_profile' %}" {% if request.path == '/company-profile/' %}class="active"{% endif %}><i class="fas fa-building"></i> Company Profile</a>
             <a href="{% url 'task_list' %}" {% if request.path == '/tasks/' %}class="active"{% endif %}><i class="fas fa-tasks"></i> Tasks</a>
             <a href="{% url 'document_list' %}" {% if request.path == '/documents/list/' %}class="active"{% endif %}><i class="fas fa-file-alt"></i> Document List</a>
+            {% if  user.tenant.slug == "raadaa" or user.tenant.slug == "transnet-cloud" %}
+                <a href="{% url 'create_document' %}" {% if request.path == '/documents/create/' %}class="active"{% endif %}><i class="fas fa-bolt"></i> Generate Document</a>
+            {% endif %}
             <a href="{% url 'create_from_editor' %}" {% if request.path == '/documents/create-editor/' %}class="active"{% endif %}><i class="fas fa-edit"></i> Document Editor</a>
             <a href="{% url 'folder_view' %}" {% if request.path == '/folders/' %}class="active"{% endif %}><i class="fas fa-folder"></i> My Folders</a>
             <a href="{% url 'performance_dashboard' %}" {% if request.path == '/dashboard/performance-dashboard/' %}class="active"{% endif %}><i class="fas fa-chart-line" style="color: #ffffff;"></i> Performance</a>
@@ -434,7 +440,7 @@
                 {% endif %}
             {% endfor %}
             <a href="{% url 'contact_support' %}" {% if request.path == '/contact-support/' %}class="active"{% endif %}><i class="fa fa-question-circle" aria-hidden="true"></i>Contact Support</a>
-        {%endif%}
+        {% endif %}
     </div>
     {% endif %}
     {% if not user.is_superuser and not user.tenant %}
@@ -628,6 +634,7 @@
             const body = document.body;
             const savedTheme = localStorage.getItem('theme');
             const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            var closed_sidebar = document.getElementById("close-sidebar");
             if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
                 body.classList.add('dark-mode');
                 themeToggleBtn.innerHTML = '<i class="fas fa-sun"></i>';
@@ -645,6 +652,8 @@
                     tenantName = tenantName.slice(0, 20);
                     tenantNameElement.innerHTML = `<strong>${tenantName}...</strong>`;
                 }
+            } else {
+                closed_sidebar.style.display = 'none';
             }
         });
     </script>
