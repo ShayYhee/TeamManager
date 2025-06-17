@@ -997,13 +997,14 @@ class EventViewSet(viewsets.ModelViewSet):
 #     return render(request, 'documents/calendar.html', {'auth_token': token.key})
 from django.middleware.csrf import get_token
 
+@login_required
 def calendar_view(request):
-    auth_token = None
+    # auth_token = None
     User = get_user_model()
-    if request.user.is_authenticated:
-        auth_token = Token.objects.get(user=request.user).key if Token.objects.filter(user=request.user).exists() else None
+    # if request.user.is_authenticated:
+    #     auth_token = Token.objects.get(user=request.user).key if Token.objects.filter(user=request.user).exists() else None
     context = {
-        'auth_token': auth_token or '',
+        # 'auth_token': auth_token or '',
         'csrf_token': get_token(request),
         'notification_bar_items': [],
         'birthday_others': [],
