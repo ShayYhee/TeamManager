@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}Staff List - Raadaa{% endblock %}
+{% block title %}Staff List - Team Manager{% endblock %}
 
 {% block content %}
     <h2>Staff</h2>
@@ -14,7 +14,7 @@
             <th>Organization</th>
             <th>Department</th>
             <th>Team</th>
-            <th>Employment Date</th>
+            {% comment %} <th>Employment Date</th>
             <th>Official Email</th>
             <th>Address</th>
             <th>Date of Birth</th>
@@ -33,7 +33,7 @@
             <th>Emergency Relationship</th>
             <th>Emergency Phone</th>
             <th>Emergency Email</th>
-            <th>Emergency Address</th>
+            <th>Emergency Address</th> {% endcomment %}
         </tr>
 
         {% for profile in profiles %}
@@ -46,7 +46,12 @@
             <td>{{ profile.organization }}</td>                        
             <td>{{ profile.department.all|join:", " }}</td>
             <td>{{ profile.team.all|join:", " }}</td>
-            <td>{{ profile.employment_date }}</td>
+            <td>
+                <a href="{% url 'view_staff_profile' profile.user.id %}">
+                    <i class="fas fa-thin fa-eye" style="color:rgb(32, 62, 230);"></i>
+                </a>
+            </td>
+            {% comment %} <td>{{ profile.employment_date }}</td>
             <td>{{ profile.official_email }}</td>
             <td>{{ profile.home_address }}</td>
             <td>{{ profile.date_of_birth }}</td>
@@ -65,7 +70,7 @@
             <td>{{ profile.emergency_relationship }}</td>
             <td>{{ profile.emergency_phone }}</td>
             <td>{{ profile.emergency_email }}</td>
-            <td>{{ profile.emergency_address }}</td>
+            <td>{{ profile.emergency_address }}</td> {% endcomment %}
         </tr>
         {% endfor %}
     </table>

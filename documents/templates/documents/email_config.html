@@ -1,0 +1,12 @@
+{% extends 'base.html' %}
+
+{% block title %}Settings{% endblock %}
+
+{% block content %}
+    <form method="POST" class="container">
+        <h2>Email Configuration</h2>
+        {% csrf_token %}
+        {{ email_config_form.as_p }}
+        <button type="submit" class="btn btn-primary">Save</button>
+    </form>
+{% endblock %}

@@ -224,6 +224,7 @@ class Notification(models.Model):
         NEWS = 'news', 'News'
         BIRTHDAY = 'birthday', 'Birthday'
         ALERT = 'alert', 'Alert'
+        EVENT = 'event', 'Event'
 
     type = models.CharField(max_length=20, choices=NotificationType.choices, default=NotificationType.NEWS)
 
@@ -243,3 +244,53 @@ class UserNotification(models.Model):
 
     class Meta:
         unique_together = ('user', 'notification')
+
+from django.db import models
+from django.conf import settings
+
+class StaffDocument(models.Model):
+    DOCUMENT_TYPES = [
+        ('resume', 'Resume'),
+        ('certificate', 'Certificate'),
+        ('id_card', 'ID Card'),
+        ('other', 'Other'),
+    ]
+
+    staff_profile = models.ForeignKey(
+        'StaffProfile', 
+        on_delete=models.CASCADE, 
+        related_name='documents'
+    )
+    file = models.FileField(upload_to='staff_documents/')
+    document_type = models.CharField(
+        max_length=50, 
+        choices=DOCUMENT_TYPES, 
+        default='other'
+    )
+    description = models.CharField(max_length=255, blank=True, null=True)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.document_type} - {self.staff_profile.full_name} ({self.uploaded_at})"
+    
+
+class Event(models.Model):
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    start_time = models.DateTimeField()
+    end_time = models.DateTimeField()
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='events')
+    created_at = models.DateTimeField(auto_now_add=True)
+    event_link = models.URLField(blank=True, null=True)
+
+    def __str__(self):
+        return f"{self.title} ({self.start_time} - {self.end_time})"
+
+class EventParticipant(models.Model):
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='participants')
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    response = models.CharField(max_length=10, choices=[('pending', 'Pending'), ('accepted', 'Accepted'), ('declined', 'Declined')], default='pending')
+    invited_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('event', 'user')

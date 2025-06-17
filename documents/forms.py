@@ -1,5 +1,6 @@
 from django import forms
-from .models import Document, User, CustomUser, Folder, File, Task, StaffProfile
+from django.forms import modelformset_factory
+from .models import Document, User, CustomUser, Folder, File, Task, StaffProfile, StaffDocument
 from ckeditor.widgets import CKEditorWidget
 from ckeditor_uploader.widgets import CKEditorUploadingWidget
 from django.contrib.auth import get_user_model
@@ -170,5 +171,30 @@ class StaffProfileForm(forms.ModelForm):
             "employment_date": forms.DateInput(attrs={"type": "date"}),
             "home_address": forms.Textarea(attrs={"rows": 2}),
             "emergency_address": forms.Textarea(attrs={"rows": 2}),
-            "team": forms.SelectMultiple(attrs={"class": "form-control"})
+            "team": forms.SelectMultiple(attrs={"class": "form-control"}),
+        }
+
+class StaffDocumentForm(forms.ModelForm):
+    class Meta:
+        model = StaffDocument
+        fields = ['file', 'document_type', 'description']
+        widgets = {
+            'file': forms.FileInput(attrs={'class': 'form-control'}),
+            'document_type': forms.Select(attrs={'class': 'form-control'}),
+            'description': forms.TextInput(attrs={'class': 'form-control'}),
+        }
+
+    def clean_file(self):
+        file = self.cleaned_data.get('file')
+        if file and file.size > 5 * 1024 * 1024:  # 5MB limit
+            raise forms.ValidationError("File size must be under 5MB.")
+        return file
+    
+class EmailConfigForm(forms.ModelForm):
+    class Meta:
+        model = CustomUser
+        fields = ['smtp_email', 'smtp_password' ]
+        widgets = {
+            'smtp_email': forms.EmailInput(attrs={'class': 'form-control'}),
+            'smtp_password': forms.PasswordInput(attrs={'class': 'form-control'}),
         }

@@ -13,8 +13,9 @@ from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
 from django.utils.text import slugify
 from django.utils.timezone import now
 from django.views.decorators.http import require_POST
-from .forms import DocumentForm, SignUpForm, CreateDocumentForm, FileUploadForm, FolderForm, TaskForm, ReassignTaskForm, StaffProfileForm
-from .models import Document, CustomUser, Role, File, Folder, Task, StaffProfile, Notification, UserNotification
+from .forms import DocumentForm, SignUpForm, CreateDocumentForm, FileUploadForm, FolderForm, TaskForm, ReassignTaskForm, StaffProfileForm, StaffDocumentForm, EmailConfigForm
+from .models import Document, CustomUser, Role, File, Folder, Task, StaffProfile, Notification, UserNotification, StaffDocument, Event
+from .serializers import EventSerializer
 from .placeholders import replace_placeholders
 from docx import Document as DocxDocument
 import subprocess
@@ -36,6 +37,7 @@ import os
 import requests
 import io
 import urllib.parse
+from rest_framework import viewsets, permissions
 
 pdf_config = pdfkit.configuration()
 
@@ -75,13 +77,21 @@ def send_approval_request(document):
     {document.created_by.get_full_name()}
     """
 
-    send_mail(
-        subject,
-        message,
-        sender_email,  # Always send from Zoho SMTP email
-        list(bdm_emails),  # Send to all BDMs
-        connection=connection
-    )
+    print("Sending mail...")
+
+    # Create email with attachment
+    email = EmailMessage(subject, message, sender_email, list(bdm_emails), connection=connection)
+    # email.attach_file(document.pdf_file.path)  # Attach the PDF
+    email.send()
+
+    # send_mail(
+    #     subject,
+    #     message,
+    #     sender_email,  # Always send from Zoho SMTP email
+    #     list(bdm_emails),  # Send to all BDMs
+    #     connection=connection
+    # )
+    print("Mail Sent")
 
     # email = EmailMessage(subject, message, sender_email, list(bdm_emails))
     # email.send()
@@ -190,6 +200,28 @@ def create_document(request):
                     #     except:
                     #         pass
                     #     return HttpResponse(f"Error converting to PDF: {e}", status=500)
+                    import platform
+                    import shutil
+                    # libreoffice_path = r"C:\Program Files (x86)\LibreOffice\program\soffice.exe"
+
+                    # Choose the right LibreOffice path
+                    if platform.system() == "Windows":
+                        paths = [
+                            r"C:\Program Files (x86)\LibreOffice\program\soffice.exe",
+                            r"C:\Program Files\LibreOffice\program\soffice.exe"
+                        ]
+                        libreoffice_path = next((p for p in paths if os.path.exists(p)), None)
+                    else:
+                        libreoffice_path = shutil.which("libreoffice")
+
+                    # Check if LibreOffice exists
+                    if not libreoffice_path or not os.path.exists(libreoffice_path):
+                        raise FileNotFoundError("LibreOffice not found. Make sure it's installed and in PATH.")
+
+                    # Debug paths
+                    print("LibreOffice path:", libreoffice_path)
+                    print("abs_word_path:", abs_word_path)
+                    print("abs_output_dir:", abs_output_dir)
 
                     try:
                         print("Starting PDF conversion with LibreOffice")
@@ -198,12 +230,15 @@ def create_document(request):
                         abs_word_path = os.path.abspath(word_path)
                         abs_output_dir = os.path.dirname(os.path.abspath(absolute_pdf_path))
 
+                        print("abs_word_path: ", abs_word_path)
+
                         # Run LibreOffice to convert .docx to .pdf
                         result = subprocess.run(
-                            ["libreoffice", "--headless", "--convert-to", "pdf", "--outdir", abs_output_dir, abs_word_path],
+                            [libreoffice_path, "--headless", "--convert-to", "pdf", "--outdir", abs_output_dir, abs_word_path],
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,
-                            check=True
+                            check=True,
+                            capture_output=True
                         )
 
                         print("LibreOffice stdout:", result.stdout.decode())
@@ -230,8 +265,8 @@ def create_document(request):
                     print("Redirecting to document_list")
                     return redirect("document_list")
 
-                    print("Sending email")
-                    send_approval_request(document)
+                print("Sending email")
+                send_approval_request(document)
             
             print("Redirecting to document_list")
             return redirect("document_list")
@@ -515,51 +550,6 @@ def delete_document(request, document_id):
     document.delete()
     return redirect("document_list")  # Redirect back to the list
 
-
-# def create_from_editor(request):
-#     if request.method == "POST":
-#         form = CreateDocumentForm(request.POST)
-#         if form.is_valid():
-#             title = form.cleaned_data["title"]
-#             content = form.cleaned_data["content"]
-
-#             # Create a .docx file
-#             doc = DocxDocument()
-#             doc.add_paragraph(content)
-
-#             word_dir = os.path.join(settings.MEDIA_ROOT, "documents/word")
-#             pdf_dir = os.path.join(settings.MEDIA_ROOT, "documents/pdf")
-#             os.makedirs(word_dir, exist_ok=True)
-#             os.makedirs(pdf_dir, exist_ok=True)
-
-#             word_filename = f"{slugify(title)}.docx"
-#             word_path = os.path.join(word_dir, word_filename)
-#             doc.save(word_path)
-
-#             # Create a .pdf file
-#             # pdf_filename = word_filename.replace('.docx', ".pdf")
-#             # pdf_path = os.path.join(pdf_dir, pdf_filename)
-#             # pdfkit.from_file(word_path, pdf_path)
-
-#             try:
-#                 # doc = HTML2DOCX()
-#                 doc = html2docx(content=content, title=title)
-#                 # doc.add(content,title=title)
-#                 # new_doc.add_html_to_document(content, doc)
-#                 # doc.add_html
-#                 doc.save(word_path)
-#             except Exception as e:
-#                 return HttpResponse(f"Error creating .docx: {e}", status=500)
-#             # Save to database
-#             # ...
-
-#             return redirect("document_list")
-#         else:
-#             print("Form errors:", form.errors)  # Debug
-#     else:
-#         form = CreateDocumentForm()
-#     return render(request, 'documents/create_from_editor.html', {'form': form})
-
 def add_formatted_content(doc, soup, word_dir):
     """Parse HTML and add formatted content and images to the .docx document."""
     for element in soup.recursiveChildGenerator():
@@ -801,16 +791,64 @@ def view_my_profile(request):
 
 @login_required
 def edit_my_profile(request):
-    profile, created = StaffProfile.objects.get_or_create(user=request.user)
-    if request.method == "POST":
-        form = StaffProfileForm(request.POST, request.FILES, instance=profile)
-        if form.is_valid():
-            form.save()
-            messages.success(request, "Your profile has been updated.")
-            return redirect("view_my_profile")
+    profile,_ = StaffProfile.objects.get_or_create(user=request.user) # staff_profile = request.user.staff_profile  # Assuming one profile per user
+    if request.method == 'POST':
+        profile_form = StaffProfileForm(request.POST, request.FILES, instance=profile)
+        
+        if profile_form.is_valid():
+            profile_form.save()
+            return redirect('view_my_profile')  # Redirect to profile view or success page
     else:
-        form = StaffProfileForm(instance=profile)
-    return render(request, "documents/edit_profile.html", {"form": form})
+        profile_form = StaffProfileForm(instance=profile)
+        document_form = StaffDocumentForm()
+        
+    return render(request, 'documents/edit_profile.html', {
+        'profile': profile,
+        'profile_form': profile_form,
+        'document_form': document_form,
+    })
+
+@login_required
+def add_staff_document(request):
+    if request.method == 'POST':
+        form = StaffDocumentForm(request.POST, request.FILES)
+        if form.is_valid():
+            document = form.save(commit=False)
+            document.staff_profile = get_object_or_404(StaffProfile, user=request.user)
+            document.save()
+            return JsonResponse({
+                'success': True,
+                'document': {
+                    'id': document.id,
+                    'description': document.description or document.document_type,
+                    'file_url': document.file.url,
+                    'document_type': document.get_document_type_display(),
+                    'uploaded_at': document.uploaded_at.strftime('%B %d, %Y')
+                }
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'errors': form.errors
+            }, status=400)
+    return JsonResponse({'success': False, 'error': 'Invalid request'}, status=400)
+
+@login_required
+def delete_staff_document(request, document_id):
+    try:
+        # Get the user's StaffProfile (assuming one profile per user)
+        staff_profile = StaffProfile.objects.get(user=request.user)
+        document = get_object_or_404(StaffDocument, id=document_id, staff_profile=staff_profile)
+        if request.method == 'POST':
+            document.delete()
+            return JsonResponse({'success': True})
+        return JsonResponse({'success': False, 'error': 'Invalid request method'}, status=400)
+    except StaffProfile.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Staff profile not found'}, status=404)
+    except StaffDocument.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Document not found or not owned by user'}, status=404)
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
 
 
 @login_required
@@ -843,7 +881,15 @@ def view_staff_profile(request, user_id):
     profile = get_object_or_404(StaffProfile, user_id=user_id)
     viewer = StaffProfile.objects.filter(user=request.user).first()
     visible_fields = [
-        "photo", "full_name", "phone_number", "official_email", "sex", "religion", "designation"
+        "photo",
+        "first_name", "last_name", "middle_name", "email", "phone_number", "sex", "date_of_birth", "home_address",
+        "state_of_origin", "lga", "religion",
+        "institution", "course", "degree", "graduation_year",
+        "account_number", "bank_name", "account_name",
+        "location", "employment_date",
+        "organization", "department", "team", "designation", "official_email",
+        "emergency_name", "emergency_relationship", "emergency_phone",
+        "emergency_address", "emergency_email",
     ]
 
     if viewer and profile.organization == viewer.organization:
@@ -915,3 +961,54 @@ def dismiss_notification(request):
         return JsonResponse({'status': 'success'})
     except Notification.DoesNotExist:
         return JsonResponse({'status': 'error', 'message': 'Notification not found'}, status=404)
+    
+@login_required
+def email_config(request):
+    user = CustomUser.objects.get(username=request.user.username)
+    if request.method == 'POST':
+        email_config_form = EmailConfigForm(request.POST, instance=user)
+        if email_config_form.is_valid():
+            email_config_form.save()
+            return redirect('view_my_profile')
+    else:
+        email_config_form = EmailConfigForm(instance=user)
+    return render(request, 'documents/email_config.html', {'email_config_form': email_config_form})
+
+from django.db import models
+from rest_framework.authtoken.models import Token
+
+class EventViewSet(viewsets.ModelViewSet):
+    serializer_class = EventSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        return Event.objects.filter(
+            models.Q(created_by=user) | models.Q(participants__user=user)
+        ).distinct()
+
+    def perform_create(self, serializer):
+        print(f"Received data: {self.request.data}")
+        serializer.save(created_by=self.request.user)
+
+# @login_required
+# def calendar_view(request):
+#     token, created = Token.objects.get_or_create(user=request.user)
+#     return render(request, 'documents/calendar.html', {'auth_token': token.key})
+from django.middleware.csrf import get_token
+
+def calendar_view(request):
+    auth_token = None
+    User = get_user_model()
+    if request.user.is_authenticated:
+        auth_token = Token.objects.get(user=request.user).key if Token.objects.filter(user=request.user).exists() else None
+    context = {
+        'auth_token': auth_token or '',
+        'csrf_token': get_token(request),
+        'notification_bar_items': [],
+        'birthday_others': [],
+        'birthday_self': False,
+        'users': User.objects.all(),
+    }
+    print(f"Context: {context}")  # Debug
+    return render(request, 'documents/calendar.html', context)

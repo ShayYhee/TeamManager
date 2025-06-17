@@ -19,11 +19,12 @@ dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
 load_dotenv(dotenv_path)
 
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'insecure-key-for-dev-only')
-DEBUG = os.getenv('DJANGO_DEBUG', 'False')
+# DEBUG = os.getenv('DJANGO_DEBUG', 'False')
+DEBUG = True
 # ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', 'localhost').split(',')
 # ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "*").split(",")
 # ALLOWED_HOSTS = ['https://raadaa.onrender.com']
-ALLOWED_HOSTS = ['raadaa.onrender.com', 'www.raadaa.onrender.com', 'localhost', '127.0.0.1:8000', '127.0.0.1']
+ALLOWED_HOSTS = ['teammanager.ng','www.teammanager.ng','raadaa.onrender.com', 'www.raadaa.onrender.com', 'localhost', '127.0.0.1:8000', '127.0.0.1']
 # WKHTMLTOPDF_PATH = os.environ.get("WKHTMLTOPDF_PATH", "/usr/bin/wkhtmltopdf")
 
 # PDFKIT_CONFIG = {
@@ -102,11 +103,22 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',  # API support
+    'rest_framework.authtoken',
     'documents',  # Our app
     'ckeditor',
     'ckeditor_uploader',
     'django_cron',
 ]
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework.authentication.TokenAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+}
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -121,6 +133,7 @@ MIDDLEWARE = [
 
 # raadaa/settings.py
 CSRF_TRUSTED_ORIGINS = [
+    "https://teammanager.ng",
     "https://raadaa.onrender.com",
     "https://*.onrender.com",  # For subdomains, if needed
     "http://localhost:8000",
@@ -156,6 +169,7 @@ WSGI_APPLICATION = 'raadaa.wsgi.application'
 
 CRON_CLASSES = [
     "documents.cron.BirthdayNotificationCronJob",
+    "documents.cron.EventReminderCronJob",
 ]
 
 # Database
@@ -176,20 +190,20 @@ CRON_CLASSES = [
 # }
 
 # Database
-if os.getenv("DATABASE_URL"):
-    DATABASES = {
-        "default": dj_database_url.config(
-            default=os.getenv("DATABASE_URL"),
-            conn_max_age=600
-        )
+# if os.getenv("DATABASE_URL"):
+#     DATABASES = {
+#         "default": dj_database_url.config(
+#             default=os.getenv("DATABASE_URL"),
+#             conn_max_age=600
+#         )
+#     }
+# else:
+DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": os.path.join(BASE_DIR, "db.sqlite3"),
     }
-else:
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.sqlite3",
-            "NAME": os.path.join(BASE_DIR, "db.sqlite3"),
-        }
-    }
+}
 
 # CKEditor upload path
 CKEDITOR_UPLOAD_PATH = "Uploads/"

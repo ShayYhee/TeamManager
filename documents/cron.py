@@ -1,13 +1,13 @@
 from django_cron import CronJobBase, Schedule
 from datetime import date, timedelta
 from django.utils.timezone import now
-from documents.models import StaffProfile, Notification
+from documents.models import StaffProfile, Notification, Event
 
 class BirthdayNotificationCronJob(CronJobBase):
     RUN_AT_TIMES = ['00:00']  # 12 AM daily
 
     schedule = Schedule(run_at_times=RUN_AT_TIMES)
-    code = 'yourapp.birthday_notification_cron'  # unique identifier
+    code = 'documents.birthday_notification_cron'  # unique identifier
 
     def do(self):
         today = date.today()
@@ -29,3 +29,20 @@ class BirthdayNotificationCronJob(CronJobBase):
                     is_active=True,
                     expires_at=now() + timedelta(hours=24)
                 )
+
+
+class EventReminderCronJob(CronJobBase):
+    RUN_EVERY_MINS = 30
+
+    schedule = Schedule(run_every_mins=RUN_EVERY_MINS)
+    code = 'documents.event_reminder_cron'
+
+    def do(self):
+        print("Running event reminder cron job...")
+        upcoming = now() + timedelta(minutes=30)
+        events = Event.objects.filter(start_time__lte=upcoming, start_time__gte=now())
+
+        for event in events:
+            for participant in event.participants.all():
+                # Your email sending logic
+                print(f"Reminder: {participant.email} for {event.title}")

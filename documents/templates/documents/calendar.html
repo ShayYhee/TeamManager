@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<h1>My Calendar</h1>
+<div id="calendar" style="border: 2px solid blue; min-height: 500px;"></div>
+
+<!-- Modal -->
+<div class="modal fade" id="eventModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <form id="eventForm">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Event Details</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="eventId">
+          <label>Title</label>
+          <input type="text" id="title" class="form-control" required>
+          <label>Description</label>
+          <textarea id="description" class="form-control"></textarea>
+          <label>Start</label>
+          <input type="datetime-local" id="start_time" class="form-control" required>
+          <label>End</label>
+          <input type="datetime-local" id="end_time" class="form-control" required>
+          <label>Meeting Link</label>
+          <input type="url" id="event_link" class="form-control">
+          <label>Participants</label>
+          <select multiple class="form-control" id="eventParticipants">
+            {% for user in users %}
+                <option value="{{ user.id }}">{{ user.username }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-primary">Save</button>
+          <button type="button" class="btn btn-danger" id="deleteBtn" style="display: none;">Delete</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  const users = [
+    {% for user in users %}
+      { id: {{ user.id }}, username: "{{ user.username | escapejs }}" },
+    {% endfor %}
+  ];
+  console.log('Users:', users);
+
+  document.addEventListener('DOMContentLoaded', function() {
+    const calendar = new FullCalendar.Calendar(document.getElementById('calendar'), {
+      initialView: 'dayGridMonth',
+      editable: true,
+      selectable: true,
+      events: '/api/events/',
+      dateClick: function(info) {
+        clearForm();
+        document.getElementById('start_time').value = info.dateStr + 'T09:00';
+        document.getElementById('end_time').value = info.dateStr + 'T10:00';
+        new bootstrap.Modal(document.getElementById('eventModal')).show();
+      },
+      eventClick: function(info) {
+        const event = info.event;
+        document.getElementById('eventId').value = event.id;
+        document.getElementById('title').value = event.title;
+        document.getElementById('start_time').value = event.start.toISOString().slice(0, 16);
+        document.getElementById('end_time').value = event.end ? event.end.toISOString().slice(0, 16) : '';
+        document.getElementById('event_link').value = event.extendedProps.event_link || '';
+        document.getElementById('description').value = event.extendedProps.description || '';
+
+        // Set participants in the select element
+        const participantSelect = document.getElementById('eventParticipants');
+        const participantUsernames = event.extendedProps.participants || [];
+        console.log('Participant usernames:', participantUsernames); // Debug
+
+        const participantIds = participantUsernames.map(username => {
+          const user = users.find(u => u.username === username);
+          return user ? user.id : null;
+        }).filter(id => id !== null);
+        console.log('Participant IDs:', participantIds); // Debug
+
+        // Clear previous selections and set new ones
+        Array.from(participantSelect.options).forEach(option => {
+          option.selected = participantIds.includes(parseInt(option.value));
+        });
+
+        document.getElementById('deleteBtn').style.display = 'inline-block';
+        new bootstrap.Modal(document.getElementById('eventModal')).show();
+      }
+
+    });
+
+    calendar.render();
+
+    // Save event
+    document.getElementById('eventForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const id = document.getElementById('eventId').value;
+      const method = id ? 'PUT' : 'POST';
+      const url = id ? `/api/events/${id}/` : '/api/events/';
+
+      // Get selected participants
+      const participantSelect = document.getElementById('eventParticipants');
+      const participants = Array.from(participantSelect.selectedOptions).map(option => ({
+        user: parseInt(option.value), // Assuming user IDs are integers
+        response: 'pending' // Default response as per EventParticipant model
+      }));
+
+      const body = {
+        title: document.getElementById('title').value,
+        description: document.getElementById('description').value,
+        start_time: document.getElementById('start_time').value, // Match serializer field name
+        end_time: document.getElementById('end_time').value, // Match serializer field name
+        event_link: document.getElementById('event_link').value, // Match serializer field name
+        participants: participants // Include participants
+      };
+
+      try {
+        const response = await fetch(url, {
+          method: method,
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': '{{ csrf_token }}'
+          },
+          body: JSON.stringify(body)
+        });
+
+        if (response.ok) {
+          document.getElementById('eventModal').querySelector('.btn-close').click();
+          calendar.refetchEvents();
+        } else {
+          const errorData = await response.json(); // Parse JSON for detailed errors
+          console.error('Failed to save:', errorData);
+          alert('Failed to save:\n' + JSON.stringify(errorData, null, 2));
+        }
+      } catch (error) {
+        console.error('Network error:', error);
+        alert('Network error occurred while saving the event.');
+      }
+    });
+
+    // Delete event
+    document.getElementById('deleteBtn').addEventListener('click', async function() {
+      const id = document.getElementById('eventId').value;
+      const response = await fetch(`/api/events/${id}/`, {
+        method: 'DELETE',
+        headers: {
+          'X-CSRFToken': '{{ csrf_token }}'
+        }
+      });
+      if (response.ok) {
+        document.getElementById('eventModal').querySelector('.btn-close').click();
+        calendar.refetchEvents();
+      }
+    });
+
+    function clearForm() {
+      document.getElementById('eventForm').reset();
+      document.getElementById('eventId').value = '';
+      document.getElementById('deleteBtn').style.display = 'none';
+    }
+  });
+</script>
+
+<style>
+  #calendar {
+    margin-top: 20px;
+    padding: 25px;
+  }
+</style>
+
+{% comment %} {% debug %} {% endcomment %}
+{% endblock %}

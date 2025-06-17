@@ -1,5 +1,7 @@
 {% load static %}
-<div class=profile>
+{% load custom_filters %}
+
+<div class="profile">
     <div class="profile-photo">
         {% if 'photo' in visible_fields and profile.photo %}
             <img src="{{ profile.photo.url }}" width="150" class="pfp"/>
@@ -9,52 +11,53 @@
     </div>
 
     <div class="profile-details">
-        <ul class="profile-details">
-            {% if 'full_name' in visible_fields %}
-                <li><strong>Name:</strong> {{ profile.first_name }} {{ profile.middle_name|default:"" }} {{ profile.last_name }}</li>
-            {% endif %}
-            {% if 'phone_number' in visible_fields %}
-                <li><strong>Phone:</strong> {{ profile.phone_number|default:"Not provided" }}</li>
-            {% endif %}
-            {% if 'official_email' in visible_fields %}
-                <li><strong>Email:</strong> {{ profile.official_email|default:"Not provided" }}</li>
-            {% endif %}
-            {% if 'sex' in visible_fields %}
-                <li><strong>Sex:</strong> {{ profile.sex|default:"Not provided" }}</li>
-            {% endif %}
-            {% if 'religion' in visible_fields %}
-                <li><strong>Religion:</strong> {{ profile.religion|default:"Not provided" }}</li>
-            {% endif %}
-            {% if 'designation' in visible_fields %}
-                <li><strong>Position:</strong> {{ profile.designation|default:"Not provided" }}</li>
-            {% endif %}
-            {% if 'organization' in visible_fields %}
-                <li><strong>Organization:</strong> {{ profile.organization.name|default:"Unassigned" }}</li>
-            {% endif %}
-            {% if 'department' in visible_fields %}
-                <li><strong>Department:</strong> 
-                    {% if profile.department.exists %}
-                        {{ profile.department.all|join:", " }}
-                    {% else %}
-                        Unassigned
-                    {% endif %}
+        {% for vis in visible_fields %}
+        {% if vis != 'photo' %}
+            <ul class="profile-details">
+                <li><strong>{{ vis|underscore_to_space_upper }}:</strong> {{ profile|dict_get:vis }}</li>
+            </ul>
+        {% endif %}
+        {% endfor %}
+        
+
+        <p><strong>Documents</strong><p>
+        {% if profile.documents.all %}
+
+            <div class="card-body">
+                <div id="documentList" class="row">
+                    {% for document in profile.documents.all %}
+                        <div class="col-md-3 document-card" data-document-id="{{ document.id }}">
+                            <div class="card mb-2">
+                                <div class="card-body">
+                                    <h5 class="card-title">{{ document.description|default:document.document_type }}</h5>
+                                    <p class="card-text">
+                                        <a href="{{ document.file.url }}" target="_blank">{{ document.file.name|slice:"20:" }}</a><br>
+                                        {% comment %} Type: {{ document.get_document_type_display }}<br>
+                                        Uploaded: {{ document.uploaded_at|date:"F d, Y" }} {% endcomment %}
+                                    </p>
+                                    {% comment %} <button class="btn btn-danger btn-sm delete-document" style="position: absolute; top: 10px; right: 10px;">X</button> {% endcomment %}
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            {% comment %} <ul>
+            {% for document in profile.documents.all %}
+                <li>
+                    {{ document.document_type }}: 
+                    <a href="{{ document.file.url }}" target="_blank">{{ document.file.name }}</a>
+                    (Uploaded: {{ document.uploaded_at|date:"F d, Y" }})
+                    {% if document.description %} - {{ document.description }}{% endif %}
                 </li>
-            {% endif %}
-            {% if 'team' in visible_fields %}
-                <li><strong>Teams:</strong>
-                    {% if profile.team.exists %}
-                        <ul class="team-list">
-                            {% for team in profile.team.all %}
-                                <li>{{ team.name }}</li>
-                            {% endfor %}
-                        </ul>
-                    {% else %}
-                        No Team
-                    {% endif %}
-                </li>
-            {% endif %}
-        </ul>
+            {% endfor %}
+            </ul> {% endcomment %}
+        {% else %}
+            <p>No documents uploaded.</p>
+        {% endif %}
     </div>
+    
 </div>
 
 <style>
@@ -69,6 +72,7 @@
         {% comment %} display: flex;
         align-items: center; {% endcomment %}
         text-align: center;
+        padding: auto;
     }
 
     .profile-photo {
@@ -83,8 +87,11 @@
         margin: 0 auto;
         border: 1px solid #000000;
         border-radius: 5px;
-        width: 600px;
+        width: 800px;
         text-align: left;
         {% comment %} height: 500px; {% endcomment %}
+    }
+    ul {
+        list-style: none;
     }
 </style>
