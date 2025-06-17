@@ -12,7 +12,7 @@ def notification_bar(request):
     # Get active notifications (excluding birthday notifications)
     notifications = Notification.objects.filter(
         is_active=True,
-        type__in=[Notification.NotificationType.NEWS, Notification.NotificationType.ALERT]
+        type__in=[Notification.NotificationType.NEWS, Notification.NotificationType.ALERT, Notification.NotificationType.EVENT]
     ).order_by('-created_at')
     
     if request.user.is_authenticated:

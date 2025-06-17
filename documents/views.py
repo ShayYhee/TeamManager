@@ -14,7 +14,7 @@ from django.utils.text import slugify
 from django.utils.timezone import now
 from django.views.decorators.http import require_POST
 from .forms import DocumentForm, SignUpForm, CreateDocumentForm, FileUploadForm, FolderForm, TaskForm, ReassignTaskForm, StaffProfileForm, StaffDocumentForm, EmailConfigForm
-from .models import Document, CustomUser, Role, File, Folder, Task, StaffProfile, Notification, UserNotification, StaffDocument, Event
+from .models import Document, CustomUser, Role, File, Folder, Task, StaffProfile, Notification, UserNotification, StaffDocument, Event, EventParticipant
 from .serializers import EventSerializer
 from .placeholders import replace_placeholders
 from docx import Document as DocxDocument
@@ -976,6 +976,7 @@ def email_config(request):
 
 from django.db import models
 from rest_framework.authtoken.models import Token
+from rest_framework.response import Response
 
 class EventViewSet(viewsets.ModelViewSet):
     serializer_class = EventSerializer
@@ -989,7 +990,33 @@ class EventViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         print(f"Received data: {self.request.data}")
-        serializer.save(created_by=self.request.user)
+        event = serializer.save(created_by=self.request.user)
+
+        # notif = Notification.objects.create(
+        #     title=f"New Event: {event.title}",
+        #     message=event.description or "You have been invited to a new event.",
+        #     type=Notification.NotificationType.EVENT,
+        #     expires_at=event.end_time,
+        #     is_active=True
+        # )
+
+        # # Step 2: Create UserNotifications for each invited user
+        # participants = self.request.data.get('participants', [])  # Should be list of user IDs
+        # for user_id in participants:
+        #     EventParticipant.objects.create(event=event, user=user_id, response="pending")
+        #     UserNotification.objects.create(user=user_id, notification=notif)
+
+    def update(self, request, *args, **kwargs):
+        event = self.get_object()
+        if event.created_by != request.user:
+            return Response({"detail": "You can only edit events you created."}, status=403)
+        return super().update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        event = self.get_object()
+        if event.created_by != request.user:
+            return Response({"detail": "You can only delete events you created."}, status=403)
+        return super().destroy(request, *args, **kwargs)
 
 # @login_required
 # def calendar_view(request):

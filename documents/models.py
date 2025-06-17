@@ -237,7 +237,7 @@ class Notification(models.Model):
     
 
 class UserNotification(models.Model):
-    user = models.ForeignKey(CustomUser, on_delete=models.CASCADE)
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     notification = models.ForeignKey(Notification, on_delete=models.CASCADE)
     dismissed = models.BooleanField(default=False)
     seen_at = models.DateTimeField(auto_now=True)

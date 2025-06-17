@@ -1,6 +1,7 @@
 from rest_framework import serializers
-from .models import Event, EventParticipant
+from .models import Event, EventParticipant, Notification, UserNotification, CustomUser
 from django.contrib.auth import get_user_model
+from django.shortcuts import get_object_or_404
 
 User = get_user_model()
 
@@ -36,7 +37,24 @@ class EventSerializer(serializers.ModelSerializer):
         participants_data = validated_data.pop('participants', [])
         event = Event.objects.create(**validated_data)
         for participant_data in participants_data:
+            print("User this:", participant_data)
             EventParticipant.objects.create(event=event, **participant_data)
+        
+        notif = Notification.objects.create(
+            title=event.title,
+            message=event.description or "You have been invited to a new event.",
+            type=Notification.NotificationType.EVENT,
+            expires_at=event.end_time,
+            is_active=True
+        )
+
+        # Step 2: Create UserNotifications for each invited user
+        participants = participant_data  # Should be list of user IDs
+        
+        for participant_data in participants_data:
+            print("User this:", participant_data['user'])
+            user = participant_data['user']
+            UserNotification.objects.create(user=user, notification=notif)
         return event
 
     def update(self, instance, validated_data):

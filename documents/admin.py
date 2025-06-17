@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from .models import CustomUser, Role, Organization, Department, Team, StaffProfile, Notification, StaffDocument, Event, EventParticipant
+from .models import CustomUser, Role, Organization, Department, Team, StaffProfile, Notification, UserNotification, StaffDocument, Event, EventParticipant
 
 class CustomUserAdmin(UserAdmin):
     model = CustomUser
@@ -29,7 +29,7 @@ admin.site.register(Team)
 admin.site.register(StaffProfile, StaffProfileAdmin)
 admin.site.register(Event)
 admin.site.register(EventParticipant)
-
+admin.site.register(UserNotification)
 @admin.register(Notification)
 class NotificationAdmin(admin.ModelAdmin):
     list_display = ('title', 'type', 'created_at', 'expires_at', 'is_active')
