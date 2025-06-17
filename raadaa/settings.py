@@ -19,8 +19,8 @@ dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
 load_dotenv(dotenv_path)
 
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'insecure-key-for-dev-only')
-# DEBUG = os.getenv('DJANGO_DEBUG', 'False')
-DEBUG = True
+DEBUG = os.getenv('DJANGO_DEBUG', 'False')
+# DEBUG = True
 # ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', 'localhost').split(',')
 # ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "*").split(",")
 # ALLOWED_HOSTS = ['https://raadaa.onrender.com']
@@ -190,20 +190,20 @@ CRON_CLASSES = [
 # }
 
 # Database
-# if os.getenv("DATABASE_URL"):
-#     DATABASES = {
-#         "default": dj_database_url.config(
-#             default=os.getenv("DATABASE_URL"),
-#             conn_max_age=600
-#         )
-#     }
-# else:
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": os.path.join(BASE_DIR, "db.sqlite3"),
+if os.getenv("DATABASE_URL"):
+    DATABASES = {
+        "default": dj_database_url.config(
+            default=os.getenv("DATABASE_URL"),
+            conn_max_age=600
+        )
     }
-}
+else:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": os.path.join(BASE_DIR, "db.sqlite3"),
+        }
+    }
 
 # CKEditor upload path
 CKEDITOR_UPLOAD_PATH = "Uploads/"
