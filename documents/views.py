@@ -218,11 +218,6 @@ def create_document(request):
                     if not libreoffice_path or not os.path.exists(libreoffice_path):
                         raise FileNotFoundError("LibreOffice not found. Make sure it's installed and in PATH.")
 
-                    # Debug paths
-                    print("LibreOffice path:", libreoffice_path)
-                    print("abs_word_path:", abs_word_path)
-                    print("abs_output_dir:", abs_output_dir)
-
                     try:
                         print("Starting PDF conversion with LibreOffice")
                         
@@ -237,9 +232,14 @@ def create_document(request):
                             [libreoffice_path, "--headless", "--convert-to", "pdf", "--outdir", abs_output_dir, abs_word_path],
                             stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE,
-                            check=True,
-                            capture_output=True
+                            check=True
                         )
+
+                        # Debug paths
+                        print("LibreOffice path:", libreoffice_path)
+                        print("abs_word_path:", abs_word_path)
+                        print("abs_output_dir:", abs_output_dir)
+
 
                         print("LibreOffice stdout:", result.stdout.decode())
                         print("LibreOffice stderr:", result.stderr.decode())
