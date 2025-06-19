@@ -163,6 +163,7 @@ TEMPLATES = [
 
 TEMPLATES[0]['OPTIONS']['context_processors'] += [
     'documents.context_processors.notification_bar',
+    'documents.context_processors.notification_count',
 ]
 
 WSGI_APPLICATION = 'raadaa.wsgi.application'
@@ -236,7 +237,7 @@ CKEDITOR_CONFIGS = {
     },
 }
 
-
+CKEDITOR_RESTRICT_BY_USER = False  # Allow all users to upload
 
 
 # Password validation

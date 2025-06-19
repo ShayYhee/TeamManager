@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth.models import User
 from raadaa import settings
 from django.utils import timezone
+import os
 
 class Document(models.Model):
     STATUS_CHOICES = [
@@ -76,11 +77,16 @@ class Folder(models.Model):
 
     def __str__(self):
         return self.name
+    
+def upload_to_folder(instance, filename):
+    folder_name = instance.folder.name if instance.folder else "unassigned"
+    return os.path.join('uploads', folder_name, filename)
+
 
 class File(models.Model):
     folder = models.ForeignKey(Folder, on_delete=models.CASCADE, related_name='files')
     uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    file = models.FileField(upload_to='uploads/')
+    file = models.FileField(upload_to=upload_to_folder)
     original_name = models.CharField(max_length=255)
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
@@ -93,6 +99,7 @@ class Task(models.Model):
         ('in_progress', 'In Progress'),
         ('completed', 'Completed'),
         ('on_hold', 'On Hold'),
+        ('overdue', 'Overdue'),
         ('cancelled', 'Cancelled'),
     ]
 
@@ -118,12 +125,14 @@ class Organization(models.Model):
     
 class Department(models.Model):
     name = models.CharField(max_length=255, unique=True)
+    organization = models.ForeignKey(Organization, on_delete=models.CASCADE, null=True, blank=True)
 
     def __str__(self):
         return self.name
     
 class Team(models.Model):
     name = models.CharField(max_length=255, unique=True)
+    department = models.ForeignKey(Department, on_delete=models.CASCADE, blank=True, null=True)
 
     def __str__(self):
         return self.name

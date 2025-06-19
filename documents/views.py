@@ -1,24 +1,34 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.models import User
+from django.contrib.admin.models import LogEntry, CHANGE
 from django.contrib.auth import login, get_user_model
 from django.contrib.auth.signals import user_logged_in
+from django.contrib.contenttypes.models import ContentType
 from django.contrib import messages
 from django.core.mail import send_mail, EmailMessage, get_connection
+from django.core.paginator import Paginator
 from django.conf import settings
 from django.db.models import Q
 from django.dispatch import receiver
 from django.forms import formset_factory
 from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
 from django.utils.text import slugify
+from django.utils import timezone
 from django.utils.timezone import now
 from django.views.decorators.http import require_POST
-from .forms import DocumentForm, SignUpForm, CreateDocumentForm, FileUploadForm, FolderForm, TaskForm, ReassignTaskForm, StaffProfileForm, StaffDocumentForm, EmailConfigForm
-from .models import Document, CustomUser, Role, File, Folder, Task, StaffProfile, Notification, UserNotification, StaffDocument, Event, EventParticipant
+from django.views.decorators.csrf import csrf_exempt
+from .forms import DocumentForm, SignUpForm, CreateDocumentForm, FileUploadForm, FolderForm, TaskForm, ReassignTaskForm, StaffProfileForm, StaffDocumentForm, EmailConfigForm, UserForm
+from .models import Document, CustomUser, Role, File, Folder, Task, StaffProfile, Notification, UserNotification, StaffDocument, Event, EventParticipant, Department
 from .serializers import EventSerializer
 from .placeholders import replace_placeholders
 from docx import Document as DocxDocument
+from docx.shared import Inches
+from ckeditor_uploader.views import upload as ckeditor_upload
+import csv
 import subprocess
+import platform
+import shutil
 # from comtypes import CoInitialize, CoUninitialize
 # from comtypes.client import CreateObject
 # from win32com.client import Dispatch, constants, gencache
@@ -38,10 +48,21 @@ import requests
 import io
 import urllib.parse
 from rest_framework import viewsets, permissions
+import logging
+logger = logging.getLogger(__name__)
 
 pdf_config = pdfkit.configuration()
 
 User = get_user_model()
+
+def is_admin(user):
+    # Check if the user is an admin
+
+    for role in user.roles.all():
+        if role.name == "Admin":
+            return True
+
+    # return user.is_staff
 
 def send_approval_request(document):
     # Get all BDM emails
@@ -200,8 +221,7 @@ def create_document(request):
                     #     except:
                     #         pass
                     #     return HttpResponse(f"Error converting to PDF: {e}", status=500)
-                    import platform
-                    import shutil
+                    
                     # libreoffice_path = r"C:\Program Files (x86)\LibreOffice\program\soffice.exe"
 
                     # Choose the right LibreOffice path
@@ -265,11 +285,11 @@ def create_document(request):
                     print("Redirecting to document_list")
                     return redirect("document_list")
 
-                print("Sending email")
-                send_approval_request(document)
+            #     print("Sending email")
+            #     send_approval_request(document)
             
-            print("Redirecting to document_list")
-            return redirect("document_list")
+            # print("Redirecting to document_list")
+            # return redirect("document_list")
         else:
             print("Formset errors:", formset.errors)
             print("Non-form errors:", formset.non_form_errors())
@@ -279,18 +299,109 @@ def create_document(request):
     
     return render(request, "documents/create_document.html", {"formset": formset})
 
+@user_passes_test(is_admin)
+def users_list(request):
+    users = CustomUser.objects.all().order_by('date_joined')
+    paginator = Paginator(users, 10) # 10 users per page
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    return render(request, "registration/users_list.html", {"users": page_obj})
+
+@user_passes_test(is_admin)
+def approve_user(request, user_id):
+    user = CustomUser.objects.get(id=user_id)
+    admin_user = CustomUser.objects.get(username=request.user)
+
+    if user:
+        user.is_active = True
+        user.save()
+        sender_email = admin_user.smtp_email
+        sender_password = admin_user.smtp_password
+
+        if not sender_email or not sender_password:
+            return HttpResponseForbidden("Your email credentials are missing. Contact admin.")
+
+        connection = get_connection(
+            backend="django.core.mail.backends.smtp.EmailBackend",
+            host="smtp.zoho.com",
+            port=587,
+            username=sender_email,
+            password=sender_password,
+            use_tls=True,
+        )
+
+        subject = f"Approval Request: {user.username}"
+        message = f"""
+        Dear {user.username},
+
+        Your account has been activated, please click the link below to login: {'http://127.0.0.1:8000/login/'or 'https://raadaa.onrender.com/login'}
+
+        Best regards,  
+        {user.get_full_name()}
+        """
+
+        print("Sending mail...")
+
+        send_mail(
+        subject,
+        message,
+        sender_email,  # Always send from Zoho SMTP email
+        [user.email],  # Send to all BDMs
+        connection=connection
+    )
+        return redirect("users_list")
+
+    return redirect("users_list")
+
+def account_activation_sent(request):
+    return render(request, "registration/account_activation_sent.html")
+
+@user_passes_test(is_admin)
+def edit_user(request, user_id):
+    user = get_object_or_404(CustomUser, id=user_id)
+    if request.method == "POST":
+        form = UserForm(request.POST, instance=user)
+        if form.is_valid():
+            form.save()
+            LogEntry.objects.log_action(
+                user_id=request.user.id,
+                content_type_id=ContentType.objects.get_for_model(User).pk,
+                object_id=user.id,
+                object_repr=user.username,
+                action_flag=CHANGE,
+                change_message='Edited user profile'
+            )
+            return redirect("users_list")
+    else:
+        form = UserForm(instance=user)
+    return render(request, "registration/edit_user.html", {"form": form})
+
 def register(request):
     if request.method == "POST":
         form = SignUpForm(request.POST)
         if form.is_valid():
             user = form.save(commit=False)
             user.set_password(form.cleaned_data["password"])
+            user.is_active = "False"
             user.save()
-            login(request, user)
-            return redirect("login")  # Redirect to document form
+            # approve_user(request, user.id)
+            # login(request, user)
+            # return redirect("login")  # Redirect to document form
+            return redirect("account_activation_sent")
     else:
         form = SignUpForm()
-    return render(request, "documents/register.html", {"form": form})
+    return render(request, "registration/register.html", {"form": form})
+
+@login_required
+@user_passes_test(is_admin)
+def delete_user(request, user_id):
+    user = get_object_or_404(CustomUser, id=user_id)
+
+    if user:
+        user.delete()
+        # return JsonResponse({'success': True})
+
+    return redirect("users_list")  # Redirect back to the list
 
 @login_required
 def document_list(request):
@@ -298,37 +409,62 @@ def document_list(request):
     documents = Document.objects.all()
 
     # Get filter parameters from the request
-    company = request.GET.get('company', '')
-    doc_type = request.GET.get('type', '')
-    status = request.GET.get('status', '')
-    created = request.GET.get('created', '')
-    created_by = request.GET.get('created_by', '')
-    approved_by = request.GET.get('approved_by', '')
-    send_email = request.GET.get('send_email', '')
+    company = request.GET.get('company', '').strip()
+    doc_type = request.GET.get('type', '').strip()
+    status = request.GET.get('status', '').strip()
+    created = request.GET.get('created', '').strip()
+    created_by = request.GET.get('created_by', '').strip()
+    approved_by = request.GET.get('approved_by', '').strip()
+    send_email = request.GET.get('send_email', '').strip()
 
-    # Apply filters if parameters are provided
+    # Apply filters
     if company:
         documents = documents.filter(company_name__iexact=company)
+        print(f"Filtering by company: {company}")
     if doc_type:
-        documents = documents.filter(document_type__icontains=doc_type)
+        documents = documents.filter(document_type__iexact=doc_type)
+        print(f"Filtering by document_type: {doc_type}")
     if status:
         documents = documents.filter(status__iexact=status)
+        print(f"Filtering by status: {status}")
     if created:
-        documents = documents.filter(created_at__date=created)
+        try:
+            documents = documents.filter(created_at__date=created)
+            print(f"Filtering by created_at: {created}")
+        except ValueError:
+            print(f"Invalid date format for created: {created}")
     if created_by:
-        documents = documents.filter(created_by__username__icontains=created_by)
+        documents = documents.filter(created_by__username__iexact=created_by)
+        print(f"Filtering by created_by: {created_by}")
     if approved_by:
-        documents = documents.filter(approved_by__username__icontains=approved_by)
+        documents = documents.filter(approved_by__username__iexact=approved_by)
+        print(f"Filtering by approved_by: {approved_by}")
     if send_email:
-        documents = documents.filter(email_sent=(send_email.lower() == 'sent'))
+        email_sent = send_email.lower() == 'sent'
+        documents = documents.filter(email_sent=email_sent)
+        print(f"Filtering by email_sent: {email_sent}")
 
+    # Paginate filtered documents
+    paginator = Paginator(documents, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    # Get distinct values for filter dropdowns
     distinct_companies = Document.objects.values_list('company_name', flat=True).distinct()
     distinct_type = Document.objects.values_list('document_type', flat=True).distinct()
-    distinct_created_by = User.objects.filter(id__in=Document.objects.values_list('created_by', flat=True).distinct())
-    distinct_approved_by = User.objects.filter(id__in=Document.objects.values_list('approved_by', flat=True).distinct())
+    distinct_created_by = User.objects.filter(
+        id__in=Document.objects.values_list('created_by', flat=True).distinct()
+    ).values_list('username', flat=True)
+    distinct_approved_by = User.objects.filter(
+        id__in=Document.objects.values_list('approved_by', flat=True).distinct()
+    ).exclude(username__isnull=True).values_list('username', flat=True)
+
+    # Debug filtered document count
+    print(f"Filtered documents count: {documents.count()}")
 
     return render(request, "documents/document_list.html", {
-        "documents": documents,
+        "documents": page_obj,
+        "page_obj": page_obj,
         "filter_params": {
             'company': company,
             'type': doc_type,
@@ -351,6 +487,8 @@ def home(request):
 @login_required
 def approve_document(request, document_id):
     document = get_object_or_404(Document, id=document_id)
+    print("Yess>>>", request)
+    print("Yess>>>", request.user)
 
     # Restrict only BDMs from approving
     if request.user.position != "BDM":
@@ -523,14 +661,7 @@ def send_approved_email(request, document_id):
     document.save()
 
     return redirect("document_list")  # Redirect to the document list
-def is_admin(user):
-    # Check if the user is an admin
 
-    for role in user.roles.all():
-        if role.name == "Admin":
-            return True
-
-    # return user.is_staff
 
 # @user_passes_test(is_admin)
 # def admin_access_page(request):
@@ -552,55 +683,83 @@ def delete_document(request, document_id):
 
 def add_formatted_content(doc, soup, word_dir):
     """Parse HTML and add formatted content and images to the .docx document."""
-    for element in soup.recursiveChildGenerator():
+    current_paragraph = None
+
+    def add_text_to_paragraph(text, bold=False, italic=False):
+        """Helper to add text to the current paragraph with formatting."""
+        nonlocal current_paragraph
+        if not current_paragraph:
+            current_paragraph = doc.add_paragraph()
+        run = current_paragraph.add_run(text or '')
+        run.bold = bold
+        run.italic = italic
+
+    for element in soup.find_all(recursive=False):  # Process top-level elements only
         if element.name == 'h1':
-            paragraph = doc.add_heading(element.get_text(), level=1)
+            current_paragraph = doc.add_heading(element.get_text(), level=1)
         elif element.name == 'h2':
-            paragraph = doc.add_heading(element.get_text(), level=2)
+            current_paragraph = doc.add_heading(element.get_text(), level=2)
         elif element.name == 'p':
-            paragraph = doc.add_paragraph(element.get_text())
-        elif element.name == 'strong':
-            paragraph = doc.add_paragraph()
-            run = paragraph.add_run(element.get_text())
-            run.bold = True
-        elif element.name == 'em':
-            paragraph = doc.add_paragraph()
-            run = paragraph.add_run(element.get_text())
-            run.italic = True
+            current_paragraph = doc.add_paragraph()
+            # Process nested elements within <p>
+            for child in element.children:
+                if child.name == 'strong':
+                    add_text_to_paragraph(child.get_text(), bold=True)
+                elif child.name == 'em':
+                    add_text_to_paragraph(child.get_text(), italic=True)
+                elif child.name == 'img':
+                    img_src = child.get('src')
+                    if img_src:
+                        try:
+                            parsed_src = urllib.parse.urlparse(img_src)
+                            if parsed_src.scheme in ('http', 'https'):
+                                print(f"Downloading remote image: {img_src}")
+                                response = requests.get(img_src, timeout=5)
+                                if response.status_code == 200:
+                                    img_data = io.BytesIO(response.content)
+                                    doc.add_picture(img_data, width=Inches(4.0))
+                                else:
+                                    print(f"Failed to download image: {img_src} (Status: {response.status_code})")
+                                    current_paragraph = doc.add_paragraph(f"[Image failed to load: {img_src}]")
+                            else:
+                                # Handle local images (e.g., /media/Uploads/image.jpg)
+                                clean_src = img_src.replace(settings.MEDIA_URL, '').lstrip('/')
+                                img_path = os.path.normpath(os.path.join(settings.MEDIA_ROOT, clean_src))
+                                print(f"Attempting to add local image: {img_path}")
+                                if os.path.exists(img_path):
+                                    doc.add_picture(img_path, width=Inches(4.0))
+                                else:
+                                    print(f"Local image not found: {img_path}")
+                                    current_paragraph = doc.add_paragraph(f"[Image not found: {img_path}]")
+                        except Exception as e:
+                            print(f"Error adding image {img_src}: {e}")
+                            current_paragraph = doc.add_paragraph(f"[Error loading image: {img_src}]")
+                else:
+                    add_text_to_paragraph(child.get_text() if hasattr(child, 'get_text') else str(child))
         elif element.name == 'ul':
-            for li in element.find_all('li'):
-                paragraph = doc.add_paragraph(li.get_text(), style='ListBullet')
+            current_paragraph = None
+            for li in element.find_all('li', recursive=False):
+                doc.add_paragraph(li.get_text(), style='ListBullet')
         elif element.name == 'ol':
-            for li in element.find_all('li'):
-                paragraph = doc.add_paragraph(li.get_text(), style='ListNumber')
-        elif element.name == 'img':
-            img_src = element.get('src')
-            if img_src:
-                try:
-                    # Normalize the image URL
-                    parsed_src = urllib.parse.urlparse(img_src)
-                    if parsed_src.scheme in ('http', 'https'):
-                        # Handle remote images
-                        print(f"Downloading remote image: {img_src}")
-                        response = requests.get(img_src, timeout=5)
-                        if response.status_code == 200:
-                            img_data = io.BytesIO(response.content)
-                            doc.add_picture(img_data, width=Inches(4.0))
-                        else:
-                            print(f"Failed to download image: {img_src} (Status: {response.status_code})")
-                    else:
-                        # Handle local images
-                        # Remove leading slashes and normalize path
-                        clean_src = img_src.lstrip('/')
-                        img_path = os.path.join(settings.MEDIA_ROOT, clean_src)
-                        img_path = os.path.normpath(img_path)  # Normalize path for the OS
-                        print(f"Attempting to add local image: {img_path}")
-                        if os.path.exists(img_path):
-                            doc.add_picture(img_path, width=Inches(4.0))
-                        else:
-                            print(f"Local image not found: {img_path}")
-                except Exception as e:
-                    print(f"Error adding image {img_src}: {e}")
+            current_paragraph = None
+            for li in element.find_all('li', recursive=False):
+                doc.add_paragraph(li.get_text(), style='ListNumber')
+        else:
+            current_paragraph = None
+            add_text_to_paragraph(element.get_text() if hasattr(element, 'get_text') else str(element))
+
+@login_required
+@csrf_exempt  # Required for CKEditor’s POST uploads
+def custom_ckeditor_upload(request):
+    if not request.user.is_authenticated:
+        return HttpResponseForbidden("You must be logged in to upload images.")
+    logger.info(f"User {request.user.username} uploading image to CKEditor")
+    response = ckeditor_upload(request)
+    if response.status_code == 200:
+        logger.info(f"Image upload successful for user {request.user.username}")
+    else:
+        logger.error(f"Image upload failed for user {request.user.username}: {response.content}")
+    return response
 
 def create_from_editor(request):
     if request.method == "POST":
@@ -611,7 +770,8 @@ def create_from_editor(request):
 
             # Create a .docx file
             doc = DocxDocument()
-            
+            doc.add_heading(title, level=1)
+
             # Parse HTML content using BeautifulSoup
             soup = BeautifulSoup(content, 'html.parser')
 
@@ -621,9 +781,6 @@ def create_from_editor(request):
             os.makedirs(word_dir, exist_ok=True)
             os.makedirs(pdf_dir, exist_ok=True)
 
-            # Add title as heading
-            # doc.add_heading(title, level=1)
-
             # Add formatted content and images
             add_formatted_content(doc, soup, word_dir)
 
@@ -632,20 +789,96 @@ def create_from_editor(request):
             word_path = os.path.join(word_dir, word_filename)
             try:
                 doc.save(word_path)
+                print(f"Saved .docx: {word_path}")
             except Exception as e:
-                return HttpResponse(f"Error creating .docx: {e}", status=500)
+                messages.error(request, f"Error creating .docx file: {e}")
+                return render(request, 'documents/create_from_editor.html', {'form': form})
 
-            # Optionally, create a .pdf file (uncomment if needed)
-            # pdf_filename = word_filename.replace('.docx', ".pdf")
-            # pdf_path = os.path.join(pdf_dir, pdf_filename)
-            # pdfkit.from_file(word_path, pdf_path)
+            # Generate and save the .pdf file using LibreOffice
+            pdf_filename = f"{slugify(title)}.pdf"
+            relative_pdf_path = os.path.join("documents/pdf", pdf_filename)
+            absolute_pdf_path = os.path.join(settings.MEDIA_ROOT, relative_pdf_path)
 
-            # Save to database (implement as needed)
-            # ...
+            # Choose the right LibreOffice path
+            if platform.system() == "Windows":
+                paths = [
+                    r"C:\Program Files (x86)\LibreOffice\program\soffice.exe",
+                    r"C:\Program Files\LibreOffice\program\soffice.exe"
+                ]
+                libreoffice_path = next((p for p in paths if os.path.exists(p)), None)
+            else:
+                libreoffice_path = shutil.which("libreoffice") or shutil.which("soffice")
 
+            # Check if LibreOffice exists
+            if not libreoffice_path or not os.path.exists(libreoffice_path):
+                messages.error(request, "LibreOffice not found. Make sure it's installed and in PATH.")
+                return render(request, 'documents/create_from_editor.html', {'form': form})
+
+            try:
+                print("Starting PDF conversion with LibreOffice")
+                
+                # Ensure paths are absolute
+                abs_word_path = os.path.abspath(word_path)
+                abs_output_dir = os.path.dirname(os.path.abspath(absolute_pdf_path))
+
+                # Run LibreOffice to convert .docx to .pdf
+                result = subprocess.run(
+                    [libreoffice_path, "--headless", "--convert-to", "pdf", "--outdir", abs_output_dir, abs_word_path],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    check=True,
+                    timeout=30  # 30 seconds
+                )
+
+                # Debug paths
+                print("LibreOffice path:", libreoffice_path)
+                print("abs_word_path:", abs_word_path)
+                print("abs_output_dir:", abs_output_dir)
+                print("LibreOffice stdout:", result.stdout.decode())
+                print("LibreOffice stderr:", result.stderr.decode())
+
+                # Confirm output PDF file exists
+                if not os.path.exists(absolute_pdf_path):
+                    if os.path.exists(word_path):
+                        os.remove(word_path)
+                    messages.error(request, "PDF file was not generated.")
+                    return render(request, 'documents/create_from_editor.html', {'form': form})
+
+            except subprocess.CalledProcessError as e:
+                print(f"LibreOffice conversion error: {e.stderr.decode()}")
+                messages.error(request, f"Error converting to PDF: {e.stderr.decode()}")
+                return render(request, 'documents/create_from_editor.html', {'form': form})
+
+            except Exception as e:
+                print(f"Unexpected error during PDF conversion: {e}")
+                messages.error(request, f"Unexpected error converting to PDF: {e}")
+                return render(request, 'documents/create_from_editor.html', {'form': form})
+
+            # Save to database
+            document = Document(
+                document_type='Uploaded',
+                document_source='editor',
+                company_name='N/A',  # Adjust as needed
+                company_address='N/A',
+                contact_person_name='N/A',
+                contact_person_email='N/A',
+                contact_person_designation='N/A',
+                sales_rep='N/A',
+                created_by=request.user,
+                word_file=f"documents/word/{word_filename}",
+                pdf_file=relative_pdf_path
+            )
+            try:
+                document.save()
+            except Exception as e:
+                messages.error(request, f"Error saving document: {e}")
+                return render(request, 'documents/create_from_editor.html', {'form': form})
+
+            messages.success(request, 'Document created successfully!')
             return redirect("document_list")
         else:
-            print("Form errors:", form.errors)  # Debug
+            print("Form errors:", form.errors)
+            messages.error(request, 'Please correct the errors below.')
     else:
         form = CreateDocumentForm()
     return render(request, 'documents/create_from_editor.html', {'form': form})
@@ -678,7 +911,17 @@ def create_folder(request):
         if form.is_valid():
             folder = form.save(commit=False)
             folder.created_by = request.user
+            parent_id = request.POST.get('parent')
+            if parent_id:
+                folder.parent = Folder.objects.get(id=parent_id)
             folder.save()
+            return redirect('folder_list', folder.parent.id if folder.parent else '')
+    return redirect(request.META.get('HTTP_REFERER', 'folder_list'))
+
+@login_required
+def delete_folder(request, folder_id):
+    folder = get_object_or_404(Folder, id=folder_id, created_by=request.user)
+    folder.delete()
     return redirect(request.META.get('HTTP_REFERER', 'folder_list'))
 
 @login_required
@@ -691,6 +934,57 @@ def upload_file(request):
             uploaded_file.original_name = request.FILES['file'].name
             uploaded_file.save()
     return redirect(request.META.get('HTTP_REFERER', 'folder_list'))
+
+@login_required
+def delete_file(request, file_id):
+    file = get_object_or_404(File, id=file_id, uploaded_by=request.user)
+    file.delete()
+    return redirect(request.META.get('HTTP_REFERER', 'folder_list'))
+
+@login_required
+def rename_folder(request, folder_id):
+    folder = get_object_or_404(Folder, id=folder_id, created_by=request.user)
+    if request.method == 'POST':
+        new_name = request.POST.get('name')
+        if new_name:
+            folder.name = new_name
+            folder.save()
+    #         return JsonResponse({'success': True, 'new_name': folder.name})
+    # return JsonResponse({'success': False}, status=400)
+    return redirect(request.META.get('HTTP_REFERER', 'folder_list'))
+
+
+@login_required
+def rename_file(request, file_id):
+    file = get_object_or_404(File, id=file_id, uploaded_by=request.user)
+    if request.method == 'POST':
+        new_name = request.POST.get('name')
+        if new_name:
+            file.original_name = new_name
+            file.save()
+    return redirect(request.META.get('HTTP_REFERER', 'folder_list'))
+
+@login_required
+def move_folder(request, folder_id):
+    folder = get_object_or_404(Folder, id=folder_id, created_by=request.user)
+    if request.method == 'POST':
+        new_parent_id = request.POST.get('new_parent_id')
+        if new_parent_id:
+            folder.parent = Folder.objects.get(id=new_parent_id)
+            folder.save()
+    return redirect(request.META.get('HTTP_REFERER', 'folder_list'))
+
+
+@login_required
+def move_file(request, file_id):
+    file = get_object_or_404(File, id=file_id, uploaded_by=request.user)
+    if request.method == 'POST':
+        new_folder_id = request.POST.get('new_folder_id')
+        if new_folder_id:
+            file.folder = Folder.objects.get(id=new_folder_id)
+            file.save()
+    return redirect(request.META.get('HTTP_REFERER', 'folder_list'))
+
 
 @login_required
 def create_task(request):
@@ -711,6 +1005,8 @@ def task_list(request):
     tasks = Task.objects.all()
     users = User.objects.all()
     status_labels = Task.STATUS_CHOICES
+    overdue_tasks = Task.objects.filter(due_date__lt=date.today(), status__in=['pending', 'in_progress', 'on_hold'])
+    overdue_tasks.update(status='overdue')
     context = {
         'tasks': tasks,
         'status_labels': status_labels,
@@ -735,7 +1031,6 @@ def task_detail(request, task_id):
 
 
 from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
 import json
 
 @csrf_exempt
@@ -771,6 +1066,29 @@ def delete_task(request, task_id):
         task.delete()
         return redirect('task_list')
     return render(request, 'documents/confirm_delete.html', {'task': task})
+
+@login_required
+def task_edit(request, task_id):
+    task = get_object_or_404(Task, id=task_id)
+    if request.method == 'POST':
+        form = TaskForm(request.POST, request.FILES, instance=task)
+        if form.is_valid():
+            task = form.save()
+            # Handle document uploads
+            for file in request.FILES.getlist('documents'):
+                Document.objects.create(task=task, pdf_file=file, company_name=file.name)
+            return redirect('task_detail', task_id=task.id)
+    else:
+        form = TaskForm(instance=task)
+    return render(request, 'documents/edit_task.html', {'form': form, 'task': task})
+
+@login_required
+def delete_task_document(request, task_id, doc_id):
+    if request.method == 'POST':
+        document = get_object_or_404(Document, id=doc_id, task__id=task_id)
+        document.delete()
+        return JsonResponse({'success': True})
+    return JsonResponse({'success': False}, status=400)
 
 @login_required
 def view_my_profile(request):
@@ -859,12 +1177,12 @@ def staff_directory(request):
     
     grouped = {}
     for profile in profiles:
-        org = profile.organization.name if profile.organization else "Unassigned"
+        org = profile.organization.name if profile.organization else "No Organization"
         depts = profile.department.all()
         if not depts:  # Handle profiles with no departments
             depts = [None]
         for dept in depts:
-            dept_name = dept.name if dept else "Unassigned"
+            dept_name = dept.name if dept else "No Department"
             teams = profile.team.all()
             if not teams:  # Handle profiles with no teams
                 teams = [None]
@@ -906,8 +1224,61 @@ def view_staff_profile(request, user_id):
     })
 
 def staff_list(request):
-    profiles = StaffProfile.objects.all()
-    return render(request, "documents/staff_list.html", {"profiles": profiles})
+    # Get query parameters
+    sort_by = request.GET.get('sort_by', 'name')
+    sort_order = request.GET.get('sort_order', 'asc')
+    search_query = request.GET.get('search', '')
+    filter_dept = request.GET.get('dept', '')
+    page = request.GET.get('page', 1)
+
+    # Base queryset
+    profiles = StaffProfile.objects.select_related('user', 'organization').prefetch_related('department', 'team')
+
+    # Search by name
+    if search_query:
+        profiles = profiles.filter(
+            Q(first_name__icontains=search_query) |
+            Q(middle_name__icontains=search_query) |
+            Q(last_name__icontains=search_query)
+        )
+
+    # Filter by department
+    if filter_dept:
+        profiles = profiles.filter(department__name__iexact=filter_dept)
+
+    # Sorting
+    sort_field = sort_by
+    if sort_by == 'name':
+        sort_field = 'first_name'
+    elif sort_by == 'department':
+        sort_field = 'department__name'
+    elif sort_by == 'team':
+        sort_field = 'team__name'
+    elif sort_by == 'photo':
+        sort_field = 'photo'
+    elif sort_by == 'organization':
+        sort_field = 'organization__name'
+
+    if sort_order == 'desc':
+        sort_field = f'-{sort_field}'
+    profiles = profiles.order_by(sort_field)
+
+    # Pagination
+    paginator = Paginator(profiles, 10)  # 10 profiles per page
+    page_obj = paginator.get_page(page)
+
+    # Departments for filter dropdown
+    departments = Department.objects.all()
+
+    context = {
+        'profiles': page_obj,
+        'departments': departments,
+        'sort_by': sort_by,
+        'sort_order': sort_order,
+        'search_query': search_query,
+        'filter_dept': filter_dept,
+    }
+    return render(request, 'documents/staff_list.html', context)
 
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
@@ -961,7 +1332,24 @@ def dismiss_notification(request):
         return JsonResponse({'status': 'success'})
     except Notification.DoesNotExist:
         return JsonResponse({'status': 'error', 'message': 'Notification not found'}, status=404)
-    
+
+@require_POST
+@login_required
+def dismiss_all_notifications(request):
+    try:
+        # Update all non-dismissed UserNotifications for the user
+        user_notifications = UserNotification.objects.filter(
+            user=request.user,
+            dismissed=False
+        )
+        updated_count = user_notifications.update(
+            dismissed=True,
+            seen_at=timezone.now()
+        )
+        return JsonResponse({'success': True, 'updated_count': updated_count})
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
 @login_required
 def email_config(request):
     user = CustomUser.objects.get(username=request.user.username)
@@ -1040,3 +1428,33 @@ def calendar_view(request):
     }
     print(f"Context: {context}")  # Debug
     return render(request, 'documents/calendar.html', context)
+
+def export_staff_csv(request):
+    if request.method != 'POST':
+        return HttpResponse(status=405)
+
+    profile_ids = request.POST.getlist('profile_ids')
+    if not profile_ids:
+        return HttpResponse(status=400, content_type='application/json', content='{"error": "No profiles selected"}')
+
+    profiles = StaffProfile.objects.filter(user__id__in=profile_ids).select_related('user', 'organization').prefetch_related('department', 'team')
+
+    response = HttpResponse(content_type='text/csv')
+    response['Content-Disposition'] = 'attachment; filename="staff_export.csv"'
+
+    writer = csv.writer(response)
+    writer.writerow(['Name', 'Phone Number', 'Email', 'Sex', 'Designation', 'Organization', 'Department', 'Team'])
+
+    for profile in profiles:
+        writer.writerow([
+            f"{profile.first_name} {profile.middle_name or ''} {profile.last_name}".strip(),
+            profile.phone_number or 'N/A',
+            profile.email or 'N/A',
+            profile.sex or 'N/A',
+            profile.designation or 'N/A',
+            profile.organization.name if profile.organization else 'N/A',
+            ', '.join(profile.department.all().values_list('name', flat=True)) or 'N/A',
+            ', '.join(profile.team.all().values_list('name', flat=True)) or 'N/A',
+        ])
+
+    return response

@@ -107,7 +107,7 @@ class SignUpForm(forms.ModelForm):
 class UserForm(forms.ModelForm):
     class Meta:
         model = CustomUser
-        fields = ["username", "email", "phone_number", "roles", "position"]
+        fields = '__all__'
 
 
 class FolderForm(forms.ModelForm):
@@ -117,6 +117,7 @@ class FolderForm(forms.ModelForm):
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'parent': forms.HiddenInput(),
+            # 'parent': forms.ModelChoiceField(queryset=Folder.objects.all(), required=False, widget=forms.HiddenInput),
         }
 
 class FileUploadForm(forms.ModelForm):

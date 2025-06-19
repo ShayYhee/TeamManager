@@ -1,7 +1,18 @@
 from django.utils.timezone import now
-from .models import StaffProfile, Notification, UserNotification
+from .models import StaffProfile, Notification, UserNotification, CustomUser
+
+def notification_count(request):
+    print("Meer>>>>>", request)
+    if request.user.is_authenticated:
+        user = CustomUser.objects.get(username=request.user)
+        # active_notif = Notification.objects.filter(is_active=True)
+        count = UserNotification.objects.filter(user=user, dismissed=False).count()
+        return {'unseen_notification_count': count}
+    return {}
 
 def notification_bar(request):
+    print("Yosh>>>>>", request)
+    print("Yosh>>>>>", request.user)
     today = now().date()
     context = {
         'notification_bar_items': [],
@@ -77,3 +88,4 @@ def notification_bar(request):
         context['notification_bar_items'] = [n for n in notifications if n.is_visible()]
 
     return context
+

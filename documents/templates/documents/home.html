@@ -4,202 +4,297 @@
 {% block title %}Home - Team Manager{% endblock %}
 
 {% block content %}
+<!-- Hero Section -->
 <div class="hero-section">
-  <div class="hero-overlay"></div>
-  <div class="hero-content-base">
-    <div class="calendar-widget animate__animated animate__fadeIn">
-      <div class="calendar-day"></div>
-      <div class="calendar-month-year"></div>
+    <div class="hero-content-base">
+        <div class="calendar-widget animate__animated animate__fadeIn">
+            <div class="calendar-day"></div>
+            <div class="calendar-month-year"></div>
+        </div>
+        <div class="hero-content animate__animated animate__fadeInUp">
+            <h1 class="display-4 fw-bold">Streamline Your Workplace</h1>
+            <p class="lead mb-4">Automate, manage, and collaborate on documents and tasks with ease.</p>
+            <div class="cta-buttons">
+                {% if user.is_authenticated %}
+                    <a href="{% url 'folder_list' %}" class="btn btn-primary btn-lg me-2">Go to Folders</a>
+                    <a href="{% url 'create_document' %}" class="btn btn-outline-light btn-lg">Create Document</a>
+                {% else %}
+                    <a href="{% url 'login' %}" class="btn btn-primary btn-lg me-2">Login</a>
+                    <a href="{% url 'register' %}" class="btn btn-outline-light btn-lg">Sign Up</a>
+                {% endif %}
+            </div>
+        </div>
     </div>
-    <div class="hero-content animate__animated animate__fadeInUp">
-      <h1 class="display-4 fw-bold">Streamline Your Workplace Documents</h1>
-      <p class="lead mb-4">Automate, manage, and collaborate on documents with ease.</p>
-      <div class="cta-buttons">
-        <a href="{% url 'login' %}" class="btn btn-primary btn-lg me-2">Login</a>
-        <a href="{% url 'register' %}" class="btn btn-outline-light btn-lg">Sign Up</a>
-      </div>
-    </div>
-  </div>
+    <div class="wave-pattern"></div>
 </div>
 
-<section class="features-section py-5">
-  <div class="container">
-    <h2 class="text-center mb-5">Why Choose Our Document Automation System?</h2>
-    <div class="row">
-      <div class="col-md-4 mb-4">
-        <div class="card h-100 shadow-sm animate__animated animate__fadeInLeft">
-          <div class="card-body text-center">
-            <i class="fas fa-file-alt fa-3x mb-3 text-primary"></i>
-            <h5 class="card-title">Document Creation</h5>
-            <p class="card-text">Create professional documents quickly with customizable templates.</p>
-          </div>
+<!-- Quick Links Section (for authenticated users) -->
+{% if user.is_authenticated %}
+<section class="quick-links-section py-5">
+    <div class="container">
+        <h2 class="text-center mb-5">Quick Links</h2>
+        <div class="row row-cols-1 row-cols-md-3 g-4">
+            <div class="col">
+                <a href="{% url 'create_task' %}" class="quick-link-card card h-100 shadow-sm text-decoration-none">
+                    <div class="card-body text-center">
+                        <i class="fas fa-tasks fa-2x mb-3 text-primary"></i>
+                        <h5 class="card-title">Create Task</h5>
+                        <p class="card-text small text-muted">Assign and track tasks for your team.</p>
+                    </div>
+                </a>
+            </div>
+            <div class="col">
+                <a href="{% url 'upload_file' %}" class="quick-link-card card h-100 shadow-sm text-decoration-none">
+                    <div class="card-body text-center">
+                        <i class="fas fa-upload fa-2x mb-3 text-primary"></i>
+                        <h5 class="card-title">Upload File</h5>
+                        <p class="card-text small text-muted">Add documents to your folders.</p>
+                    </div>
+                </a>
+            </div>
+            <div class="col">
+                <a href="{% url 'calendar' %}" class="quick-link-card card h-100 shadow-sm text-decoration-none">
+                    <div class="card-body text-center">
+                        <i class="fas fa-calendar fa-2x mb-3 text-primary"></i>
+                        <h5 class="card-title">View Calendar</h5>
+                        <p class="card-text small text-muted">Check upcoming events and deadlines.</p>
+                    </div>
+                </a>
+            </div>
         </div>
-      </div>
-      <div class="col-md-4 mb-4">
-        <div class="card h-100 shadow-sm animate__animated animate__fadeInUp">
-          <div class="card-body text-center">
-            <i class="fas fa-users fa-3x mb-3 text-primary"></i>
-            <h5 class="card-title">Team Collaboration</h5>
-            <p class="card-text">Collaborate in real-time with your team, with version control and feedback.</p>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-4 mb-4">
-        <div class="card h-100 shadow-sm animate__animated animate__fadeInRight">
-          <div class="card-body text-center">
-            <i class="fas fa-shield-alt fa-3x mb-3 text-primary"></i>
-            <h5 class="card-title">Secure Storage</h5>
-            <p class="card-text">Store documents securely with encryption and access controls.</p>
-          </div>
-        </div>
-      </div>
     </div>
-  </div>
+</section>
+{% endif %}
+
+<!-- Features Section -->
+<section class="features-section py-5">
+    <div class="container">
+        <h2 class="text-center mb-5">Why Choose Team Manager?</h2>
+        <div class="row row-cols-1 row-cols-md-3 g-4">
+            <div class="col">
+                <div class="card h-100 shadow-sm animate__animated animate__fadeInLeft">
+                    <div class="card-body text-center">
+                        <i class="fas fa-file-alt fa-3x mb-3 text-primary"></i>
+                        <h5 class="card-title">Document Creation</h5>
+                        <p class="card-text">Create professional documents quickly with customizable templates.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col">
+                <div class="card h-100 shadow-sm animate__animated animate__fadeInUp">
+                    <div class="card-body text-center">
+                        <i class="fas fa-users fa-3x mb-3 text-primary"></i>
+                        <h5 class="card-title">Team Collaboration</h5>
+                        <p class="card-text">Collaborate in real-time with version control and feedback.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col">
+                <div class="card h-100 shadow-sm animate__animated animate__fadeInRight">
+                    <div class="card-body text-center">
+                        <i class="fas fa-shield-alt fa-3x mb-3 text-primary"></i>
+                        <h5 class="card-title">Secure Storage</h5>
+                        <p class="card-text">Store documents securely with encryption and access controls.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </section>
 
 <style>
-  .hero-section {
-    position: relative;
-    background-image: url("{% static 'raadaa/home.png' %}");
-    background-size: cover;
-    background-position: center;
-    height: 80vh;
-    color: white;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .hero-overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.5), rgba(0, 0, 0, 0.7));
-  }
-
-  .hero-content-base {
-    position: relative;
-    z-index: 1;
-    width: 100%;
-    padding: 20px;
-  }
-
-  .hero-content {
-    text-align: center;
-    max-width: 600px;
-    margin: 0 auto;
-  }
-
-  .hero-content h1 {
-    font-size: 3rem;
-    font-weight: 700;
-    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
-  }
-
-  .hero-content .lead {
-    font-size: 1.25rem;
-    font-weight: 300;
-  }
-
-  .calendar-widget {
-    position: absolute;
-    top: 20px;
-    right: 20px;
-    background: rgba(255, 255, 255, 0.95);
-    border-radius: 12px;
-    padding: 15px;
-    text-align: center;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-    color: #1a1a1a;
-    font-family: 'Roboto', sans-serif;
-  }
-
-  .calendar-day {
-    font-size: 2.5rem;
-    font-weight: bold;
-    line-height: 1;
-  }
-
-  .calendar-month-year {
-    font-size: 1rem;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-  }
-
-  .features-section {
-    background: #f8f9fa;
-    padding: 60px 0;
-  }
-
-  .features-section .card {
-    border: none;
-    border-radius: 10px;
-    transition: transform 0.3s ease;
-  }
-
-  .features-section .card:hover {
-    transform: translateY(-10px);
-  }
-
-  .btn-primary {
-    background-color: #007bff;
-    border-color: #007bff;
-    transition: background-color 0.3s ease;
-  }
-
-  .btn-primary:hover {
-    background-color: #0056b3;
-    border-color: #0056b3;
-  }
-
-  .btn-outline-light {
-    border-color: #fff;
-    color: #fff;
-    transition: background-color 0.3s ease;
-  }
-
-  .btn-outline-light:hover {
-    background-color: rgba(255, 255, 255, 0.2);
-    color: #fff;
-  }
-
-  /* Sidebar adjustments (assuming sidebar is in base.html) */
-  .sidebar {
-    background: #1a1a1a;
-    color: #fff;
-    height: 100vh;
-    width: 250px;
-    position: fixed;
-    top: 0;
-    left: 0;
-    padding: 20px;
-    z-index: 1000;
-  }
-
-  .sidebar a {
-    color: #adb5bd;
-    display: block;
-    padding: 10px 0;
-    text-decoration: none;
-    transition: color 0.3s ease;
-  }
-
-  .sidebar a:hover {
-    color: #fff;
-  }
+    .hero-section {
+        position: relative;
+        background: linear-gradient(135deg, #319795 0%, #2d3748 100%);
+        height: 70vh;
+        color: #e2e8f0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+    }
+    body.dark-mode .hero-section {
+        background: linear-gradient(135deg, #1a202c 0%, #319795 100%);
+    }
+    .hero-content-base {
+        position: relative;
+        z-index: 1;
+        width: 100%;
+        padding: 20px;
+    }
+    .hero-content {
+        text-align: center;
+        max-width: 700px;
+        margin: 0 auto;
+    }
+    .hero-content h1 {
+        font-size: 2.5rem;
+        font-weight: 700;
+        text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.3);
+    }
+    .hero-content .lead {
+        font-size: 1.2rem;
+        font-weight: 400;
+    }
+    .cta-buttons .btn-primary {
+        background-color: #319795;
+        border-color: #319795;
+    }
+    .cta-buttons .btn-primary:hover {
+        background-color: #2c7a7b;
+        border-color: #2c7a7b;
+    }
+    .cta-buttons .btn-outline-light {
+        border-color: #e2e8f0;
+        color: #e2e8f0;
+    }
+    .cta-buttons .btn-outline-light:hover {
+        background-color: rgba(226, 232, 240, 0.2);
+        color: #e2e8f0;
+    }
+    .calendar-widget {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        background: rgba(255, 255, 255, 0.95);
+        border-radius: 12px;
+        padding: 15px;
+        text-align: center;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        color: #2d3748;
+    }
+    body.dark-mode .calendar-widget {
+        background: rgba(45, 55, 72, 0.95);
+        color: #e2e8f0;
+    }
+    .calendar-day {
+        font-size: 2rem;
+        font-weight: 600;
+    }
+    .calendar-month-year {
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    .wave-pattern {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        height: 100px;
+        background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 320'%3E%3Cpath fill='%23ffffff' fill-opacity='0.1' d='M0,192L48,181.3C96,171,192,149,288,149.3C384,149,480,171,576,181.3C672,192,768,192,864,181.3C960,171,1056,149,1152,138.7C1248,128,1344,128,1392,128L1440,128L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z'%3E%3C/path%3E%3C/svg%3E") no-repeat bottom;
+    }
+    body.dark-mode .wave-pattern {
+        background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 320'%3E%3Cpath fill='%232d3748' fill-opacity='0.1' d='M0,192L48,181.3C96,171,192,149,288,149.3C384,149,480,171,576,181.3C672,192,768,192,864,181.3C960,171,1056,149,1152,138.7C1248,128,1344,128,1392,128L1440,128L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z'%3E%3C/path%3E%3C/svg%3E") no-repeat bottom;
+    }
+    .quick-links-section {
+        background: #ffffff;
+        padding: 40px 0;
+    }
+    body.dark-mode .quick-links-section {
+        background: #2d3748;
+    }
+    .quick-link-card {
+        border-radius: 12px;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+        color: #2d3748;
+    }
+    body.dark-mode .quick-link-card {
+        color: #e2e8f0;
+        background: #3b4a6b;
+    }
+    .quick-link-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+    }
+    body.dark-mode .quick-link-card:hover {
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+    }
+    .quick-link-card .card-title {
+        font-size: 1.1rem;
+        font-weight: 500;
+    }
+    .features-section {
+        background: #f8f9fa;
+        padding: 60px 0;
+    }
+    body.dark-mode .features-section {
+        background: #1a202c;
+    }
+    .features-section .card {
+        border-radius: 12px;
+        border: none;
+        transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+    body.dark-mode .features-section .card {
+        background: #3b4a6b;
+    }
+    .features-section .card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+    }
+    body.dark-mode .features-section .card:hover {
+        box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+    }
+    .features-section .card-title {
+        font-size: 1.2rem;
+        font-weight: 500;
+        color: #2d3748;
+    }
+    body.dark-mode .features-section .card-title {
+        color: #e2e8f0;
+    }
+    .features-section .card-text {
+        color: #718096;
+    }
+    body.dark-mode .features-section .card-text {
+        color: #a0aec0;
+    }
+    @media (max-width: 768px) {
+        .hero-section {
+            height: 60vh;
+        }
+        .hero-content h1 {
+            font-size: 2rem;
+        }
+        .hero-content .lead {
+            font-size: 1rem;
+        }
+        .calendar-widget {
+            top: 10px;
+            right: 10px;
+            padding: 10px;
+        }
+        .calendar-day {
+            font-size: 1.5rem;
+        }
+        .calendar-month-year {
+            font-size: 0.8rem;
+        }
+        .cta-buttons .btn-lg {
+            font-size: 0.9rem;
+            padding: 8px 16px;
+        }
+    }
+    @media (max-width: 576px) {
+        .hero-content {
+            padding: 0 15px;
+        }
+        .quick-links-section h2,
+        .features-section h2 {
+            font-size: 1.5rem;
+        }
+    }
 </style>
 
 <script>
-  $(document).ready(function() {
+$(document).ready(function() {
     const today = new Date();
     const day = today.getDate();
     const month = today.toLocaleString('default', { month: 'long' });
     const year = today.getFullYear();
-
     $('.calendar-day').text(day);
-    $('.calendar-month-year').text(`${month}, ${year}`);
-  });
+    $('.calendar-month-year').text(`${month} ${year}`);
+});
 </script>
 {% endblock %}
