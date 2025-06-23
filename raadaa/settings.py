@@ -20,7 +20,7 @@ load_dotenv(dotenv_path)
 
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'insecure-key-for-dev-only')
 DEBUG = os.getenv('DJANGO_DEBUG', 'False')
-ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', 'raadaa.onrender.com', 'www.raadaa.onrender.com', 'localhost', '127.0.0.1:8000', '127.0.0.1').split(',')
+ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', ['raadaa.onrender.com', 'www.raadaa.onrender.com', 'localhost', '127.0.0.1:8000', '127.0.0.1'])
 # ALLOWED_HOSTS = ['teammanager.ng','www.teammanager.ng','raadaa.onrender.com', 'www.raadaa.onrender.com', 'localhost', '127.0.0.1:8000', '127.0.0.1']
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
