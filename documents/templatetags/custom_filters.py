@@ -38,3 +38,55 @@ def get_file_extension(value):
     if isinstance(value, str):
         split_value = value.split('.')[-1]
     return split_value.lower()
+
+@register.filter
+def get_file_name(value):
+    if isinstance(value, str):
+        split_value = value.split('\\')[-1]
+    return split_value
+
+@register.filter
+def subtract(value, arg):
+    """
+    Subtracts arg from value.
+    Example: {{ 100|subtract:completion_percentage }}
+    """
+    try:
+        return float(value) - float(arg)
+    except (ValueError, TypeError):
+        return value
+    
+@register.filter
+def is_previewable(filename):
+    return get_file_extension(filename) in ['pdf', 'jpeg', 'jpg', 'png']
+
+@register.filter
+def file_type(filename):
+    ext = get_file_extension(filename)
+    return 'pdf' if ext == 'pdf' else 'image' if ext in ['jpeg', 'jpg', 'png'] else 'other'
+
+@register.filter
+def file_icon(filename):
+    ext = get_file_extension(filename)
+    return {
+        'jpeg': 'fa-file-image',
+        'jpg': 'fa-file-image',
+        'png': 'fa-file-image',
+        'pdf': 'fa-file-pdf',
+        'docx': 'fa-file-word',
+        'csv': 'fa-file-csv',
+        'xlsx': 'fa-file-excel'
+    }.get(ext, 'fa-file')
+
+@register.filter
+def file_color(filename):
+    ext = get_file_extension(filename)
+    return {
+        'jpeg': '#08428e',
+        'jpg': '#08428e',
+        'png': '#08428e',
+        'pdf': '#a10707',
+        'docx': '#2a6ec6',
+        'csv': '#178939',
+        'xlsx': '#178939'
+    }.get(ext, '#0e0f11')

@@ -1,6 +1,6 @@
 from django import forms
 from django.forms import modelformset_factory
-from .models import Document, User, CustomUser, Folder, File, Task, StaffProfile, StaffDocument
+from .models import Document, User, CustomUser, Folder, File, Task, StaffProfile, StaffDocument, Department, Team, PublicFolder, PublicFile
 from ckeditor.widgets import CKEditorWidget
 from ckeditor_uploader.widgets import CKEditorUploadingWidget
 from django.contrib.auth import get_user_model
@@ -199,3 +199,41 @@ class EmailConfigForm(forms.ModelForm):
             'smtp_email': forms.EmailInput(attrs={'class': 'form-control'}),
             'smtp_password': forms.PasswordInput(attrs={'class': 'form-control'}),
         }
+
+class PublicFolderForm(forms.ModelForm):
+    department = forms.ModelChoiceField(
+        queryset=Department.objects.all(),
+        required=False,
+        label='Department'
+    )
+    team = forms.ModelChoiceField(
+        queryset=Team.objects.all(),
+        required=False,
+        label='Team'
+    )
+
+    class Meta:
+        model = PublicFolder
+        fields = ['name', 'parent', 'department', 'team']
+
+    def clean(self):
+        cleaned_data = super().clean()
+        department = cleaned_data.get('department')
+        team = cleaned_data.get('team')
+        parent = cleaned_data.get('parent')
+
+        if not (department or team):
+            raise forms.ValidationError('A public folder must be associated with a department or team.')
+        if team and not department:
+            raise forms.ValidationError('A team must be associated with a department.')
+        if parent and team and parent.team != team:
+            raise forms.ValidationError('Subfolder team must match parent team.')
+        if parent and department and parent.department != department:
+            raise forms.ValidationError('Subfolder department must match parent department.')
+
+        return cleaned_data
+
+class PublicFileForm(forms.ModelForm):
+    class Meta:
+        model = PublicFile
+        fields = ['file']

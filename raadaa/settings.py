@@ -20,19 +20,9 @@ load_dotenv(dotenv_path)
 
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'insecure-key-for-dev-only')
 DEBUG = os.getenv('DJANGO_DEBUG', 'False')
-# DEBUG = True
-# ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', 'localhost').split(',')
-# ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "*").split(",")
-# ALLOWED_HOSTS = ['https://raadaa.onrender.com']
-ALLOWED_HOSTS = ['teammanager.ng','www.teammanager.ng','raadaa.onrender.com', 'www.raadaa.onrender.com', 'localhost', '127.0.0.1:8000', '127.0.0.1']
-# WKHTMLTOPDF_PATH = os.environ.get("WKHTMLTOPDF_PATH", "/usr/bin/wkhtmltopdf")
+ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', 'raadaa.onrender.com', 'www.raadaa.onrender.com', 'localhost', '127.0.0.1:8000', '127.0.0.1').split(',')
+# ALLOWED_HOSTS = ['teammanager.ng','www.teammanager.ng','raadaa.onrender.com', 'www.raadaa.onrender.com', 'localhost', '127.0.0.1:8000', '127.0.0.1']
 
-# PDFKIT_CONFIG = {
-#     'wkhtmltopdf': WKHTMLTOPDF_PATH
-# }
-# print(SECRET_KEY)
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
-# BASE_DIR = Path(__file__).resolve().parent.parent
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 MEDIA_URL = "/media/"
@@ -104,7 +94,8 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'rest_framework',  # API support
     'rest_framework.authtoken',
-    'documents',  # Our app
+    # 'documents',  # Our app
+    'documents.apps.DocumentsConfig',
     'ckeditor',
     'ckeditor_uploader',
     'django_cron',
@@ -175,20 +166,6 @@ CRON_CLASSES = [
 
 # Database
 # https://docs.djangoproject.com/en/5.1/ref/settings/#databases
-
-# DATABASES = {
-#     # 'default': {
-#     #     'ENGINE': 'django.db.backends.postgresql',
-#     #     'NAME': 'TransnetDocSystem',
-#     #     'USER': 'postgres',
-#     #     'PASSWORD': 'password',
-#     #     'HOST': 'localhost',
-#     #     'PORT': '5432',
-#     # }
-#     'default': dj_database_url.config(
-#         default=os.getenv("DATABASE_URL")
-#     )
-# }
 
 # Database
 if os.getenv("DATABASE_URL"):

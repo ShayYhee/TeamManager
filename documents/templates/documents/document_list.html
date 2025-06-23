@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load custom_filters%}
 
 {% block title %}Document List - Team Manager{% endblock %}
 {% block content %}
@@ -89,7 +90,7 @@
                     <table class="table table-hover align-middle">
                         <thead class="table-light">
                             <tr>
-                                <th>Company</th>
+                                <th>Company | Document</th>
                                 <th>Type</th>
                                 <th>Status</th>
                                 <th>Created</th>
@@ -103,7 +104,12 @@
                         <tbody>
                             {% for document in documents %}
                             <tr>
-                                <td>{{ document.company_name }}</td>
+                                <td>{% if document.company_name == "N/A" %}
+                                        {{ document.pdf_file.name|get_file_name }}
+                                    {% else %}
+                                        {{ document.company_name }} | {{ document.pdf_file.name|get_file_name }}
+                                    {% endif %}
+                                </td>
                                 <td>{{ document.get_document_type_display }}</td>
                                 <td>
                                     <span class="badge {% if document.status == 'approved' %}bg-success{% else %}bg-warning{% endif %}">

@@ -8,8 +8,9 @@ from django.contrib.contenttypes.models import ContentType
 from django.contrib import messages
 from django.core.mail import send_mail, EmailMessage, get_connection
 from django.core.paginator import Paginator
+from django.core.exceptions import ValidationError
 from django.conf import settings
-from django.db.models import Q
+from django.db.models import Q, F
 from django.dispatch import receiver
 from django.forms import formset_factory
 from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
@@ -18,8 +19,9 @@ from django.utils import timezone
 from django.utils.timezone import now
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
-from .forms import DocumentForm, SignUpForm, CreateDocumentForm, FileUploadForm, FolderForm, TaskForm, ReassignTaskForm, StaffProfileForm, StaffDocumentForm, EmailConfigForm, UserForm
-from .models import Document, CustomUser, Role, File, Folder, Task, StaffProfile, Notification, UserNotification, StaffDocument, Event, EventParticipant, Department
+from .forms import DocumentForm, SignUpForm, CreateDocumentForm, FileUploadForm, FolderForm, TaskForm, ReassignTaskForm, StaffProfileForm, StaffDocumentForm, EmailConfigForm, UserForm, PublicFolderForm, PublicFileForm
+from .models import Document, CustomUser, Role, File, Folder, Task, StaffProfile, Notification, UserNotification, StaffDocument, Event, EventParticipant, Department, Team, PublicFile, PublicFolder
+from raadaa.settings import ALLOWED_HOSTS
 from .serializers import EventSerializer
 from .placeholders import replace_placeholders
 from docx import Document as DocxDocument
@@ -29,17 +31,12 @@ import csv
 import subprocess
 import platform
 import shutil
-# from comtypes import CoInitialize, CoUninitialize
-# from comtypes.client import CreateObject
-# from win32com.client import Dispatch, constants, gencache
 import pdfkit
 from raadaa import settings
 from html2docx import html2docx
 from docx2txt import process
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 import smtplib
-from docx import Document as DocxDocument
-from docx.shared import Pt, Inches
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from bs4 import BeautifulSoup
 from django.http import HttpResponse
@@ -48,6 +45,7 @@ import requests
 import io
 import urllib.parse
 from rest_framework import viewsets, permissions
+import json
 import logging
 logger = logging.getLogger(__name__)
 
@@ -66,7 +64,7 @@ def is_admin(user):
 
 def send_approval_request(document):
     # Get all BDM emails
-    bdm_emails = User.objects.filter(position="BDM").values_list("email", flat=True)
+    bdm_emails = CustomUser.objects.filter(roles__name="BDM").values_list("email", flat=True)
 
     # Ensure there are BDMs to notify
     if not bdm_emails:
@@ -202,28 +200,6 @@ def create_document(request):
                     relative_pdf_path = os.path.join("documents/pdf", pdf_filename)
                     absolute_pdf_path = os.path.join(settings.MEDIA_ROOT, relative_pdf_path)
 
-                    # try:
-                    #     print("Starting PDF conversion")
-                    #     CoInitialize()
-                    #     word = CreateObject("Word.Application")
-                    #     word.Visible = False
-                    #     doc = word.Documents.Open(os.path.abspath(word_path))
-                    #     doc.SaveAs(os.path.abspath(absolute_pdf_path), FileFormat=17)
-                    #     doc.Close()
-                    #     word.Quit()
-                    #     CoUninitialize()
-                    #     document.pdf_file = relative_pdf_path
-                    #     document.save()
-                    # except Exception as e:
-                    #     print(f"PDF conversion error: {e}")
-                    #     try:
-                    #         CoUninitialize()
-                    #     except:
-                    #         pass
-                    #     return HttpResponse(f"Error converting to PDF: {e}", status=500)
-                    
-                    # libreoffice_path = r"C:\Program Files (x86)\LibreOffice\program\soffice.exe"
-
                     # Choose the right LibreOffice path
                     if platform.system() == "Windows":
                         paths = [
@@ -305,7 +281,7 @@ def users_list(request):
     paginator = Paginator(users, 10) # 10 users per page
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
-    return render(request, "registration/users_list.html", {"users": page_obj})
+    return render(request, "users/users_list.html", {"users": page_obj})
 
 @user_passes_test(is_admin)
 def approve_user(request, user_id):
@@ -374,7 +350,7 @@ def edit_user(request, user_id):
             return redirect("users_list")
     else:
         form = UserForm(instance=user)
-    return render(request, "registration/edit_user.html", {"form": form})
+    return render(request, "users/edit_user.html", {"form": form})
 
 def register(request):
     if request.method == "POST":
@@ -481,7 +457,7 @@ def document_list(request):
     })
 
 def home(request):
-    return render(request, "documents/home.html")
+    return render(request, "home.html")
 
 
 @login_required
@@ -491,7 +467,8 @@ def approve_document(request, document_id):
     print("Yess>>>", request.user)
 
     # Restrict only BDMs from approving
-    if request.user.position != "BDM":
+    
+    if not request.user.roles.filter(name="BDM").exists():
         return HttpResponseForbidden("You are not allowed to approve this document.")
 
     document.status = "approved"
@@ -576,7 +553,7 @@ def send_approved_email(request, document_id):
     sales_rep_email = User.objects.filter(username=document.sales_rep).values_list("email", flat=True)
 
     # Get all BDM emails
-    bdm_emails = User.objects.filter(position="BDM").values_list("email", flat=True)
+    bdm_emails = CustomUser.objects.filter(roles__name="BDM").values_list("email", flat=True)
 
     # Combine into a single list
     cc_list = list(sales_rep_email) + list(bdm_emails)
@@ -896,7 +873,7 @@ def folder_list(request, parent_id=None):
     folder_form = FolderForm(initial={'parent': parent})
     file_form = FileUploadForm()
 
-    return render(request, 'documents/folder_list.html', {
+    return render(request, 'folder/folder_list.html', {
         'parent': parent,
         'folders': folders,
         'files': files,
@@ -915,14 +892,15 @@ def create_folder(request):
             if parent_id:
                 folder.parent = Folder.objects.get(id=parent_id)
             folder.save()
-            return redirect('folder_list', folder.parent.id if folder.parent else '')
-    return redirect(request.META.get('HTTP_REFERER', 'folder_list'))
+            return JsonResponse({'success': True})
+    return JsonResponse({'success': False, 'errors': form.errors}, status=400)
 
 @login_required
 def delete_folder(request, folder_id):
     folder = get_object_or_404(Folder, id=folder_id, created_by=request.user)
     folder.delete()
-    return redirect(request.META.get('HTTP_REFERER', 'folder_list'))
+    return JsonResponse({'success': True})
+    # return JsonResponse({'success': False, 'errors': form.errors}, status=400)
 
 @login_required
 def upload_file(request):
@@ -933,13 +911,15 @@ def upload_file(request):
             uploaded_file.uploaded_by = request.user
             uploaded_file.original_name = request.FILES['file'].name
             uploaded_file.save()
-    return redirect(request.META.get('HTTP_REFERER', 'folder_list'))
+        return JsonResponse({'success': True})
+    return JsonResponse({'success': False, 'errors': form.errors}, status=400)
 
 @login_required
 def delete_file(request, file_id):
     file = get_object_or_404(File, id=file_id, uploaded_by=request.user)
     file.delete()
-    return redirect(request.META.get('HTTP_REFERER', 'folder_list'))
+    return JsonResponse({'success': True})
+    # return JsonResponse({'success': False, 'errors': form.errors}, status=400)
 
 @login_required
 def rename_folder(request, folder_id):
@@ -949,9 +929,9 @@ def rename_folder(request, folder_id):
         if new_name:
             folder.name = new_name
             folder.save()
-    #         return JsonResponse({'success': True, 'new_name': folder.name})
-    # return JsonResponse({'success': False}, status=400)
-    return redirect(request.META.get('HTTP_REFERER', 'folder_list'))
+            return JsonResponse({'success': True, 'new_name': folder.name})
+    return JsonResponse({'success': False}, status=400)
+    # return redirect(request.META.get('HTTP_REFERER', 'folder_list'))
 
 
 @login_required
@@ -962,7 +942,8 @@ def rename_file(request, file_id):
         if new_name:
             file.original_name = new_name
             file.save()
-    return redirect(request.META.get('HTTP_REFERER', 'folder_list'))
+        return JsonResponse({'success': True})
+    return JsonResponse({'success': False}, status=400)
 
 @login_required
 def move_folder(request, folder_id):
@@ -972,7 +953,8 @@ def move_folder(request, folder_id):
         if new_parent_id:
             folder.parent = Folder.objects.get(id=new_parent_id)
             folder.save()
-    return redirect(request.META.get('HTTP_REFERER', 'folder_list'))
+        return JsonResponse({'success': True})
+    return JsonResponse({'success': False}, status=400)
 
 
 @login_required
@@ -983,9 +965,9 @@ def move_file(request, file_id):
         if new_folder_id:
             file.folder = Folder.objects.get(id=new_folder_id)
             file.save()
-    return redirect(request.META.get('HTTP_REFERER', 'folder_list'))
-
-
+        return JsonResponse({'success': True})
+    return JsonResponse({'success': False}, status=400)
+# Tasks
 @login_required
 def create_task(request):
     if request.method == 'POST':
@@ -993,63 +975,81 @@ def create_task(request):
         if form.is_valid():
             task = form.save(commit=False)
             task.created_by = request.user
+            if task.due_date and task.due_date < date.today():
+                task.status = 'overdue'
             task.save()
-            form.save_m2m()  # Save documents relationship
-            return redirect('task_list')  # You will define this page later
+            form.save_m2m()
+            return redirect('task_list')
     else:
         form = TaskForm()
-    return render(request, 'documents/create_task.html', {'form': form})
+    return render(request, 'tasks/create_task.html', {'form': form})
 
 @login_required
 def task_list(request):
-    tasks = Task.objects.all()
-    users = User.objects.all()
-    status_labels = Task.STATUS_CHOICES
-    overdue_tasks = Task.objects.filter(due_date__lt=date.today(), status__in=['pending', 'in_progress', 'on_hold'])
+    category = request.GET.get('category', 'overall')
+    tasks = Task.objects.filter(Q(assigned_to=request.user) | Q(created_by=request.user)).distinct()
+    
+    if category == 'personal':
+        tasks = tasks.filter(assigned_to=request.user, created_by=request.user)
+    elif category == 'corporate':
+        tasks = tasks.filter(assigned_to=request.user).exclude(created_by=request.user)
+    
+    # Update overdue tasks (run periodically, e.g., via Celery task)
+    overdue_tasks = Task.objects.filter(
+        due_date__lt=date.today(),
+        status__in=['pending', 'in_progress', 'on_hold'],
+        assigned_to=request.user
+    )
     overdue_tasks.update(status='overdue')
+
+    # department_users = CustomUser.objects.filter(department=request.user.department) if request.user.department else []
+    users = CustomUser.objects.all()
     context = {
         'tasks': tasks,
-        'status_labels': status_labels,
+        'status_labels': Task.STATUS_CHOICES,
         'today': date.today(),
         'user': request.user,
+        # 'users': department_users,
         'users': users,
+        'category': category,
     }
-    # status_labels = [
-    #     ('pending', 'Pending'),
-    #     ('in_progress', 'In Progress'),
-    #     ('on_hold', 'On Hold'),
-    #     ('completed', 'Completed'),
-    #     ('cancelled', 'Cancelled'),
-    # ]
-    return render(request, 'documents/task_list.html', context)
+    return render(request, 'tasks/task_list.html', context)
 
 @login_required
 def task_detail(request, task_id):
     task = get_object_or_404(Task, id=task_id)
-    return render(request, 'documents/task_detail.html', {'task': task})
-
-
-
-from django.http import JsonResponse
-import json
+    if not (task.assigned_to == request.user or task.created_by == request.user or request.user.is_hod()):
+        return render(request, 'tasks/error.html', {'message': 'Access denied.'})
+    return render(request, 'tasks/task_detail.html', {'task': task})
 
 @csrf_exempt
 @login_required
 def update_task_status(request, task_id):
+    task = get_object_or_404(Task, id=task_id)
+    if not (task.assigned_to == request.user or task.created_by == request.user or request.user.is_hod()):
+        return JsonResponse({'error': 'Access denied'}, status=403)
+    
     if request.method == 'POST':
-        task = get_object_or_404(Task, id=task_id)
-        data = json.loads(request.body)
-        new_status = data.get('status')
-        if new_status in dict(Task.STATUS_CHOICES):
-            task.status = new_status
-            task.save()
-            return JsonResponse({'success': True, 'status': task.status})
+        try:
+            data = json.loads(request.body)
+            new_status = data.get('status')
+            if new_status in dict(Task.STATUS_CHOICES):
+                task.status = new_status
+                if new_status == 'completed':
+                    task.completed_at = timezone.now()
+                task.save()
+                return JsonResponse({'success': True, 'status': task.status})
+            return JsonResponse({'error': 'Invalid status'}, status=400)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'Invalid JSON'}, status=400)
     return JsonResponse({'error': 'Invalid request'}, status=400)
-
 
 @login_required
 def reassign_task(request, task_id):
     task = get_object_or_404(Task, id=task_id)
+    if not (task.created_by == request.user or request.user.is_hod()):
+        return render(request, 'tasks/error.html', {'message': 'Access denied.'})
+    
     if request.method == 'POST':
         form = ReassignTaskForm(request.POST, instance=task)
         if form.is_valid():
@@ -1057,38 +1057,144 @@ def reassign_task(request, task_id):
             return redirect('task_list')
     else:
         form = ReassignTaskForm(instance=task)
-    return render(request, 'documents/reassign_task.html', {'form': form, 'task': task})
+    return render(request, 'tasks/reassign_task.html', {'form': form, 'task': task})
 
 @login_required
 def delete_task(request, task_id):
     task = get_object_or_404(Task, id=task_id)
+    if not (task.created_by == request.user or request.user.is_hod()):
+        return render(request, 'tasks/error.html', {'message': 'Access denied.'})
+    
     if request.method == 'POST':
         task.delete()
         return redirect('task_list')
-    return render(request, 'documents/confirm_delete.html', {'task': task})
+    return render(request, 'tasks/confirm_delete.html', {'task': task})
 
 @login_required
 def task_edit(request, task_id):
     task = get_object_or_404(Task, id=task_id)
+    if not (task.created_by == request.user or request.user.is_hod()):
+        return render(request, 'tasks/error.html', {'message': 'Access denied.'})
+    
     if request.method == 'POST':
-        form = TaskForm(request.POST, request.FILES, instance=task)
+        form = TaskForm(request.POST, instance=task)
         if form.is_valid():
             task = form.save()
-            # Handle document uploads
-            for file in request.FILES.getlist('documents'):
-                Document.objects.create(task=task, pdf_file=file, company_name=file.name)
             return redirect('task_detail', task_id=task.id)
     else:
         form = TaskForm(instance=task)
-    return render(request, 'documents/edit_task.html', {'form': form, 'task': task})
+    return render(request, 'tasks/edit_task.html', {'form': form, 'task': task})
 
 @login_required
 def delete_task_document(request, task_id, doc_id):
+    task = get_object_or_404(Task, id=task_id)
+    document = get_object_or_404(Document, id=doc_id)
+    if not (task.created_by == request.user or request.user.is_hod()) or document not in task.documents.all():
+        return JsonResponse({'error': 'Access denied'}, status=403)
+    
     if request.method == 'POST':
-        document = get_object_or_404(Document, id=doc_id, task__id=task_id)
-        document.delete()
+        task.documents.remove(document)
+        if not task.documents.exists():
+            document.delete()
         return JsonResponse({'success': True})
-    return JsonResponse({'success': False}, status=400)
+    return JsonResponse({'error': 'Invalid request'}, status=400)
+
+@login_required
+def performance_dashboard(request):
+    user = request.user
+    category = request.GET.get('category', 'overall')
+    
+    tasks = Task.objects.filter(assigned_to=user)
+    if category == 'personal':
+        tasks = tasks.filter(created_by=user)
+    elif category == 'corporate':
+        tasks = tasks.exclude(created_by=user)
+    
+    total_tasks = tasks.count()
+    completed_tasks = tasks.filter(status='completed').count()
+    completion_percentage = (completed_tasks / total_tasks * 100) if total_tasks > 0 else 0
+
+    now = timezone.now()
+    week_ago = now - timedelta(days=7)
+    month_ago = now - timedelta(days=30)
+    year_ago = now - timedelta(days=365)
+
+    weekly_completed = tasks.filter(status='completed', completed_at__gte=week_ago).count()
+    monthly_completed = tasks.filter(status='completed', completed_at__gte=month_ago).count()
+    yearly_completed = tasks.filter(status='completed', completed_at__gte=year_ago).count()
+
+    overdue_tasks = tasks.filter(status='overdue', due_date__lt=now).count()
+
+    performance_score = completion_percentage - (overdue_tasks * 10)
+    performance_score = max(0, min(100, performance_score))
+
+    context = {
+        'category': category,
+        'completion_percentage': round(completion_percentage, 2),
+        'weekly_completed': weekly_completed,
+        'monthly_completed': monthly_completed,
+        'yearly_completed': yearly_completed,
+        'overdue_tasks': overdue_tasks,
+        'performance_score': round(performance_score, 2),
+    }
+    return render(request, 'dashboard/performance_dashboard.html', context)
+
+@login_required
+def hod_performance_dashboard(request):
+    user = request.user
+    if not user.is_hod():
+        return render(request, 'tasks/error.html', {'message': 'Access denied. HOD role required.'})
+
+    department = user.department
+    if not department:
+        return render(request, 'tasks/error.html', {'message': 'No department assigned.'})
+
+    department_users = CustomUser.objects.filter(department=department).select_related('department')
+    users_ids = [u.id for u in department_users]
+
+    # Get user_id from query parameter (optional)
+    selected_user_id = request.GET.get('user_id', 'all')
+    
+    # Base query: corporate tasks (created by department members, not personal)
+    tasks = Task.objects.filter(created_by__in=users_ids).exclude(created_by=F('assigned_to')).select_related('created_by', 'assigned_to')
+
+    # Filter by selected user if specified
+    if selected_user_id != 'all':
+        tasks = tasks.filter(assigned_to_id=selected_user_id)
+
+    # Department-wide or user-specific metrics
+    total_tasks = tasks.count()
+    completed_tasks = tasks.filter(status='completed').count()
+    completion_percentage = (completed_tasks / total_tasks * 100) if total_tasks > 0 else 0
+
+    # Per-user metrics for the table
+    user_metrics = []
+    for dept_user in department_users:
+        user_tasks = Task.objects.filter(
+            created_by__in=users_ids,
+            assigned_to=dept_user
+        ).exclude(created_by=F('assigned_to')).select_related('assigned_to')
+        user_total_tasks = user_tasks.count()
+        user_completed_tasks = user_tasks.filter(status='completed').count()
+        user_completion_percentage = (user_completed_tasks / user_total_tasks * 100) if user_total_tasks > 0 else 0
+        user_metrics.append({
+            'user_id': dept_user.id,
+            'full_name': dept_user.get_full_name() or dept_user.username,
+            'total_tasks': user_total_tasks,
+            'completed_tasks': user_completed_tasks,
+            'completion_percentage': round(user_completion_percentage, 2),
+        })
+
+    context = {
+        'department': department.name,
+        'completion_percentage': round(completion_percentage, 2),
+        'total_tasks': total_tasks,
+        'completed_tasks': completed_tasks,
+        'user_metrics': user_metrics,
+        'department_users': department_users,
+        'selected_user_id': selected_user_id,
+    }
+    return render(request, 'dashboard/hod_performance_dashboard.html', context)
 
 @login_required
 def view_my_profile(request):
@@ -1104,7 +1210,7 @@ def view_my_profile(request):
             "emergency_name", "emergency_relationship", "emergency_phone",
             "emergency_address", "emergency_email",
         ]
-    return render(request, "documents/my_profile.html", {"profile": profile, "visible_fields": visible_fields})
+    return render(request, "dashboard/my_profile.html", {"profile": profile, "visible_fields": visible_fields})
 
 
 @login_required
@@ -1120,7 +1226,7 @@ def edit_my_profile(request):
         profile_form = StaffProfileForm(instance=profile)
         document_form = StaffDocumentForm()
         
-    return render(request, 'documents/edit_profile.html', {
+    return render(request, 'dashboard/edit_profile.html', {
         'profile': profile,
         'profile_form': profile_form,
         'document_form': document_form,
@@ -1172,26 +1278,27 @@ def delete_staff_document(request, document_id):
 @login_required
 @user_passes_test(is_admin)
 def staff_directory(request):
-    profiles = StaffProfile.objects.select_related("user", "organization").prefetch_related("team", "department").all()
-    print(f"Profiles found: {profiles.count()}")  # Debug: Verify profiles
+    profiles = StaffProfile.objects.select_related("user", "organization", "department").prefetch_related("team").all()
+    
+    # Restrict to department for HODs (optional)
+    if request.user.is_hod() and not is_admin(request.user):
+        profiles = profiles.filter(department=request.user.department)
+    
+    logger.debug(f"Profiles found: {profiles.count()}")
     
     grouped = {}
     for profile in profiles:
         org = profile.organization.name if profile.organization else "No Organization"
-        depts = profile.department.all()
-        if not depts:  # Handle profiles with no departments
-            depts = [None]
-        for dept in depts:
-            dept_name = dept.name if dept else "No Department"
-            teams = profile.team.all()
-            if not teams:  # Handle profiles with no teams
-                teams = [None]
-            for team in teams:
-                team_name = team.name if team else "No Team"
-                grouped.setdefault(org, {}).setdefault(dept_name, {}).setdefault(team_name, []).append(profile)
+        dept = profile.department.name if profile.department else "No Department"
+        teams = profile.team.all()
+        if not teams:
+            teams = [None]
+        for team in teams:
+            team_name = team.name if team else "No Team"
+            grouped.setdefault(org, {}).setdefault(dept, {}).setdefault(team_name, []).append(profile)
     
-    print(f"Grouped dictionary: {grouped}")  # Debug: Inspect grouped structure
-    return render(request, "documents/staff_directory.html", {"grouped": grouped})
+    logger.debug(f"Grouped dictionary: {grouped}")
+    return render(request, "staff/staff_directory.html", {"grouped": grouped})
 
 
 @login_required
@@ -1217,7 +1324,7 @@ def view_staff_profile(request, user_id):
             if shared_teams:
                 visible_fields += ["team"]
 
-    return render(request, "documents/view_staff_profile.html", {
+    return render(request, "staff/view_staff_profile.html", {
         "profile": profile,
         "viewer": viewer,
         "visible_fields": visible_fields,
@@ -1278,7 +1385,7 @@ def staff_list(request):
         'search_query': search_query,
         'filter_dept': filter_dept,
     }
-    return render(request, 'documents/staff_list.html', context)
+    return render(request, 'staff/staff_list.html', context)
 
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
@@ -1311,7 +1418,7 @@ def notifications_view(request):
         dismissed=True
     ).select_related('notification').order_by('-seen_at')
 
-    return render(request, 'documents/notifications.html', {
+    return render(request, 'users/notifications.html', {
         'active_notifications': active_notifications,
         'dismissed_notifications': dismissed_notifications
     })
@@ -1360,7 +1467,7 @@ def email_config(request):
             return redirect('view_my_profile')
     else:
         email_config_form = EmailConfigForm(instance=user)
-    return render(request, 'documents/email_config.html', {'email_config_form': email_config_form})
+    return render(request, 'users/email_config.html', {'email_config_form': email_config_form})
 
 from django.db import models
 from rest_framework.authtoken.models import Token
@@ -1427,7 +1534,7 @@ def calendar_view(request):
         'users': User.objects.all(),
     }
     print(f"Context: {context}")  # Debug
-    return render(request, 'documents/calendar.html', context)
+    return render(request, 'users/calendar.html', context)
 
 def export_staff_csv(request):
     if request.method != 'POST':
@@ -1458,3 +1565,155 @@ def export_staff_csv(request):
         ])
 
     return response
+
+
+# Public Folder Views
+@login_required
+def public_folder_list(request, public_folder_id=None):
+    user = request.user
+    parent_public_folder = get_object_or_404(PublicFolder, id=public_folder_id) if public_folder_id else None
+
+    public_folders = PublicFolder.objects.filter(
+        Q(department=user.department) | Q(team__in=user.teams.all()),
+        parent=parent_public_folder
+    ).distinct()
+
+    public_files = PublicFile.objects.filter(
+        Q(folder=parent_public_folder) &
+        (Q(folder__department=user.department) | Q(folder__team__in=user.teams.all()))
+    ).distinct()
+
+    context = {
+        'parent': parent_public_folder,
+        'public_folders': public_folders,
+        'public_files': public_files,
+        'folder_form': PublicFolderForm(),
+        'file_form': PublicFileForm(),
+    }
+    return render(request, 'folder/public_folder_list.html', context)
+
+@login_required
+@require_POST
+def create_public_folder(request):
+    form = PublicFolderForm(request.POST)
+    if form.is_valid():
+        folder = form.save(commit=False)
+        folder.created_by = request.user
+        user = request.user
+
+        if folder.department and folder.department != user.department:
+            # return JsonResponse({'success': False, 'errors': {'department': ['Invalid department']}}, status=403)
+            return render(request, 'folder/error.html', {'message': 'Invalid Department.'})
+        if folder.team and folder.team not in user.teams.all():
+            return JsonResponse({'success': False, 'errors': {'team': ['Invalid team']}}, status=403)
+        if folder.parent and not (folder.parent.department == user.department or folder.parent.team in user.teams.all()):
+            return JsonResponse({'success': False, 'errors': {'parent': ['No access to parent folder']}}, status=403)
+
+        try:
+            folder.save()
+            return JsonResponse({'success': True, 'folder_id': folder.id})
+        except ValidationError as e:
+            return JsonResponse({'success': False, 'errors': {'name': [str(e)]}}, status=400)
+    return JsonResponse({'success': False, 'errors': form.errors}, status=400)
+
+@login_required
+@require_POST
+def rename_public_folder(request, folder_id):
+    folder = get_object_or_404(PublicFolder, id=folder_id)
+    if folder.created_by != request.user:
+        return JsonResponse({'success': False, 'errors': {'name': ['You can only rename your own folders']}}, status=403)
+    name = request.POST.get('name')
+    if not name:
+        return JsonResponse({'success': False, 'errors': {'name': ['Name is required']}}, status=400)
+    folder.name = name
+    folder.save()
+    return JsonResponse({'success': True})
+
+@login_required
+@require_POST
+def move_public_folder(request, folder_id):
+    folder = get_object_or_404(PublicFolder, id=folder_id)
+    if folder.created_by != request.user:
+        return JsonResponse({'success': False, 'errors': {'new_parent_id': ['You can only move your own folders']}}, status=403)
+    new_parent_id = request.POST.get('new_parent_id')
+    user = request.user
+    if new_parent_id:
+        new_parent = get_object_or_404(PublicFolder, id=new_parent_id)
+        if not (new_parent.department == user.department or new_parent.team in user.teams.all()):
+            return JsonResponse({'success': False, 'errors': {'new_parent_id': ['No access to destination']}}, status=403)
+        if new_parent == folder or new_parent in folder.subfolders.all():
+            return JsonResponse({'success': False, 'errors': {'new_parent_id': ['Invalid destination']}}, status=400)
+        folder.parent = new_parent
+    else:
+        folder.parent = None
+    folder.save()
+    return JsonResponse({'success': True})
+
+@login_required
+@require_POST
+def delete_public_folder(request, folder_id):
+    folder = get_object_or_404(PublicFolder, id=folder_id)
+    if folder.created_by != request.user:
+        return JsonResponse({'success': False, 'errors': {'folder': ['You can only delete your own folders']}}, status=403)
+    folder.delete()
+    return JsonResponse({'success': True})
+
+@login_required
+@require_POST
+def upload_public_file(request):
+    form = PublicFileForm(request.POST, request.FILES)
+    if form.is_valid():
+        file = form.save(commit=False)
+        file.created_by = request.user
+        file.original_name = request.FILES['file'].name
+        public_folder_id = request.POST.get('folder')
+        if public_folder_id:
+            public_folder = get_object_or_404(PublicFolder, id=public_folder_id)
+            user = request.user
+            if not (public_folder.department == user.department or public_folder.team in user.teams.all()):
+                return JsonResponse({'success': False, 'errors': {'folder': ['No access to folder']}}, status=403)
+            file.folder = public_folder
+        file.save()
+        return JsonResponse({'success': True, 'file_id': file.id})
+    return JsonResponse({'success': False, 'errors': form.errors}, status=400)
+
+
+@login_required
+@require_POST
+def rename_public_file(request, file_id):
+    file = get_object_or_404(PublicFile, id=file_id)
+    if file.created_by != request.user:
+        return JsonResponse({'success': False, 'errors': {'name': ['You can only rename your own files']}}, status=403)
+    name = request.POST.get('name')
+    if not name:
+        return JsonResponse({'success': False, 'errors': {'name': ['Name is required']}}, status=400)
+    file.original_name = name
+    file.save()
+    return JsonResponse({'success': True})
+
+@login_required
+@require_POST
+def move_public_file(request, file_id):
+    file = get_object_or_404(PublicFile, id=file_id)
+    if file.created_by != request.user:
+        return JsonResponse({'success': False, 'errors': {'new_folder_id': ['You can only move your own files']}}, status=403)
+    new_folder_id = request.POST.get('new_folder_id')
+    user = request.user
+    if new_folder_id:
+        new_folder = get_object_or_404(PublicFolder, id=new_folder_id)
+        if not (new_folder.department == user.department or new_folder.team in user.teams.all()):
+            return JsonResponse({'success': False, 'errors': {'new_folder_id': ['No access to destination']}}, status=403)
+        file.folder = new_folder
+    else:
+        file.folder = None
+    file.save()
+    return JsonResponse({'success': True})
+
+@login_required
+@require_POST
+def delete_public_file(request, file_id):
+    file = get_object_or_404(PublicFile, id=file_id)
+    if file.created_by != request.user:
+        return JsonResponse({'success': False, 'errors': {'file': ['You can only delete your own files']}}, status=403)
+    file.delete()
+    return JsonResponse({'success': True})
