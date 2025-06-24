@@ -22,8 +22,12 @@ RUN apt-get update && apt-get install -y \
     libasound2 \
     libfontconfig1 \
     libfreetype6 \
-    libssl-dev \
-    && rm -rf /var/lib/apt/lists/*
+    libssl-dev && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Confirm LibreOffice installed (debug step)
+RUN libreoffice --version
 
 # Set workdir
 WORKDIR /app
