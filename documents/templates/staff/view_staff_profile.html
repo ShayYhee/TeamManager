@@ -1,0 +1,8 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ profile.user.username }}'s Profile - Team Manager{% endblock %}
+
+{% block content %}
+<h2>{{ profile.user.username }}'s Profile</h2>
+{% include 'staff/profile_detail.html' with profile=profile visible_fields=visible_fields %}
+{% endblock %}

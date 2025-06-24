@@ -1,0 +1,324 @@
+{% extends 'base.html' %}
+
+{% block title %}Edit Profile - Team Manager{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-lg-8 col-md-10">
+            <!-- Staff Profile Form -->
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-header bg-transparent d-flex align-items-center justify-content-between" onclick="toggleVisibility(this)" role="button" aria-expanded="true" aria-controls="profileFormCollapse">
+                    <h3 class="mb-0"><i class="fas fa-user me-2"></i> Profile Information</h3>
+                    <span class="caret"><i class="fas fa-chevron-right"></i></span>
+                </div>
+                <div class="card-body collapse show" id="profileFormCollapse">
+                    <form method="post" enctype="multipart/form-data" novalidate>
+                        {% csrf_token %}
+                        {% if profile_form.non_field_errors %}
+                            <div class="alert alert-danger" role="alert">
+                                {% for error in profile_form.non_field_errors %}
+                                    {{ error }}
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+                        {% for field in profile_form %}
+                            <div class="mb-3">
+                                <label for="{{ field.id_for_label }}" class="form-label fw-medium">
+                                    {{ field.label }}
+                                    {% if field.field.required %}
+                                        <span class="text-danger">*</span>
+                                    {% endif %}
+                                </label>
+                                {{ field }}
+                                {% if field.errors %}
+                                    <div class="text-danger small mt-1">
+                                        {% for error in field.errors %}
+                                            {{ error }}
+                                        {% endfor %}
+                                    </div>
+                                {% endif %}
+                                {% if field.help_text %}
+                                    <div class="form-text small">{{ field.help_text }}</div>
+                                {% endif %}
+                            </div>
+                        {% endfor %}
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-1"></i> Save Profile
+                            </button>
+                            <a href="{% url 'view_my_profile' %}" class="btn btn-outline-secondary">
+                                <i class="fas fa-times me-1"></i> Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Documents Section -->
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-header bg-transparent d-flex align-items-center justify-content-between" onclick="toggleVisibility(this)" role="button" aria-expanded="true" aria-controls="documentsCollapse">
+                    <h3 class="mb-0"><i class="fas fa-file-alt me-2"></i> Documents</h3>
+                    <div class="d-flex align-items-center gap-2">
+                        <button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#documentModal">
+                            <i class="fas fa-plus me-1"></i> Add Document
+                        </button>
+                        <span class="caret"><i class="fas fa-chevron-right"></i></span>
+                    </div>
+                </div>
+                <div class="card-body collapse show" id="documentsCollapse">
+                    <div id="documentList" class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3">
+                        {% for document in profile.documents.all %}
+                            <div class="col document-card" data-document-id="{{ document.id }}">
+                                <div class="card h-100 position-relative">
+                                    <div class="card-body">
+                                        <h5 class="card-title mb-3">{{ document.description|default:document.document_type }}</h5>
+                                        <p class="card-text small">
+                                            <a href="{{ document.file.url }}" target="_blank" class="text-primary text-decoration-underline" title="{{ document.file.name }}">{{ document.file.name|slice:"20:" }}</a><br>
+                                            <span class="text-muted">Type:</span> {{ document.get_document_type_display }}<br>
+                                            <span class="text-muted">Uploaded:</span> {{ document.uploaded_at|date:"F d, Y" }}
+                                        </p>
+                                        <button class="btn btn-danger btn-sm delete-document" title="Delete Document" aria-label="Delete Document">
+                                            <i class="fas fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                    {% if not profile.documents.all %}
+                        <p class="text-muted text-center mt-3">No documents uploaded yet.</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Document Modal -->
+<div class="modal fade" id="documentModal" tabindex="-1" aria-labelledby="documentModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="documentModalLabel">Add Document</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="documentForm" enctype="multipart/form-data" novalidate>
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label for="id_file" class="form-label fw-medium">File <span class="text-danger">*</span></label>
+                        <input type="file" name="file" class="form-control" id="id_file" required>
+                        <div class="form-text small">Supported formats: PDF, DOCX, images (max 5MB).</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="id_document_type" class="form-label fw-medium">Document Type <span class="text-danger">*</span></label>
+                        <select name="document_type" class="form-select" id="id_document_type" required>
+                            {% for value, label in document_form.document_type.field.choices %}
+                                <option value="{{ value }}">{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="id_description" class="form-label fw-medium">Description</label>
+                        <input type="text" name="description" class="form-control" id="id_description">
+                    </div>
+                    <div id="formErrors" class="text-danger small"></div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="saveDocument">
+                    <i class="fas fa-save me-1"></i> Save Document
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .card {
+        border-radius: 12px;
+        transition: all 0.3s ease;
+    }
+    body.dark-mode .card {
+        background: #2d3748;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+    .card-header {
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+    }
+    body.dark-mode .card-header {
+        background: #3b4a6b !important;
+    }
+    .card-header:hover {
+        background-color: #e2e8f0;
+    }
+    body.dark-mode .card-header:hover {
+        background-color: #4a5568 !important;
+    }
+    .caret {
+        transition: transform 0.3s ease;
+    }
+    .caret.rotated {
+        transform: rotate(90deg);
+    }
+    .form-label {
+        color: #2d3748;
+    }
+    body.dark-mode .form-label {
+        color: #e2e8f0;
+    }
+    .form-control, .form-select {
+        border-radius: 8px;
+        border: 1px solid #e2e8f0;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+    body.dark-mode .form-control,
+    body.dark-mode .form-select {
+        background: #4a5568;
+        border-color: #4a5568;
+        color: #e2e8f0;
+    }
+    .form-control:focus, .form-select:focus {
+        border-color: #319795;
+        box-shadow: 0 0 0 0.2rem rgba(49, 151, 149, 0.25);
+    }
+    .form-text {
+        color: #718096;
+    }
+    body.dark-mode .form-text {
+        color: #a0aec0;
+    }
+    .document-card .card {
+        transition: transform 0.2s ease;
+    }
+    .document-card .card:hover {
+        transform: translateY(-4px);
+    }
+    .delete-document {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        padding: 4px 8px;
+    }
+    .card-title {
+        font-size: 1.1rem;
+        font-weight: 500;
+    }
+    .card-text a {
+        word-break: break-all;
+    }
+    @media (max-width: 576px) {
+        .card-body {
+            padding: 1rem;
+        }
+        h3 {
+            font-size: 1.25rem;
+        }
+        .btn-sm {
+            font-size: 0.75rem;
+            padding: 4px 8px;
+        }
+    }
+</style>
+
+<script>
+$(document).ready(function() {
+    // Initialize Select2 for document type if needed
+    $('#id_document_type').select2({
+        dropdownParent: $('#documentModal'),
+        theme: 'bootstrap-5',
+        width: '100%'
+    });
+
+    // Add Document
+    $('#saveDocument').click(function() {
+        var formData = new FormData($('#documentForm')[0]);
+        $.ajax({
+            url: '{% url "add_staff_document" %}',
+            type: 'POST',
+            data: formData,
+            processData: false,
+            contentType: false,
+            success: function(response) {
+                if (response.success) {
+                    // Append new document card
+                    var doc = response.document;
+                    var cardHtml = `
+                        <div class="col document-card" data-document-id="${doc.id}">
+                            <div class="card h-100 position-relative">
+                                <div class="card-body">
+                                    <h5 class="card-title mb-3">${doc.description || doc.document_type}</h5>
+                                    <p class="card-text small">
+                                        <a href="${doc.file_url}" target="_blank" class="text-primary text-decoration-underline" title="${doc.file_url.split('/').pop()}">${doc.file_url.split('/').pop()}</a><br>
+                                        <span class="text-muted">Type:</span> ${doc.document_type}<br>
+                                        <span class="text-muted">Uploaded:</span> ${doc.uploaded_at}
+                                    </p>
+                                    <button class="btn btn-danger btn-sm delete-document" title="Delete Document" aria-label="Delete Document">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    $('#documentList').append(cardHtml);
+                    $('#documentModal').modal('hide');
+                    $('#documentForm')[0].reset();
+                    $('#formErrors').empty();
+                    // Reinitialize Select2 after form reset
+                    $('#id_document_type').select2({
+                        dropdownParent: $('#documentModal'),
+                        theme: 'bootstrap-5',
+                        width: '100%'
+                    });
+                } else {
+                    // Display errors
+                    var errors = '';
+                    for (var field in response.errors) {
+                        errors += response.errors[field].join('<br>') + '<br>';
+                    }
+                    $('#formErrors').html(errors);
+                }
+            },
+            error: function() {
+                $('#formErrors').html('An error occurred. Please try again.');
+            }
+        });
+    });
+
+    // Delete Document
+    $(document).on('click', '.delete-document', function() {
+        var card = $(this).closest('.document-card');
+        var documentId = card.data('document-id');
+        if (confirm('Are you sure you want to delete this document?')) {
+            $.ajax({
+                url: '{% url "delete_staff_document" document_id=0 %}'.replace('0', documentId),
+                type: 'POST',
+                headers: {'X-CSRFToken': '{{ csrf_token }}'},
+                success: function(response) {
+                    if (response.success) {
+                        card.fadeOut(300, function() { $(this).remove(); });
+                    } else {
+                        alert('Failed to delete document: ' + response.error);
+                    }
+                },
+                error: function(xhr) {
+                    alert('An error occurred: ' + xhr.status + ' ' + xhr.statusText);
+                }
+            });
+        }
+    });
+});
+
+function toggleVisibility(header) {
+    const next = header.nextElementSibling;
+    const caret = header.querySelector('.caret i');
+    const isExpanded = next.classList.contains('show');
+    $(next).collapse('toggle');
+    caret.className = isExpanded ? 'fas fa-chevron-right' : 'fas fa-chevron-down';
+    header.setAttribute('aria-expanded', !isExpanded);
+}
+</script>
+{% endblock %}
