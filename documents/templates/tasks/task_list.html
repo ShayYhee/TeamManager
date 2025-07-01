@@ -220,7 +220,7 @@
                 const taskId = card.getAttribute('data-id');
                 const newStatus = column.dataset.status;
                 try {
-                    const response = await fetch(`/documents/tasks/${taskId}/update-status/`, {
+                    const response = await fetch(`/tasks/${taskId}/update-status/`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -261,7 +261,7 @@
         submitButton.disabled = true;
         try {
             const formData = new FormData(e.target);
-            const response = await fetch(`/documents/tasks/${formData.get('task_id')}/reassign/`, {
+            const response = await fetch(`/tasks/${formData.get('task_id')}/reassign/`, {
                 method: 'POST',
                 headers: {
                     'X-CSRFToken': formData.get('csrfmiddlewaretoken')
@@ -285,7 +285,7 @@
         submitButton.disabled = true;
         try {
             const taskId = document.getElementById('deleteTaskId').value;
-            const response = await fetch(`/documents/tasks/${taskId}/delete/`, {
+            const response = await fetch(`/tasks/${taskId}/delete/`, {
                 method: 'POST',
                 headers: {
                     'X-CSRFToken': document.querySelector('#deleteForm input[name=csrfmiddlewaretoken]').value

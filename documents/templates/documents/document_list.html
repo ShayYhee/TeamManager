@@ -142,8 +142,12 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    {% if document.status == "pending" and user.position == "BDM" %}
-                                        <a href="{% url 'approve_document' document.id %}" class="btn btn-primary btn-sm">Approve</a>
+                                    {% if document.status == "pending" %}
+                                        {% for role in user.roles.all %}
+                                            {% if role.name == "BDM" %}
+                                                <a href="{% url 'approve_document' document.id %}" class="btn btn-primary btn-sm">Approve</a>
+                                            {% endif %}
+                                        {% endfor %}
                                     {% elif document.status == "approved" %}
                                         {% if document.approved_by == user %}
                                             You

@@ -1,16 +1,35 @@
 from rest_framework import serializers
-from .models import Event, EventParticipant, Notification, UserNotification, CustomUser
 from django.contrib.auth import get_user_model
-from django.shortcuts import get_object_or_404
+from .models import Event, EventParticipant, Notification, UserNotification, CustomUser
+import logging
 
-User = get_user_model()
+logger = logging.getLogger(__name__)
+
+CustomUser = get_user_model()
 
 class EventParticipantSerializer(serializers.ModelSerializer):
-    user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
+    user = serializers.PrimaryKeyRelatedField(
+        queryset=CustomUser.objects.all()  # Will be filtered by tenant in __init__
+    )
 
     class Meta:
         model = EventParticipant
         fields = ['user', 'response']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Filter user queryset by tenant if context is available
+        if self.context.get('request'):
+            tenant = self.context['request'].tenant
+            self.fields['user'].queryset = CustomUser.objects.filter(tenant=tenant)
+
+    def validate_user(self, value):
+        # Ensure the selected user belongs to the same tenant as the request
+        request = self.context.get('request')
+        if request and value.tenant != request.tenant:
+            logger.error(f"Invalid user {value.username}: tenant mismatch")
+            raise serializers.ValidationError("Selected user does not belong to your tenant.")
+        return value
 
 class EventSerializer(serializers.ModelSerializer):
     participants = EventParticipantSerializer(many=True, required=False)
@@ -33,14 +52,35 @@ class EventSerializer(serializers.ModelSerializer):
             'event_link': instance.event_link
         }
 
+    def validate(self, data):
+        # Ensure the event's tenant matches the request's tenant
+        request = self.context.get('request')
+        if request and 'tenant' not in data:
+            data['tenant'] = request.tenant
+        elif request and data.get('tenant') != request.tenant:
+            logger.error(f"Invalid tenant for event creation: {data.get('tenant')}")
+            raise serializers.ValidationError("Event tenant does not match the request tenant.")
+        return data
+
     def create(self, validated_data):
+        request = self.context.get('request')
         participants_data = validated_data.pop('participants', [])
+        # Ensure tenant is set for the event
+        validated_data['tenant'] = request.tenant
         event = Event.objects.create(**validated_data)
+
+        # Create EventParticipant entries
         for participant_data in participants_data:
-            print("User this:", participant_data)
+            user = participant_data['user']
+            participant_data['tenant']= request.tenant
+            if user.tenant != request.tenant:
+                logger.error(f"Invalid participant {user.username}: tenant mismatch")
+                raise serializers.ValidationError(f"User {user.username} does not belong to the tenant.")
             EventParticipant.objects.create(event=event, **participant_data)
-        
+
+        # Create notification for the event
         notif = Notification.objects.create(
+            tenant=request.tenant,
             title=event.title,
             message=event.description or "You have been invited to a new event.",
             type=Notification.NotificationType.EVENT,
@@ -48,16 +88,23 @@ class EventSerializer(serializers.ModelSerializer):
             is_active=True
         )
 
-        # Step 2: Create UserNotifications for each invited user
-        participants = participant_data  # Should be list of user IDs
-        
+        # Create UserNotifications for each participant
         for participant_data in participants_data:
-            print("User this:", participant_data['user'])
             user = participant_data['user']
-            UserNotification.objects.create(user=user, notification=notif)
+            UserNotification.objects.create(
+                tenant=request.tenant,
+                user=user,
+                notification=notif
+            )
         return event
 
     def update(self, instance, validated_data):
+        request = self.context.get('request')
+        # Ensure the event being updated belongs to the tenant
+        if instance.tenant != request.tenant:
+            logger.error(f"Unauthorized update attempt on event {instance.id} by user {request.user.username}")
+            raise serializers.ValidationError("You are not authorized to update this event.")
+        
         participants_data = validated_data.pop('participants', None)
         instance = super().update(instance, validated_data)
         if participants_data is not None:
@@ -65,5 +112,9 @@ class EventSerializer(serializers.ModelSerializer):
             instance.participants.all().delete()
             # Add new participants
             for participant_data in participants_data:
+                user = participant_data['user']
+                if user.tenant != request.tenant:
+                    logger.error(f"Invalid participant {user.username}: tenant mismatch")
+                    raise serializers.ValidationError(f"User {user.username} does not belong to the tenant.")
                 EventParticipant.objects.create(event=instance, **participant_data)
         return instance

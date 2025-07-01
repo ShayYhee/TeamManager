@@ -145,7 +145,7 @@
             const button = this;
             button.disabled = true;
             try {
-                const response = await fetch(`/documents/tasks/${taskId}/delete-document/${docId}/`, {
+                const response = await fetch(`/tasks/${taskId}/delete-document/${docId}/`, {
                     method: 'POST',
                     headers: {
                         'X-CSRFToken': document.querySelector('input[name=csrfmiddlewaretoken]').value

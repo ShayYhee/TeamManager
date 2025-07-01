@@ -10,6 +10,7 @@ from django.core.mail import send_mail, EmailMessage, get_connection
 from django.core.paginator import Paginator
 from django.core.exceptions import ValidationError
 from django.conf import settings
+from django.db import transaction
 from django.db.models import Q, F
 from django.dispatch import receiver
 from django.forms import formset_factory
@@ -32,6 +33,7 @@ import subprocess
 import platform
 import shutil
 import pdfkit
+import re
 from raadaa import settings
 from html2docx import html2docx
 from docx2txt import process
@@ -63,13 +65,20 @@ def is_admin(user):
     # return user.is_staff
 
 def send_approval_request(document):
-    # Get all BDM emails
-    bdm_emails = CustomUser.objects.filter(roles__name="BDM").values_list("email", flat=True)
+    # Get all BDM emails for the document's tenant
+    bdm_emails = CustomUser.objects.filter(
+        tenant=document.tenant,  # Filter by the document's tenant
+        roles__name="BDM"
+    ).values_list("email", flat=True)
 
     # Ensure there are BDMs to notify
     if not bdm_emails:
         return
     
+    # Ensure the document's creator is from the same tenant
+    if document.created_by.tenant != document.tenant:
+        return HttpResponseForbidden("Unauthorized: Creator does not belong to the document's tenant.")
+
     sender_email = document.created_by.smtp_email
     sender_password = document.created_by.smtp_password
 
@@ -100,20 +109,11 @@ def send_approval_request(document):
 
     # Create email with attachment
     email = EmailMessage(subject, message, sender_email, list(bdm_emails), connection=connection)
-    # email.attach_file(document.pdf_file.path)  # Attach the PDF
+    email.attach_file(document.pdf_file.path)  # Attach the PDF
     email.send()
-
-    # send_mail(
-    #     subject,
-    #     message,
-    #     sender_email,  # Always send from Zoho SMTP email
-    #     list(bdm_emails),  # Send to all BDMs
-    #     connection=connection
-    # )
+    
     print("Mail Sent")
 
-    # email = EmailMessage(subject, message, sender_email, list(bdm_emails))
-    # email.send()
 
 @login_required
 def create_document(request):
@@ -132,6 +132,43 @@ def create_document(request):
                     print("Processing form:", form.cleaned_data)
                     document = form.save(commit=False)
                     document.created_by = request.user
+                    document.tenant = request.tenant  # Set tenant from middleware
+                    # Validate that the user belongs to the same tenant
+                    if document.created_by.tenant != request.tenant:
+                        return HttpResponse("Unauthorized: User does not belong to the current tenant.", status=403)
+
+                    # Get or create the "Template Document" folder
+                    user = request.user
+                    department = user.department if hasattr(user, 'department') else None
+                    team = user.teams.first() if hasattr(user, 'teams') and user.teams.exists() else None
+
+                    # Ensure user has a department or team
+                    if not department and not team:
+                        return HttpResponse("Error: User must be associated with a department or team.", status=403)
+
+                    # Choose department or team for the folder (prefer department if available)
+                    folder_defaults = {
+                        'created_by': user,
+                        'department': department,
+                        'team': team if not department else None  # Use team only if no department
+                    }
+
+                    try:
+                        template_folder, created = PublicFolder.objects.get_or_create(
+                            tenant=request.tenant,
+                            name="Template Document",
+                            defaults=folder_defaults
+                        )
+                    except ValidationError as e:
+                        print(f"PublicFolder creation error: {e}")
+                        return HttpResponse(f"Error creating Template Document folder: {e}", status=400)
+
+                    # Validate folder access (similar to create_public_folder)
+                    if template_folder.department and template_folder.department != user.department:
+                        return HttpResponse("Invalid Department for Template Document folder.", status=403)
+                    if template_folder.team and template_folder.team not in user.teams.all():
+                        return HttpResponse("Invalid Team for Template Document folder.", status=403)
+
                     document.save()
 
                     creation_method = form.cleaned_data['creation_method']
@@ -173,6 +210,16 @@ def create_document(request):
                         word_path = os.path.join(word_dir, word_filename)
                         doc.save(word_path)
                         document.word_file = os.path.join("documents/word", word_filename)
+
+                        # Save Word file to PublicFile
+                        public_word_file = PublicFile(
+                            tenant=request.tenant,
+                            original_name=word_filename,
+                            file=os.path.join("documents/word", word_filename),
+                            folder=template_folder,
+                            created_by=user
+                        )
+                        public_word_file.save()
                     else:
                         uploaded_file = form.cleaned_data['uploaded_file']
                         file_extension = uploaded_file.name.lower().split('.')[-1]
@@ -184,6 +231,16 @@ def create_document(request):
                                 for chunk in uploaded_file.chunks():
                                     f.write(chunk)
                             document.word_file = os.path.join("documents/word", word_filename)
+
+                            # Save Word file to PublicFile
+                            public_word_file = PublicFile(
+                                tenant=request.tenant,
+                                original_name=word_filename,
+                                file=os.path.join("documents/word", word_filename),
+                                folder=template_folder,
+                                created_by=user
+                            )
+                            public_word_file.save()
                         elif file_extension == 'pdf':
                             pdf_filename = f"{base_filename}.pdf"
                             pdf_path = os.path.join(pdf_dir, pdf_filename)
@@ -192,6 +249,17 @@ def create_document(request):
                                     f.write(chunk)
                             document.pdf_file = os.path.join("documents/pdf", pdf_filename)
                             document.save()
+
+                            # Save PDF file to PublicFile
+                            public_pdf_file = PublicFile(
+                                tenant=request.tenant,
+                                original_name=pdf_filename,
+                                file=os.path.join("documents/pdf", pdf_filename),
+                                folder=template_folder,
+                                created_by=user
+                            )
+                            public_pdf_file.save()
+
                             print("Sending email for uploaded PDF")
                             send_approval_request(document)
                             continue
@@ -231,12 +299,6 @@ def create_document(request):
                             check=True
                         )
 
-                        # Debug paths
-                        print("LibreOffice path:", libreoffice_path)
-                        print("abs_word_path:", abs_word_path)
-                        print("abs_output_dir:", abs_output_dir)
-
-
                         print("LibreOffice stdout:", result.stdout.decode())
                         print("LibreOffice stderr:", result.stderr.decode())
 
@@ -244,6 +306,16 @@ def create_document(request):
                         if os.path.exists(absolute_pdf_path):
                             document.pdf_file = relative_pdf_path
                             document.save()
+
+                            # Save PDF file to PublicFile
+                            public_pdf_file = PublicFile(
+                                tenant=request.tenant,
+                                original_name=pdf_filename,
+                                file=relative_pdf_path,
+                                folder=template_folder,
+                                created_by=user
+                            )
+                            public_pdf_file.save()
                         else:
                             return HttpResponse("PDF file was not generated.", status=500)
 
@@ -258,14 +330,8 @@ def create_document(request):
                     print("Sending email")
                     send_approval_request(document)
 
-                    print("Redirecting to document_list")
-                    return redirect("document_list")
-
-            #     print("Sending email")
-            #     send_approval_request(document)
-            
-            # print("Redirecting to document_list")
-            # return redirect("document_list")
+            print("Redirecting to document_list")
+            return redirect("document_list")
         else:
             print("Formset errors:", formset.errors)
             print("Non-form errors:", formset.non_form_errors())
@@ -277,55 +343,89 @@ def create_document(request):
 
 @user_passes_test(is_admin)
 def users_list(request):
-    users = CustomUser.objects.all().order_by('date_joined')
-    paginator = Paginator(users, 10) # 10 users per page
+    # Validate that the requesting user belongs to the current tenant
+    if request.user.tenant != request.tenant:
+        return HttpResponseForbidden("Unauthorized: User does not belong to the current tenant.")
+
+    # Filter users by the current tenant
+    users = CustomUser.objects.filter(tenant=request.tenant).order_by('date_joined')
+    paginator = Paginator(users, 10)  # 10 users per page
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     return render(request, "users/users_list.html", {"users": page_obj})
 
 @user_passes_test(is_admin)
 def approve_user(request, user_id):
-    user = CustomUser.objects.get(id=user_id)
-    admin_user = CustomUser.objects.get(username=request.user)
+    # Validate that the admin belongs to the current tenant
+    if request.user.tenant != request.tenant:
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
 
-    if user:
-        user.is_active = True
-        user.save()
-        sender_email = admin_user.smtp_email
-        sender_password = admin_user.smtp_password
+    # Get the user, ensuring they belong to the same tenant
+    try:
+        user = CustomUser.objects.get(id=user_id, tenant=request.tenant)
+    except CustomUser.DoesNotExist:
+        return HttpResponseForbidden("User not found or does not belong to your tenant.")
 
-        if not sender_email or not sender_password:
-            return HttpResponseForbidden("Your email credentials are missing. Contact admin.")
+    # Activate the user
+    user.is_active = True
+    user.save()
 
-        connection = get_connection(
-            backend="django.core.mail.backends.smtp.EmailBackend",
-            host="smtp.zoho.com",
-            port=587,
-            username=sender_email,
-            password=sender_password,
-            use_tls=True,
-        )
+    # Use the admin's email credentials (request.user is already the admin)
+    admin_user = request.user
+    sender_email = admin_user.smtp_email
+    sender_password = admin_user.smtp_password
 
-        subject = f"Approval Request: {user.username}"
-        message = f"""
-        Dear {user.username},
+    if not sender_email or not sender_password:
+        return HttpResponseForbidden("Your email credentials are missing. Contact admin.")
 
-        Your account has been activated, please click the link below to login: {'http://127.0.0.1:8000/login/'or 'https://raadaa.onrender.com/login'}
-
-        Best regards,  
-        {user.get_full_name()}
-        """
-
-        print("Sending mail...")
-
-        send_mail(
-        subject,
-        message,
-        sender_email,  # Always send from Zoho SMTP email
-        [user.email],  # Send to all BDMs
-        connection=connection
+    # Set up email connection
+    connection = get_connection(
+        backend="django.core.mail.backends.smtp.EmailBackend",
+        host="smtp.zoho.com",
+        port=587,
+        username=sender_email,
+        password=sender_password,
+        use_tls=True,
     )
-        return redirect("users_list")
+
+    # Generate tenant-specific login URL
+    # Determine base domain based on environment
+    if settings.DEBUG:
+        base_domain = "127.0.0.1:8000"  # Local development
+        protocol = "http"
+    else:
+        base_domain = "teammanager.ng"  # Production
+        protocol = "https"
+
+    # Generate tenant-specific login URL
+    login_url = f"{protocol}://{request.tenant.slug}.{base_domain}/login"
+
+    # Prepare email
+    subject = f"Account Approval: {user.username}"
+    message = f"""
+    Dear {user.username},
+
+    Your account has been activated. Please click the link below to log in:
+    {login_url}
+
+    Best regards,  
+    {admin_user.get_full_name() or admin_user.username}
+    """
+
+    print("Sending mail...")
+
+    try:
+        # Send email to the user
+        send_mail(
+            subject,
+            message,
+            sender_email,
+            [user.email],
+            connection=connection,
+        )
+    except Exception as e:
+        print(f"Failed to send email: {e}")
+        return HttpResponseForbidden("Failed to send approval email. Contact admin.")
 
     return redirect("users_list")
 
@@ -334,14 +434,22 @@ def account_activation_sent(request):
 
 @user_passes_test(is_admin)
 def edit_user(request, user_id):
-    user = get_object_or_404(CustomUser, id=user_id)
+    # Validate that the admin belongs to the current tenant
+    if request.user.tenant != request.tenant:
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+
+    # Get the user, ensuring they belong to the same tenant
+    user = get_object_or_404(CustomUser, id=user_id, tenant=request.tenant)
+
     if request.method == "POST":
         form = UserForm(request.POST, instance=user)
         if form.is_valid():
+            # Ensure the tenant field cannot be changed
+            form.instance.tenant = request.tenant
             form.save()
             LogEntry.objects.log_action(
                 user_id=request.user.id,
-                content_type_id=ContentType.objects.get_for_model(User).pk,
+                content_type_id=ContentType.objects.get_for_model(CustomUser).pk,
                 object_id=user.id,
                 object_repr=user.username,
                 action_flag=CHANGE,
@@ -352,17 +460,53 @@ def edit_user(request, user_id):
         form = UserForm(instance=user)
     return render(request, "users/edit_user.html", {"form": form})
 
+
 def register(request):
     if request.method == "POST":
         form = SignUpForm(request.POST)
         if form.is_valid():
             user = form.save(commit=False)
             user.set_password(form.cleaned_data["password"])
-            user.is_active = "False"
+            user.is_active = False
+            user.tenant = request.tenant
+            if not request.tenant:
+                return HttpResponseForbidden("No tenant associated with this request.")
             user.save()
-            # approve_user(request, user.id)
-            # login(request, user)
-            # return redirect("login")  # Redirect to document form
+
+            # Send confirmation email
+            admin_user = CustomUser.objects.filter(
+                tenant=request.tenant, roles__name="Admin"
+            ).first()
+            if admin_user:
+                sender_email = admin_user.smtp_email
+                sender_password = admin_user.smtp_password
+                if sender_email and sender_password:
+                    connection = get_connection(
+                        backend="django.core.mail.backends.smtp.EmailBackend",
+                        host="smtp.zoho.com",
+                        port=587,
+                        username=sender_email,
+                        password=sender_password,
+                        use_tls=True,
+                    )
+                    base_domain = "127.0.0.1:8000" if settings.DEBUG else "teammanager.ng"
+                    protocol = "http" if settings.DEBUG else "https"
+                    login_url = f"{protocol}://{request.tenant.slug}.{base_domain}/login"
+                    subject = f"Account Pending Approval: {user.username}"
+                    message = f"""
+                    Dear {user.username},
+
+                    Your account has been created and is pending approval. You will be notified once approved. 
+                    Once activated, you can log in at: {login_url}
+
+                    Best regards,  
+                    {admin_user.get_full_name() or admin_user.username}
+                    """
+                    try:
+                        send_mail(subject, message, sender_email, [user.email], connection=connection)
+                    except Exception as e:
+                        print(f"Failed to send email: {e}")
+                        # Log error or notify admin, but proceed with registration
             return redirect("account_activation_sent")
     else:
         form = SignUpForm()
@@ -371,18 +515,28 @@ def register(request):
 @login_required
 @user_passes_test(is_admin)
 def delete_user(request, user_id):
-    user = get_object_or_404(CustomUser, id=user_id)
+    # Validate that the admin belongs to the current tenant
+    if request.user.tenant != request.tenant:
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
 
-    if user:
-        user.delete()
-        # return JsonResponse({'success': True})
+    # Get the user, ensuring they belong to the same tenant
+    user = get_object_or_404(CustomUser, id=user_id, tenant=request.tenant)
 
-    return redirect("users_list")  # Redirect back to the list
+    # Prevent admins from deleting themselves
+    if user == request.user:
+        return HttpResponseForbidden("You cannot delete your own account.")
+
+    user.delete()
+    return redirect("users_list")
 
 @login_required
 def document_list(request):
-    # Start with all documents
-    documents = Document.objects.all()
+    # Validate that the user belongs to the current tenant
+    if request.user.tenant != request.tenant:
+        return HttpResponseForbidden("Unauthorized: User does not belong to the current tenant.")
+
+    # Start with documents filtered by the current tenant
+    documents = Document.objects.filter(tenant=request.tenant)
 
     # Get filter parameters from the request
     company = request.GET.get('company', '').strip()
@@ -410,10 +564,10 @@ def document_list(request):
         except ValueError:
             print(f"Invalid date format for created: {created}")
     if created_by:
-        documents = documents.filter(created_by__username__iexact=created_by)
+        documents = documents.filter(created_by__username__iexact=created_by, created_by__tenant=request.tenant)
         print(f"Filtering by created_by: {created_by}")
     if approved_by:
-        documents = documents.filter(approved_by__username__iexact=approved_by)
+        documents = documents.filter(approved_by__username__iexact=approved_by, approved_by__tenant=request.tenant)
         print(f"Filtering by approved_by: {approved_by}")
     if send_email:
         email_sent = send_email.lower() == 'sent'
@@ -425,14 +579,16 @@ def document_list(request):
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
 
-    # Get distinct values for filter dropdowns
-    distinct_companies = Document.objects.values_list('company_name', flat=True).distinct()
-    distinct_type = Document.objects.values_list('document_type', flat=True).distinct()
-    distinct_created_by = User.objects.filter(
-        id__in=Document.objects.values_list('created_by', flat=True).distinct()
+    # Get distinct values for filter dropdowns, scoped to the tenant
+    distinct_companies = Document.objects.filter(tenant=request.tenant).values_list('company_name', flat=True).distinct()
+    distinct_type = Document.objects.filter(tenant=request.tenant).values_list('document_type', flat=True).distinct()
+    distinct_created_by = CustomUser.objects.filter(
+        tenant=request.tenant,
+        id__in=Document.objects.filter(tenant=request.tenant).values_list('created_by', flat=True).distinct()
     ).values_list('username', flat=True)
-    distinct_approved_by = User.objects.filter(
-        id__in=Document.objects.values_list('approved_by', flat=True).distinct()
+    distinct_approved_by = CustomUser.objects.filter(
+        tenant=request.tenant,
+        id__in=Document.objects.filter(tenant=request.tenant).values_list('approved_by', flat=True).distinct()
     ).exclude(username__isnull=True).values_list('username', flat=True)
 
     # Debug filtered document count
@@ -462,20 +618,23 @@ def home(request):
 
 @login_required
 def approve_document(request, document_id):
-    document = get_object_or_404(Document, id=document_id)
-    print("Yess>>>", request)
-    print("Yess>>>", request.user)
+    # Ensure the user belongs to the current tenant
+    if not hasattr(request, 'tenant') or not request.user.tenant == request.tenant:
+        return HttpResponseForbidden("You are not authorized to perform actions for this tenant.")
 
-    # Restrict only BDMs from approving
-    
+    # Fetch the document, ensuring it belongs to the current tenant
+    document = get_object_or_404(Document, id=document_id, tenant=request.tenant)
+
+    # Restrict approval to users with the BDM role
     if not request.user.roles.filter(name="BDM").exists():
         return HttpResponseForbidden("You are not allowed to approve this document.")
 
+    # Update document status and approved_by
     document.status = "approved"
     document.approved_by = request.user
     document.save()
 
-    # Ensure the BDM has SMTP credentials
+    # Ensure the BDM has SMTP credentials (or use tenant-specific SMTP settings)
     sender_email = request.user.smtp_email
     sender_password = request.user.smtp_password
 
@@ -492,26 +651,31 @@ def approve_document(request, document_id):
         use_tls=True,
     )
 
-    # Send email notification to the BDA
-    subject = "Your Document Has Been Approved"
-    message = f"Hello {document.created_by.username},\n\nYour document '{document.company_name} _ {document.document_type}' has been approved by {request.user.username}."
+    # Ensure the document's creator belongs to the same tenant
+    if document.created_by.tenant != request.tenant:
+        return HttpResponseForbidden("Invalid document creator for this tenant.")
 
-    send_mail(
-        subject,
-        message,
-        sender_email,  # Logged-in BDM's email
-        [document.created_by.email],  # BDA's email
-        connection=connection,  # Use dynamic SMTP connection
+    # Send email notification to the BDA
+    subject = f"Document Approved for {request.tenant.name}"
+    message = (
+        f"Hello {document.created_by.username},\n\n"
+        f"Your document '{document.company_name} _ {document.document_type}' "
+        f"has been approved by {request.user.username} for tenant {request.tenant.name}."
     )
 
-    return redirect("document_list")  # Redirect to dashboard
+    email = EmailMessage(subject, message, sender_email, [document.created_by.email], connection=connection)
+    email.attach_file(document.pdf_file.path)  # Attach the PDF
+    email.send()
 
-# def get_sr_email(document, sales_rep):
-#     return CustomUser.objects.filter(fullname={document.sales_rep}).values_list("email", flat=True)
+    return redirect("document_list")  # Redirect to tenant-scoped document list
 
+@login_required
 def autocomplete_sales_rep(request):
+    if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+        return HttpResponseForbidden("You are not authorized for this tenant.")
     if 'term' in request.GET:
-        qs = User.objects.filter(
+        qs = CustomUser.objects.filter(
+            tenant = request.tenant,
             roles__name='Sales Rep',
             username__icontains=request.GET.get('term')
         ).distinct()
@@ -520,7 +684,9 @@ def autocomplete_sales_rep(request):
 
 
 def send_approved_email(request, document_id):
-    document = get_object_or_404(Document, id=document_id)
+    if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+        return HttpResponseForbidden("You are not authorized for this tenant.")
+    document = get_object_or_404(Document, id=document_id, tenant=request.tenant)
 
     # Ensure the document is approved before sending an email
     if document.status != "approved":
@@ -546,14 +712,16 @@ def send_approved_email(request, document_id):
     # Main recipient
     raw_recipients = document.contact_person_email  # e.g., "email1@example.com, email2@example.com"
     recipient = [email.strip() for email in raw_recipients.split(",") if email.strip()] # in case of multiple emails
+    if not recipient:
+        return HttpResponseForbidden("No valid recipient email provided.")
 
     # recipient = [document.contact_person_email]
 
     # Get Sales Rep email
-    sales_rep_email = User.objects.filter(username=document.sales_rep).values_list("email", flat=True)
+    sales_rep_email = CustomUser.objects.filter(username=document.sales_rep, tenant=request.tenant).values_list("email", flat=True)
 
     # Get all BDM emails
-    bdm_emails = CustomUser.objects.filter(roles__name="BDM").values_list("email", flat=True)
+    bdm_emails = CustomUser.objects.filter(roles__name="BDM", tenant=request.tenant).values_list("email", flat=True)
 
     # Combine into a single list
     cc_list = list(sales_rep_email) + list(bdm_emails)
@@ -647,7 +815,9 @@ def send_approved_email(request, document_id):
 @login_required
 @user_passes_test(is_admin)
 def delete_document(request, document_id):
-    document = get_object_or_404(Document, id=document_id)
+    if hasattr(request, 'tenant') and request.user.tenant != request.tenant:
+        return HttpResponseForbidden("You are not authorized to perform actions for this tenant.")
+    document = get_object_or_404(Document, id=document_id, tenant=request.tenant)
 
     # Ensure document files are deleted from storage
     if document.word_file:
@@ -728,6 +898,8 @@ def add_formatted_content(doc, soup, word_dir):
 @login_required
 @csrf_exempt  # Required for CKEditor’s POST uploads
 def custom_ckeditor_upload(request):
+    if hasattr(request, 'tenant') and request.user.tenant != request.tenant:
+        return HttpResponseForbidden("You are not authorized to perform actions for this tenant.")
     if not request.user.is_authenticated:
         return HttpResponseForbidden("You must be logged in to upload images.")
     logger.info(f"User {request.user.username} uploading image to CKEditor")
@@ -738,7 +910,12 @@ def custom_ckeditor_upload(request):
         logger.error(f"Image upload failed for user {request.user.username}: {response.content}")
     return response
 
+@login_required
 def create_from_editor(request):
+    # Validate that the user belongs to the current tenant
+    if request.user.tenant != request.tenant:
+        return HttpResponseForbidden("Unauthorized: User does not belong to the current tenant.")
+
     if request.method == "POST":
         form = CreateDocumentForm(request.POST)
         if form.is_valid():
@@ -761,8 +938,44 @@ def create_from_editor(request):
             # Add formatted content and images
             add_formatted_content(doc, soup, word_dir)
 
+            # Get or create the "Template Document" folder
+            user = request.user
+            department = user.department if hasattr(user, 'department') else None
+            team = user.teams.first() if hasattr(user, 'teams') and user.teams.exists() else None
+
+            # Ensure user has a department or team
+            if not department and not team:
+                messages.error(request, "User must be associated with a department or team.")
+                return render(request, 'documents/create_from_editor.html', {'form': form})
+
+            # Choose department or team for the folder (prefer department if available)
+            folder_defaults = {
+                'created_by': user,
+                'department': department,
+                'team': team if not department else None
+            }
+
+            try:
+                template_folder, created = PublicFolder.objects.get_or_create(
+                    tenant=request.tenant,
+                    name="Template Document",
+                    defaults=folder_defaults
+                )
+            except ValidationError as e:
+                print(f"PublicFolder creation error: {e}")
+                messages.error(request, f"Error creating Template Document folder: {e}")
+                return render(request, 'documents/create_from_editor.html', {'form': form})
+
+            # Validate folder access
+            if template_folder.department and template_folder.department != user.department:
+                messages.error(request, "Invalid Department for Template Document folder.")
+                return render(request, 'documents/create_from_editor.html', {'form': form})
+            if template_folder.team and template_folder.team not in user.teams.all():
+                messages.error(request, "Invalid Team for Template Document folder.")
+                return render(request, 'documents/create_from_editor.html', {'form': form})
+
             # Save the .docx file
-            word_filename = f"{slugify(title)}.docx"
+            word_filename = f"{slugify(title)}_{request.user.id}_{template_folder.id}.docx"
             word_path = os.path.join(word_dir, word_filename)
             try:
                 doc.save(word_path)
@@ -772,7 +985,7 @@ def create_from_editor(request):
                 return render(request, 'documents/create_from_editor.html', {'form': form})
 
             # Generate and save the .pdf file using LibreOffice
-            pdf_filename = f"{slugify(title)}.pdf"
+            pdf_filename = f"{slugify(title)}_{request.user.id}_{template_folder.id}.pdf"
             relative_pdf_path = os.path.join("documents/pdf", pdf_filename)
             absolute_pdf_path = os.path.join(settings.MEDIA_ROOT, relative_pdf_path)
 
@@ -793,8 +1006,6 @@ def create_from_editor(request):
 
             try:
                 print("Starting PDF conversion with LibreOffice")
-                
-                # Ensure paths are absolute
                 abs_word_path = os.path.abspath(word_path)
                 abs_output_dir = os.path.dirname(os.path.abspath(absolute_pdf_path))
 
@@ -804,10 +1015,9 @@ def create_from_editor(request):
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     check=True,
-                    timeout=30  # 30 seconds
+                    timeout=30
                 )
 
-                # Debug paths
                 print("LibreOffice path:", libreoffice_path)
                 print("abs_word_path:", abs_word_path)
                 print("abs_output_dir:", abs_output_dir)
@@ -831,18 +1041,43 @@ def create_from_editor(request):
                 messages.error(request, f"Unexpected error converting to PDF: {e}")
                 return render(request, 'documents/create_from_editor.html', {'form': form})
 
-            # Save to database
+            # Save to PublicFile
+            try:
+                public_word_file = PublicFile(
+                    tenant=request.tenant,
+                    original_name=word_filename,
+                    file=os.path.join("documents/word", word_filename),
+                    folder=template_folder,
+                    created_by=user
+                )
+                public_word_file.save()
+
+                public_pdf_file = PublicFile(
+                    tenant=request.tenant,
+                    original_name=pdf_filename,
+                    file=relative_pdf_path,
+                    folder=template_folder,
+                    created_by=user
+                )
+                public_pdf_file.save()
+            except Exception as e:
+                print(f"Error saving to PublicFile: {e}")
+                messages.error(request, f"Error saving files to public storage: {e}")
+                return render(request, 'documents/create_from_editor.html', {'form': form})
+
+            # Save to Document
             document = Document(
                 document_type='Uploaded',
                 document_source='editor',
-                company_name='N/A',  # Adjust as needed
+                company_name='N/A',
                 company_address='N/A',
                 contact_person_name='N/A',
                 contact_person_email='N/A',
                 contact_person_designation='N/A',
                 sales_rep='N/A',
                 created_by=request.user,
-                word_file=f"documents/word/{word_filename}",
+                tenant=request.tenant,
+                word_file=os.path.join("documents/word", word_filename),
                 pdf_file=relative_pdf_path
             )
             try:
@@ -863,12 +1098,15 @@ def create_from_editor(request):
 
 @login_required
 def folder_list(request, parent_id=None):
+    if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+        return HttpResponseForbidden("You are not authorized for this tenant.")
+    
     parent = None
     if parent_id:
-        parent = get_object_or_404(Folder, id=parent_id, created_by=request.user)
+        parent = get_object_or_404(Folder, id=parent_id, created_by=request.user, tenant=request.tenant)
 
-    folders = Folder.objects.filter(created_by=request.user, parent=parent)
-    files = File.objects.filter(folder=parent, uploaded_by=request.user)
+    folders = Folder.objects.filter(created_by=request.user, parent=parent, tenant=request.tenant)
+    files = File.objects.filter(folder=parent, uploaded_by=request.user, tenant=request.tenant)
 
     folder_form = FolderForm(initial={'parent': parent})
     file_form = FileUploadForm()
@@ -888,16 +1126,22 @@ def create_folder(request):
         if form.is_valid():
             folder = form.save(commit=False)
             folder.created_by = request.user
+            folder.tenant = request.tenant
+            # Validate that the user belongs to the same tenant
+            if folder.created_by.tenant != request.tenant:
+                return HttpResponse("Unauthorized: User does not belong to the current tenant.", status=403)
             parent_id = request.POST.get('parent')
             if parent_id:
-                folder.parent = Folder.objects.get(id=parent_id)
+                folder.parent = Folder.objects.get(id=parent_id, tenant=request.tenant)
             folder.save()
             return JsonResponse({'success': True})
     return JsonResponse({'success': False, 'errors': form.errors}, status=400)
 
 @login_required
 def delete_folder(request, folder_id):
-    folder = get_object_or_404(Folder, id=folder_id, created_by=request.user)
+    if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+        return HttpResponseForbidden("You are not authorized for this tenant.")
+    folder = get_object_or_404(Folder, id=folder_id, created_by=request.user, tenant=request.tenant)
     folder.delete()
     return JsonResponse({'success': True})
     # return JsonResponse({'success': False, 'errors': form.errors}, status=400)
@@ -910,48 +1154,93 @@ def upload_file(request):
             uploaded_file = form.save(commit=False)
             uploaded_file.uploaded_by = request.user
             uploaded_file.original_name = request.FILES['file'].name
+            uploaded_file.tenant = request.tenant
+            if uploaded_file.uploaded_by.tenant != request.tenant:
+                return HttpResponse("Unauthorized: User does not belong to the current tenant.", status=403)
             uploaded_file.save()
         return JsonResponse({'success': True})
     return JsonResponse({'success': False, 'errors': form.errors}, status=400)
 
 @login_required
 def delete_file(request, file_id):
-    file = get_object_or_404(File, id=file_id, uploaded_by=request.user)
+    if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+        return HttpResponseForbidden("You are not authorized for this tenant.")
+    file = get_object_or_404(File, id=file_id, uploaded_by=request.user, tenant=request.tenant)
     file.delete()
     return JsonResponse({'success': True})
     # return JsonResponse({'success': False, 'errors': form.errors}, status=400)
 
 @login_required
 def rename_folder(request, folder_id):
-    folder = get_object_or_404(Folder, id=folder_id, created_by=request.user)
+    if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+        return HttpResponseForbidden("You are not authorized for this tenant.")
+    folder = get_object_or_404(Folder, id=folder_id, created_by=request.user, tenant=request.tenant)
     if request.method == 'POST':
-        new_name = request.POST.get('name')
-        if new_name:
-            folder.name = new_name
-            folder.save()
-            return JsonResponse({'success': True, 'new_name': folder.name})
-    return JsonResponse({'success': False}, status=400)
-    # return redirect(request.META.get('HTTP_REFERER', 'folder_list'))
+        new_name = request.POST.get('name', '').strip()
+
+        # Validate the new name
+        if not new_name:
+            return JsonResponse({'success': False, 'error': 'Folder name cannot be empty.'}, status=400)
+
+        if len(new_name) > 255:
+            return JsonResponse({'success': False, 'error': 'Folder name is too long.'}, status=400)
+
+        # Validate name format (e.g., no special characters)
+        if not re.match(r'^[\w\s\-\.]+$', new_name):
+            return JsonResponse({'success': False, 'error': 'Folder name contains invalid characters.'}, status=400)
+
+        # Check for duplicate folder names within the tenant
+        if Folder.objects.filter(tenant=request.tenant, name=new_name).exclude(id=folder.id).exists():
+            return JsonResponse({'success': False, 'error': 'A folder with this name already exists.'}, status=400)
+
+        try:
+            with transaction.atomic():
+                folder.name = new_name
+                folder.save()
+                return JsonResponse({'success': True, 'new_name': folder.name})
+        except ValidationError as e:
+            return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
+    return JsonResponse({'success': False, 'error': 'Invalid request method.'}, status=400)
 
 
 @login_required
 def rename_file(request, file_id):
-    file = get_object_or_404(File, id=file_id, uploaded_by=request.user)
+    if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+        return HttpResponseForbidden("You are not authorized for this tenant.")
+    file = get_object_or_404(File, id=file_id, uploaded_by=request.user, tenant=request.tenant)
     if request.method == 'POST':
         new_name = request.POST.get('name')
-        if new_name:
-            file.original_name = new_name
-            file.save()
-        return JsonResponse({'success': True})
-    return JsonResponse({'success': False}, status=400)
+        # Validate the new name
+        if not new_name:
+            return JsonResponse({'success': False, 'error': 'File name cannot be empty.'}, status=400)
+
+        if len(new_name) > 255:
+            return JsonResponse({'success': False, 'error': 'File name is too long.'}, status=400)
+
+        # Validate name format (e.g., no special characters)
+        if not re.match(r'^[\w\s\-\.]+$', new_name):
+            return JsonResponse({'success': False, 'error': 'File name contains invalid characters.'}, status=400)
+
+        try:
+            with transaction.atomic():
+                file.original_name = new_name
+                file.save()
+                return JsonResponse({'success': True, 'new_name': file.original_name})
+        except ValidationError as e:
+            return JsonResponse({'success': False, 'error': str(e)}, status=400)
+
+    return JsonResponse({'success': False, 'error': 'Invalid request method.'}, status=400)
 
 @login_required
 def move_folder(request, folder_id):
-    folder = get_object_or_404(Folder, id=folder_id, created_by=request.user)
+    if not hasattr (request, 'tenant') or request.user.tenant != request.tenant:
+        return HttpResponseForbidden("You are not authorized for this tenant.")
+    folder = get_object_or_404(Folder, id=folder_id, created_by=request.user, tenant=request.tenant)
     if request.method == 'POST':
         new_parent_id = request.POST.get('new_parent_id')
         if new_parent_id:
-            folder.parent = Folder.objects.get(id=new_parent_id)
+            folder.parent = Folder.objects.get(id=new_parent_id, tenant=request.tenant)
             folder.save()
         return JsonResponse({'success': True})
     return JsonResponse({'success': False}, status=400)
@@ -959,57 +1248,82 @@ def move_folder(request, folder_id):
 
 @login_required
 def move_file(request, file_id):
-    file = get_object_or_404(File, id=file_id, uploaded_by=request.user)
+    if not hasattr (request, 'tenant') or request.user.tenant != request.tenant:
+        return HttpResponseForbidden("You are not authorized for this tenant.")
+    file = get_object_or_404(File, id=file_id, uploaded_by=request.user, tenant=request.tenant)
     if request.method == 'POST':
         new_folder_id = request.POST.get('new_folder_id')
         if new_folder_id:
-            file.folder = Folder.objects.get(id=new_folder_id)
+            file.folder = Folder.objects.get(id=new_folder_id, tenant=request.tenant)
             file.save()
         return JsonResponse({'success': True})
     return JsonResponse({'success': False}, status=400)
 # Tasks
 @login_required
 def create_task(request):
+    # Ensure the user belongs to the current tenant
+    if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+        return HttpResponseForbidden("You are not authorized for this tenant.")
+
     if request.method == 'POST':
-        form = TaskForm(request.POST)
+        form = TaskForm(request.POST, user=request.user)
         if form.is_valid():
             task = form.save(commit=False)
             task.created_by = request.user
-            if task.due_date and task.due_date < date.today():
-                task.status = 'overdue'
+            task.tenant = request.user.tenant
             task.save()
             form.save_m2m()
             return redirect('task_list')
     else:
-        form = TaskForm()
+        form = TaskForm(user=request.user)
+
     return render(request, 'tasks/create_task.html', {'form': form})
+
 
 @login_required
 def task_list(request):
+    # Validate tenant access
+    if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+        logger.error(f"Unauthorized access by user {request.user.username}: tenant mismatch")
+        return HttpResponseForbidden("You are not authorized for this tenant.")
+
     category = request.GET.get('category', 'overall')
-    tasks = Task.objects.filter(Q(assigned_to=request.user) | Q(created_by=request.user)).distinct()
     
+    # Filter tasks by tenant and user (assigned_to or created_by)
+    tasks = Task.objects.filter(
+        Q(assigned_to=request.user) | Q(created_by=request.user),
+        tenant=request.tenant
+    ).distinct()
+    
+    # Apply category-specific filtering
     if category == 'personal':
         tasks = tasks.filter(assigned_to=request.user, created_by=request.user)
     elif category == 'corporate':
         tasks = tasks.filter(assigned_to=request.user).exclude(created_by=request.user)
     
-    # Update overdue tasks (run periodically, e.g., via Celery task)
+    # Update overdue tasks for the current tenant
     overdue_tasks = Task.objects.filter(
+        tenant=request.tenant,
         due_date__lt=date.today(),
         status__in=['pending', 'in_progress', 'on_hold'],
         assigned_to=request.user
     )
-    overdue_tasks.update(status='overdue')
+    if overdue_tasks.exists():
+        logger.debug(f"Updating {overdue_tasks.count()} overdue tasks for tenant {request.tenant}")
+        overdue_tasks.update(status='overdue')
 
-    # department_users = CustomUser.objects.filter(department=request.user.department) if request.user.department else []
-    users = CustomUser.objects.all()
+    # Filter users by tenant and optionally by department
+    users = CustomUser.objects.filter(tenant=request.tenant)
+    if request.user.department:
+        users = users.filter(department=request.user.department)
+    
+    logger.debug(f"Task list for tenant {request.tenant}: {tasks.count()} tasks, {users.count()} users")
+
     context = {
         'tasks': tasks,
         'status_labels': Task.STATUS_CHOICES,
         'today': date.today(),
         'user': request.user,
-        # 'users': department_users,
         'users': users,
         'category': category,
     }
@@ -1017,7 +1331,7 @@ def task_list(request):
 
 @login_required
 def task_detail(request, task_id):
-    task = get_object_or_404(Task, id=task_id)
+    task = get_object_or_404(Task, id=task_id, tenant=request.tenant)
     if not (task.assigned_to == request.user or task.created_by == request.user or request.user.is_hod()):
         return render(request, 'tasks/error.html', {'message': 'Access denied.'})
     return render(request, 'tasks/task_detail.html', {'task': task})
@@ -1025,7 +1339,10 @@ def task_detail(request, task_id):
 @csrf_exempt
 @login_required
 def update_task_status(request, task_id):
-    task = get_object_or_404(Task, id=task_id)
+    if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+        logger.error(f"Unauthorized access by user {request.user.username}: tenant mismatch")
+        return HttpResponseForbidden("You are not authorized for this tenant.") 
+    task = get_object_or_404(Task, id=task_id, tenant=request.tenant)
     if not (task.assigned_to == request.user or task.created_by == request.user or request.user.is_hod()):
         return JsonResponse({'error': 'Access denied'}, status=403)
     
@@ -1037,6 +1354,7 @@ def update_task_status(request, task_id):
                 task.status = new_status
                 if new_status == 'completed':
                     task.completed_at = timezone.now()
+                task.tenant = request.tenant
                 task.save()
                 return JsonResponse({'success': True, 'status': task.status})
             return JsonResponse({'error': 'Invalid status'}, status=400)
@@ -1046,22 +1364,55 @@ def update_task_status(request, task_id):
 
 @login_required
 def reassign_task(request, task_id):
-    task = get_object_or_404(Task, id=task_id)
+    # Fetch the task, ensuring it belongs to the current tenant
+    task = get_object_or_404(Task, id=task_id, tenant=request.tenant)
+
+    # Check permissions: only the task creator or HOD can reassign
     if not (task.created_by == request.user or request.user.is_hod()):
-        return render(request, 'tasks/error.html', {'message': 'Access denied.'})
-    
+        return JsonResponse({'error': 'Access denied.'}, status=403)
+
     if request.method == 'POST':
-        form = ReassignTaskForm(request.POST, instance=task)
-        if form.is_valid():
-            form.save()
-            return redirect('task_list')
-    else:
-        form = ReassignTaskForm(instance=task)
-    return render(request, 'tasks/reassign_task.html', {'form': form, 'task': task})
+        try:
+            # Extract data from POST request
+            assigned_to_id = request.POST.get('assigned_to')
+            due_date = request.POST.get('due_date')
+            if not assigned_to_id:
+                return JsonResponse({'error': 'Assigned user is required.'}, status=400)
+            
+            if not due_date:
+                return JsonResponse({'error': 'Due date is required.'}, status=400)
+
+            # Parse due date
+            due_date = datetime.strptime(due_date, '%Y-%m-%d').date()
+            if due_date < date.today():
+                return JsonResponse({'error': 'Due date cannot be in the past.'}, status=400)
+
+            # Fetch the user to assign the task to, ensuring they belong to the same tenant
+            from django.contrib.auth import get_user_model
+            CustomUser = get_user_model()
+            try:
+                assigned_user = CustomUser.objects.get(id=assigned_to_id, tenant=request.tenant)
+            except CustomUser.DoesNotExist:
+                return JsonResponse({'error': 'Invalid user selected.'}, status=400)
+
+            # Update the task
+            if task.due_date != due_date:
+                task.due_date = due_date
+            task.assigned_to = assigned_user
+            task.status = 'in_progress'
+            task.save()
+
+            return JsonResponse({'success': True, 'message': 'Task reassigned successfully.'})
+        except ValidationError as e:
+            return JsonResponse({'error': str(e)}, status=400)
+        except Exception as e:
+            return JsonResponse({'error': 'An error occurred while reassigning the task.'}, status=500)
+
+    return JsonResponse({'error': 'Invalid request method.'}, status=405)
 
 @login_required
 def delete_task(request, task_id):
-    task = get_object_or_404(Task, id=task_id)
+    task = get_object_or_404(Task, id=task_id, tenant=request.tenant)
     if not (task.created_by == request.user or request.user.is_hod()):
         return render(request, 'tasks/error.html', {'message': 'Access denied.'})
     
@@ -1072,23 +1423,37 @@ def delete_task(request, task_id):
 
 @login_required
 def task_edit(request, task_id):
-    task = get_object_or_404(Task, id=task_id)
+    # Validate tenant access
+    if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+        logger.error(f"Unauthorized access by user {request.user.username}: tenant mismatch")
+        return HttpResponseForbidden("You are not authorized for this tenant.")
+
+    # Fetch task with tenant filter
+    task = get_object_or_404(Task, id=task_id, tenant=request.user.tenant)
+
+    # Check access permissions
     if not (task.created_by == request.user or request.user.is_hod()):
+        logger.warning(f"Access denied for user {request.user.username} on task {task_id}")
         return render(request, 'tasks/error.html', {'message': 'Access denied.'})
     
     if request.method == 'POST':
-        form = TaskForm(request.POST, instance=task)
+        form = TaskForm(request.POST, request.FILES, instance=task, user=request.user)
         if form.is_valid():
-            task = form.save()
+            form.instance.tenant = request.tenant
+            form.save()
+            logger.info(f"Task {task.id} edited by {request.user.username} in tenant {request.tenant}")
             return redirect('task_detail', task_id=task.id)
+        
     else:
-        form = TaskForm(instance=task)
+        form = TaskForm(instance=task, user=request.user)
+        logger.debug(f"TaskForm initialized for task {task_id} with tenant: {request.tenant}")
+
     return render(request, 'tasks/edit_task.html', {'form': form, 'task': task})
 
 @login_required
-def delete_task_document(request, task_id, doc_id):
-    task = get_object_or_404(Task, id=task_id)
-    document = get_object_or_404(Document, id=doc_id)
+def delete_task_document(request, task_id, file_id):
+    task = get_object_or_404(Task, id=task_id, tenant=request.tenant)
+    document = get_object_or_404(File, id=file_id, tenant=request.tenant)
     if not (task.created_by == request.user or request.user.is_hod()) or document not in task.documents.all():
         return JsonResponse({'error': 'Access denied'}, status=403)
     
@@ -1101,10 +1466,16 @@ def delete_task_document(request, task_id, doc_id):
 
 @login_required
 def performance_dashboard(request):
+    # Validate tenant access
+    if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+        logger.error(f"Unauthorized access by user {request.user.username}: tenant mismatch")
+        return HttpResponseForbidden("You are not authorized for this tenant.")
+
     user = request.user
     category = request.GET.get('category', 'overall')
     
-    tasks = Task.objects.filter(assigned_to=user)
+    # Filter tasks by tenant and assigned_to user
+    tasks = Task.objects.filter(tenant=request.user.tenant, assigned_to=user)
     if category == 'personal':
         tasks = tasks.filter(created_by=user)
     elif category == 'corporate':
@@ -1141,6 +1512,10 @@ def performance_dashboard(request):
 
 @login_required
 def hod_performance_dashboard(request):
+    # Validate tenant access
+    if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+        logger.error(f"Unauthorized access by user {request.user.username}: tenant mismatch")
+        return HttpResponseForbidden("You are not authorized for this tenant.")
     user = request.user
     if not user.is_hod():
         return render(request, 'tasks/error.html', {'message': 'Access denied. HOD role required.'})
@@ -1149,14 +1524,14 @@ def hod_performance_dashboard(request):
     if not department:
         return render(request, 'tasks/error.html', {'message': 'No department assigned.'})
 
-    department_users = CustomUser.objects.filter(department=department).select_related('department')
+    department_users = CustomUser.objects.filter(department=department, tenant=request.tenant).select_related('department')
     users_ids = [u.id for u in department_users]
 
     # Get user_id from query parameter (optional)
     selected_user_id = request.GET.get('user_id', 'all')
     
     # Base query: corporate tasks (created by department members, not personal)
-    tasks = Task.objects.filter(created_by__in=users_ids).exclude(created_by=F('assigned_to')).select_related('created_by', 'assigned_to')
+    tasks = Task.objects.filter(created_by__in=users_ids, tenant=request.tenant).exclude(created_by=F('assigned_to')).select_related('created_by', 'assigned_to')
 
     # Filter by selected user if specified
     if selected_user_id != 'all':
@@ -1172,7 +1547,8 @@ def hod_performance_dashboard(request):
     for dept_user in department_users:
         user_tasks = Task.objects.filter(
             created_by__in=users_ids,
-            assigned_to=dept_user
+            assigned_to=dept_user,
+            tenant=request.tenant
         ).exclude(created_by=F('assigned_to')).select_related('assigned_to')
         user_total_tasks = user_tasks.count()
         user_completed_tasks = user_tasks.filter(status='completed').count()
@@ -1198,15 +1574,18 @@ def hod_performance_dashboard(request):
 
 @login_required
 def view_my_profile(request):
-    profile, created = StaffProfile.objects.get_or_create(user=request.user)
+    if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+        logger.error(f"Unauthorized access by user {request.user.username}: tenant mismatch")
+        return HttpResponseForbidden("You are not authorized for this tenant.")
+    
+    profile, created = StaffProfile.objects.get_or_create(user=request.user, tenant=request.tenant)
     visible_fields = [
             "photo",
             "first_name", "last_name", "middle_name", "email", "phone_number", "sex", "date_of_birth", "home_address",
             "state_of_origin", "lga", "religion",
             "institution", "course", "degree", "graduation_year",
             "account_number", "bank_name", "account_name",
-            "location", "employment_date",
-            "organization", "department", "team", "designation", "official_email",
+            "location", "employment_date", "department", "team", "designation", "official_email",
             "emergency_name", "emergency_relationship", "emergency_phone",
             "emergency_address", "emergency_email",
         ]
@@ -1215,15 +1594,19 @@ def view_my_profile(request):
 
 @login_required
 def edit_my_profile(request):
-    profile,_ = StaffProfile.objects.get_or_create(user=request.user) # staff_profile = request.user.staff_profile  # Assuming one profile per user
+    if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+        logger.error(f"Unauthorized access by user {request.user.username}: tenant mismatch")
+        return HttpResponseForbidden("You are not authorized for this tenant.")
+    
+    profile,_ = StaffProfile.objects.get_or_create(user=request.user, tenant=request.tenant) # staff_profile = request.user.staff_profile  # Assuming one profile per user
     if request.method == 'POST':
-        profile_form = StaffProfileForm(request.POST, request.FILES, instance=profile)
+        profile_form = StaffProfileForm(request.POST, request.FILES, instance=profile, user=request.user)
         
         if profile_form.is_valid():
             profile_form.save()
             return redirect('view_my_profile')  # Redirect to profile view or success page
     else:
-        profile_form = StaffProfileForm(instance=profile)
+        profile_form = StaffProfileForm(instance=profile, user=request.user)
         document_form = StaffDocumentForm()
         
     return render(request, 'dashboard/edit_profile.html', {
@@ -1234,11 +1617,14 @@ def edit_my_profile(request):
 
 @login_required
 def add_staff_document(request):
+    if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+        logger.error(f"Unauthorized access by user {request.user.username}: tenant mismatch")
+        return HttpResponseForbidden("You are not authorized for this tenant.")
     if request.method == 'POST':
-        form = StaffDocumentForm(request.POST, request.FILES)
+        form = StaffDocumentForm(request.POST, request.FILES, user=request.user)
         if form.is_valid():
             document = form.save(commit=False)
-            document.staff_profile = get_object_or_404(StaffProfile, user=request.user)
+            document.staff_profile = get_object_or_404(StaffProfile, user=request.user, tenant=request.tenant)
             document.save()
             return JsonResponse({
                 'success': True,
@@ -1259,9 +1645,13 @@ def add_staff_document(request):
 
 @login_required
 def delete_staff_document(request, document_id):
+    if hasattr(request, 'tenant') and request.user.tenant != request.tenant:
+        logger.error(f"Unauthorized access by user {request.user.username}: tenant mismatch")
+        return HttpResponseForbidden("You are not authorized for this tenant.")
+    
     try:
         # Get the user's StaffProfile (assuming one profile per user)
-        staff_profile = StaffProfile.objects.get(user=request.user)
+        staff_profile = StaffProfile.objects.get(user=request.user, tenant=request.tenant)
         document = get_object_or_404(StaffDocument, id=document_id, staff_profile=staff_profile)
         if request.method == 'POST':
             document.delete()
@@ -1278,33 +1668,50 @@ def delete_staff_document(request, document_id):
 @login_required
 @user_passes_test(is_admin)
 def staff_directory(request):
-    profiles = StaffProfile.objects.select_related("user", "organization", "department").prefetch_related("team").all()
+    if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+        logger.error(f"Unauthorized access by user {request.user.username}: tenant mismatch")
+        return HttpResponseForbidden("You are not authorized for this tenant.")
     
+    # Filter staff profiles by tenant
+    profiles = StaffProfile.objects.select_related(
+        "user", "department"
+    ).prefetch_related("team").filter(user__tenant=request.user.tenant)
+
     # Restrict to department for HODs (optional)
     if request.user.is_hod() and not is_admin(request.user):
         profiles = profiles.filter(department=request.user.department)
-    
+
     logger.debug(f"Profiles found: {profiles.count()}")
-    
+
+    # Grouping by Department → Team (Tenant is already scoped)
     grouped = {}
     for profile in profiles:
-        org = profile.organization.name if profile.organization else "No Organization"
         dept = profile.department.name if profile.department else "No Department"
         teams = profile.team.all()
         if not teams:
             teams = [None]
         for team in teams:
             team_name = team.name if team else "No Team"
-            grouped.setdefault(org, {}).setdefault(dept, {}).setdefault(team_name, []).append(profile)
-    
+            grouped.setdefault(dept, {}).setdefault(team_name, []).append(profile)
+
     logger.debug(f"Grouped dictionary: {grouped}")
     return render(request, "staff/staff_directory.html", {"grouped": grouped})
 
 
 @login_required
 def view_staff_profile(request, user_id):
-    profile = get_object_or_404(StaffProfile, user_id=user_id)
-    viewer = StaffProfile.objects.filter(user=request.user).first()
+    if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+        logger.error(f"Unauthorized access by user {request.user.username}: tenant mismatch")
+        return HttpResponseForbidden("You are not authorized for this tenant.")
+    
+    profile = get_object_or_404(StaffProfile, user_id=user_id, tenant=request.tenant)
+
+    # Ensure the profile belongs to the same tenant as the requesting user
+    if profile.user.tenant != request.user.tenant:
+        return render(request, "403.html", status=403)
+
+    viewer = StaffProfile.objects.filter(user=request.user, tenant=request.tenant).first()
+
     visible_fields = [
         "photo",
         "first_name", "last_name", "middle_name", "email", "phone_number", "sex", "date_of_birth", "home_address",
@@ -1312,14 +1719,15 @@ def view_staff_profile(request, user_id):
         "institution", "course", "degree", "graduation_year",
         "account_number", "bank_name", "account_name",
         "location", "employment_date",
-        "organization", "department", "team", "designation", "official_email",
+        "department", "team", "designation", "official_email",
         "emergency_name", "emergency_relationship", "emergency_phone",
         "emergency_address", "emergency_email",
     ]
 
-    if viewer and profile.organization == viewer.organization:
-        visible_fields += ["organization", "department"]
+    # Visibility logic based on shared department/team (within same tenant already)
+    if viewer:
         if profile.department == viewer.department:
+            visible_fields += ["department"]
             shared_teams = set(profile.team.values_list("id", flat=True)) & set(viewer.team.values_list("id", flat=True))
             if shared_teams:
                 visible_fields += ["team"]
@@ -1331,6 +1739,10 @@ def view_staff_profile(request, user_id):
     })
 
 def staff_list(request):
+    if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+        logger.error(f"Unauthorized access by user {request.user.username}: tenant mismatch")
+        return HttpResponseForbidden("You are not authorized for this tenant.")
+    
     # Get query parameters
     sort_by = request.GET.get('sort_by', 'name')
     sort_order = request.GET.get('sort_order', 'asc')
@@ -1338,8 +1750,10 @@ def staff_list(request):
     filter_dept = request.GET.get('dept', '')
     page = request.GET.get('page', 1)
 
-    # Base queryset
-    profiles = StaffProfile.objects.select_related('user', 'organization').prefetch_related('department', 'team')
+    # Base queryset: only staff from the same tenant
+    profiles = StaffProfile.objects.select_related(
+        'user', 'department'
+    ).prefetch_related('team').filter(user__tenant=request.user.tenant)
 
     # Search by name
     if search_query:
@@ -1363,8 +1777,6 @@ def staff_list(request):
         sort_field = 'team__name'
     elif sort_by == 'photo':
         sort_field = 'photo'
-    elif sort_by == 'organization':
-        sort_field = 'organization__name'
 
     if sort_order == 'desc':
         sort_field = f'-{sort_field}'
@@ -1374,8 +1786,10 @@ def staff_list(request):
     paginator = Paginator(profiles, 10)  # 10 profiles per page
     page_obj = paginator.get_page(page)
 
-    # Departments for filter dropdown
-    departments = Department.objects.all()
+    # Filter dropdown: restrict departments to the tenant only
+    departments = Department.objects.filter(
+        staff__user__tenant=request.user.tenant
+    ).distinct()
 
     context = {
         'profiles': page_obj,
@@ -1396,10 +1810,16 @@ from django.utils.timezone import now
 
 @login_required
 def notifications_view(request):
-    # Get all active notifications
+    # Validate tenant access
+    if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+        logger.error(f"Unauthorized access by user {request.user.username}: tenant mismatch")
+        return HttpResponseForbidden("You are not authorized for this tenant.")
+
+    # Filter notifications by tenant and active status
     all_notifications = Notification.objects.filter(
+        tenant=request.user.tenant,
         is_active=True
-    ).order_by('-created_at')
+    )
 
     # Ensure UserNotification exists for each active notification
     active_notifications = []
@@ -1407,14 +1827,15 @@ def notifications_view(request):
         user_notification, created = UserNotification.objects.get_or_create(
             user=request.user,
             notification=notification,
-            defaults={'seen_at': now(), 'dismissed': False}
+            defaults={'seen_at': timezone.now(), 'dismissed': False}
         )
         if not user_notification.dismissed:
             active_notifications.append(user_notification)
 
-    # Get dismissed notifications
+    # Get dismissed notifications for the user and tenant
     dismissed_notifications = UserNotification.objects.filter(
         user=request.user,
+        notification__tenant=request.user.tenant,
         dismissed=True
     ).select_related('notification').order_by('-seen_at')
 
@@ -1428,8 +1849,9 @@ def notifications_view(request):
 def dismiss_notification(request):
     notification_id = request.POST.get('notification_id')
     try:
-        notification = Notification.objects.get(id=notification_id)
+        notification = Notification.objects.get(id=notification_id, tenant=request.user.tenant)
         user_notification, created = UserNotification.objects.get_or_create(
+            tenant=request.user.tenant,
             user=request.user,
             notification=notification,
             defaults={'seen_at': now()}
@@ -1446,6 +1868,7 @@ def dismiss_all_notifications(request):
     try:
         # Update all non-dismissed UserNotifications for the user
         user_notifications = UserNotification.objects.filter(
+            tenant=request.user.tenant,
             user=request.user,
             dismissed=False
         )
@@ -1459,7 +1882,7 @@ def dismiss_all_notifications(request):
 
 @login_required
 def email_config(request):
-    user = CustomUser.objects.get(username=request.user.username)
+    user = CustomUser.objects.get(username=request.user.username, tenant=request.user.tenant)
     if request.method == 'POST':
         email_config_form = EmailConfigForm(request.POST, instance=user)
         if email_config_form.is_valid():
@@ -1480,12 +1903,13 @@ class EventViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         user = self.request.user
         return Event.objects.filter(
-            models.Q(created_by=user) | models.Q(participants__user=user)
+            models.Q(created_by=user) | models.Q(participants__user=user),
+            tenant=user.tenant
         ).distinct()
 
     def perform_create(self, serializer):
         print(f"Received data: {self.request.data}")
-        event = serializer.save(created_by=self.request.user)
+        event = serializer.save(created_by=self.request.user, tenant=self.request.user.tenant)
 
         # notif = Notification.objects.create(
         #     title=f"New Event: {event.title}",
@@ -1522,7 +1946,7 @@ from django.middleware.csrf import get_token
 @login_required
 def calendar_view(request):
     # auth_token = None
-    User = get_user_model()
+    CustomUser = get_user_model()
     # if request.user.is_authenticated:
     #     auth_token = Token.objects.get(user=request.user).key if Token.objects.filter(user=request.user).exists() else None
     context = {
@@ -1531,26 +1955,32 @@ def calendar_view(request):
         'notification_bar_items': [],
         'birthday_others': [],
         'birthday_self': False,
-        'users': User.objects.all(),
+        'users': CustomUser.objects.filter(tenant=request.user.tenant),
     }
     print(f"Context: {context}")  # Debug
     return render(request, 'users/calendar.html', context)
 
+@require_POST
 def export_staff_csv(request):
-    if request.method != 'POST':
-        return HttpResponse(status=405)
-
     profile_ids = request.POST.getlist('profile_ids')
     if not profile_ids:
-        return HttpResponse(status=400, content_type='application/json', content='{"error": "No profiles selected"}')
+        return HttpResponse(
+            status=400,
+            content_type='application/json',
+            content='{"error": "No profiles selected"}'
+        )
 
-    profiles = StaffProfile.objects.filter(user__id__in=profile_ids).select_related('user', 'organization').prefetch_related('department', 'team')
+    # Only export profiles that belong to the same tenant as the requester
+    profiles = StaffProfile.objects.filter(
+        user__id__in=profile_ids,
+        user__tenant=request.user.tenant
+    ).select_related('user', 'department').prefetch_related('team')
 
     response = HttpResponse(content_type='text/csv')
     response['Content-Disposition'] = 'attachment; filename="staff_export.csv"'
 
     writer = csv.writer(response)
-    writer.writerow(['Name', 'Phone Number', 'Email', 'Sex', 'Designation', 'Organization', 'Department', 'Team'])
+    writer.writerow(['Name', 'Phone Number', 'Email', 'Sex', 'Designation', 'Department', 'Team'])
 
     for profile in profiles:
         writer.writerow([
@@ -1559,28 +1989,27 @@ def export_staff_csv(request):
             profile.email or 'N/A',
             profile.sex or 'N/A',
             profile.designation or 'N/A',
-            profile.organization.name if profile.organization else 'N/A',
-            ', '.join(profile.department.all().values_list('name', flat=True)) or 'N/A',
+            profile.department.name if profile.department else 'N/A',
             ', '.join(profile.team.all().values_list('name', flat=True)) or 'N/A',
         ])
 
     return response
 
-
 # Public Folder Views
 @login_required
 def public_folder_list(request, public_folder_id=None):
     user = request.user
-    parent_public_folder = get_object_or_404(PublicFolder, id=public_folder_id) if public_folder_id else None
+    parent_public_folder = get_object_or_404(PublicFolder, id=public_folder_id, tenant=user.tenant) if public_folder_id else None
 
     public_folders = PublicFolder.objects.filter(
         Q(department=user.department) | Q(team__in=user.teams.all()),
-        parent=parent_public_folder
+        parent=parent_public_folder,
+        tenant=user.tenant
     ).distinct()
 
     public_files = PublicFile.objects.filter(
         Q(folder=parent_public_folder) &
-        (Q(folder__department=user.department) | Q(folder__team__in=user.teams.all()))
+        (Q(folder__department=user.department) | Q(folder__team__in=user.teams.all())), tenant=user.tenant
     ).distinct()
 
     context = {
@@ -1619,7 +2048,7 @@ def create_public_folder(request):
 @login_required
 @require_POST
 def rename_public_folder(request, folder_id):
-    folder = get_object_or_404(PublicFolder, id=folder_id)
+    folder = get_object_or_404(PublicFolder, id=folder_id, tenant=request.tenant)
     if folder.created_by != request.user:
         return JsonResponse({'success': False, 'errors': {'name': ['You can only rename your own folders']}}, status=403)
     name = request.POST.get('name')
@@ -1632,13 +2061,13 @@ def rename_public_folder(request, folder_id):
 @login_required
 @require_POST
 def move_public_folder(request, folder_id):
-    folder = get_object_or_404(PublicFolder, id=folder_id)
+    folder = get_object_or_404(PublicFolder, id=folder_id, tenant=request.tenant)
     if folder.created_by != request.user:
         return JsonResponse({'success': False, 'errors': {'new_parent_id': ['You can only move your own folders']}}, status=403)
     new_parent_id = request.POST.get('new_parent_id')
     user = request.user
     if new_parent_id:
-        new_parent = get_object_or_404(PublicFolder, id=new_parent_id)
+        new_parent = get_object_or_404(PublicFolder, id=new_parent_id, tenant=request.tenant)
         if not (new_parent.department == user.department or new_parent.team in user.teams.all()):
             return JsonResponse({'success': False, 'errors': {'new_parent_id': ['No access to destination']}}, status=403)
         if new_parent == folder or new_parent in folder.subfolders.all():
@@ -1652,7 +2081,7 @@ def move_public_folder(request, folder_id):
 @login_required
 @require_POST
 def delete_public_folder(request, folder_id):
-    folder = get_object_or_404(PublicFolder, id=folder_id)
+    folder = get_object_or_404(PublicFolder, id=folder_id, tenant=request.tenant)
     if folder.created_by != request.user:
         return JsonResponse({'success': False, 'errors': {'folder': ['You can only delete your own folders']}}, status=403)
     folder.delete()
@@ -1666,9 +2095,10 @@ def upload_public_file(request):
         file = form.save(commit=False)
         file.created_by = request.user
         file.original_name = request.FILES['file'].name
+        file.tenant = request.tenant
         public_folder_id = request.POST.get('folder')
         if public_folder_id:
-            public_folder = get_object_or_404(PublicFolder, id=public_folder_id)
+            public_folder = get_object_or_404(PublicFolder, id=public_folder_id, tenant=request.tenant)
             user = request.user
             if not (public_folder.department == user.department or public_folder.team in user.teams.all()):
                 return JsonResponse({'success': False, 'errors': {'folder': ['No access to folder']}}, status=403)
@@ -1681,7 +2111,7 @@ def upload_public_file(request):
 @login_required
 @require_POST
 def rename_public_file(request, file_id):
-    file = get_object_or_404(PublicFile, id=file_id)
+    file = get_object_or_404(PublicFile, id=file_id, tenant=request.tenant)
     if file.created_by != request.user:
         return JsonResponse({'success': False, 'errors': {'name': ['You can only rename your own files']}}, status=403)
     name = request.POST.get('name')
@@ -1694,13 +2124,13 @@ def rename_public_file(request, file_id):
 @login_required
 @require_POST
 def move_public_file(request, file_id):
-    file = get_object_or_404(PublicFile, id=file_id)
+    file = get_object_or_404(PublicFile, id=file_id, tenant=request.tenant)
     if file.created_by != request.user:
         return JsonResponse({'success': False, 'errors': {'new_folder_id': ['You can only move your own files']}}, status=403)
     new_folder_id = request.POST.get('new_folder_id')
     user = request.user
     if new_folder_id:
-        new_folder = get_object_or_404(PublicFolder, id=new_folder_id)
+        new_folder = get_object_or_404(PublicFolder, id=new_folder_id, tenant=request.tenant)
         if not (new_folder.department == user.department or new_folder.team in user.teams.all()):
             return JsonResponse({'success': False, 'errors': {'new_folder_id': ['No access to destination']}}, status=403)
         file.folder = new_folder
@@ -1712,7 +2142,7 @@ def move_public_file(request, file_id):
 @login_required
 @require_POST
 def delete_public_file(request, file_id):
-    file = get_object_or_404(PublicFile, id=file_id)
+    file = get_object_or_404(PublicFile, id=file_id, tenant=request.tenant)
     if file.created_by != request.user:
         return JsonResponse({'success': False, 'errors': {'file': ['You can only delete your own files']}}, status=403)
     file.delete()

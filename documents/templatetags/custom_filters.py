@@ -90,3 +90,16 @@ def file_color(filename):
         'csv': '#178939',
         'xlsx': '#178939'
     }.get(ext, '#0e0f11')
+
+@register.filter
+def format_teams(value, separator=', '):
+    """
+    Convert a ManyToManyField queryset (e.g., teams) to a string with names separated by the given separator.
+    """
+    if value is None:
+        return "N/A"
+    try:
+        # Assuming teams is a queryset of related objects with a name field
+        return separator.join(str(team) for team in value.all())
+    except AttributeError:
+        return "N/A"

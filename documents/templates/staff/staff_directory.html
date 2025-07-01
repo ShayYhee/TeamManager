@@ -13,47 +13,37 @@
                 </div>
                 <div class="card-body">
                     {% if grouped %}
-                        {% for org, depts in grouped.items %}
-                            <div class="org mb-3">
-                                <h3 class="toggle d-flex align-items-center" data-bs-toggle="collapse" data-bs-target="#org-{{ org|slugify }}" aria-expanded="false" aria-controls="org-{{ org|slugify }}">
-                                    <i class="fas fa-building me-2 text-primary"></i>
-                                    <span class="caret me-2">▸</span> {{ org }}
+                        {% for dept, teams in grouped.items %}
+                            <div class="dept mb-3">
+                                <h3 class="toggle d-flex align-items-center" data-bs-toggle="collapse" data-bs-target="#dept-{{ dept|slugify }}" aria-expanded="false" aria-controls="dept-{{ dept|slugify }}">
+                                    <i class="fas fa-sitemap me-2 text-primary"></i>
+                                    <span class="caret me-2">▸</span> {{ dept }}
                                 </h3>
-                                <div class="dept-container collapse" id="org-{{ org|slugify }}">
-                                    {% for dept, teams in depts.items %}
-                                        <div class="dept ms-3 mt-2">
-                                            <h4 class="toggle d-flex align-items-center" data-bs-toggle="collapse" data-bs-target="#dept-{{ org|slugify }}-{{ dept|slugify }}" aria-expanded="false" aria-controls="dept-{{ org|slugify }}-{{ dept|slugify }}">
-                                                <i class="fas fa-sitemap me-2 text-primary"></i>
-                                                <span class="caret me-2">▸</span> {{ dept }}
-                                            </h4>
-                                            <div class="team-container collapse" id="dept-{{ org|slugify }}-{{ dept|slugify }}">
-                                                {% for team, members in teams.items %}
-                                                    <div class="team ms-3 mt-2">
-                                                        <h5 class="toggle d-flex align-items-center" data-bs-toggle="collapse" data-bs-target="#team-{{ org|slugify }}-{{ dept|slugify }}-{{ team|slugify }}" aria-expanded="false" aria-controls="team-{{ org|slugify }}-{{ dept|slugify }}-{{ team|slugify }}">
-                                                            <i class="fas fa-users me-2 text-primary"></i>
-                                                            <span class="caret me-2">▸</span> {{ team }}
-                                                        </h5>
-                                                        <ul class="list-group list-group-flush members collapse" id="team-{{ org|slugify }}-{{ dept|slugify }}-{{ team|slugify }}">
-                                                            {% for profile in members %}
-                                                                <li class="list-group-item d-flex align-items-center">
-                                                                    {% if profile.photo %}
-                                                                        <a href="#" 
-                                                                           data-media-url="{{ profile.photo.url }}" 
-                                                                           data-media-type="image" 
-                                                                           data-media-name="{{ profile.first_name }} {{ profile.last_name }}'s Photo" 
-                                                                           class="me-2">
-                                                                            <img src="{{ profile.photo.url }}" alt="{{ profile.first_name }} {{ profile.last_name }}" class="rounded-circle" style="width: 32px; height: 32px; object-fit: cover;">
-                                                                        </a>
-                                                                    {% else %}
-                                                                        <img src="{% static 'raadaa/no_photo.jpeg' %}" alt="No Photo" class="rounded-circle me-2" style="width: 32px; height: 32px; object-fit: cover;">
-                                                                    {% endif %}
-                                                                    <a href="{% url 'view_staff_profile' profile.user.id %}" class="text-decoration-none">{{ profile.first_name }} {{ profile.last_name }}</a>
-                                                                </li>
-                                                            {% endfor %}
-                                                        </ul>
-                                                    </div>
+                                <div class="team-container collapse" id="dept-{{ dept|slugify }}">
+                                    {% for team, members in teams.items %}
+                                        <div class="team ms-3 mt-2">
+                                            <h5 class="toggle d-flex align-items-center" data-bs-toggle="collapse" data-bs-target="#team-{{ dept|slugify }}-{{ team|slugify }}" aria-expanded="false" aria-controls="team-{{ dept|slugify }}-{{ team|slugify }}">
+                                                <i class="fas fa-users me-2 text-primary"></i>
+                                                <span class="caret me-2">▸</span> {{ team }}
+                                            </h5>
+                                            <ul class="list-group list-group-flush members collapse" id="team-{{ dept|slugify }}-{{ team|slugify }}">
+                                                {% for profile in members %}
+                                                    <li class="list-group-item d-flex align-items-center">
+                                                        {% if profile.photo %}
+                                                            <a href="#"
+                                                            data-media-url="{{ profile.photo.url }}"
+                                                            data-media-type="image"
+                                                            data-media-name="{{ profile.first_name }} {{ profile.last_name }}'s Photo"
+                                                            class="me-2">
+                                                                <img src="{{ profile.photo.url }}" alt="{{ profile.first_name }} {{ profile.last_name }}" class="rounded-circle" style="width: 32px; height: 32px; object-fit: cover;">
+                                                            </a>
+                                                        {% else %}
+                                                            <img src="{% static 'raadaa/no_photo.jpeg' %}" alt="No Photo" class="rounded-circle me-2" style="width: 32px; height: 32px; object-fit: cover;">
+                                                        {% endif %}
+                                                        <a href="{% url 'view_staff_profile' profile.user.id %}" class="text-decoration-none">{{ profile.first_name }} {{ profile.last_name }}</a>
+                                                    </li>
                                                 {% endfor %}
-                                            </div>
+                                            </ul>
                                         </div>
                                     {% endfor %}
                                 </div>

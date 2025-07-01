@@ -7,6 +7,18 @@ from django.contrib.auth import get_user_model
 
 User = get_user_model()
 
+class TenantAwareModelForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        self.user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
+
+def filter_by_tenant(queryset, user):
+    tenant = getattr(user, 'tenant', None)
+    if tenant:
+        return queryset.filter(tenant=tenant)
+    return queryset.none()
+
+
 class DocumentForm(forms.ModelForm):
     creation_method = forms.ChoiceField(
         choices=[('template', 'Use Template'), ('upload', 'Upload Document')],
@@ -143,6 +155,21 @@ class TaskForm(forms.ModelForm):
             'status': forms.Select(attrs={'class': 'form-control'}),
         }
 
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
+
+        if user:
+            tenant = getattr(user, 'tenant', None)
+            if tenant:
+                self.fields['assigned_to'].queryset = CustomUser.objects.filter(tenant=tenant)
+                self.fields['documents'].queryset = File.objects.filter(tenant=tenant, uploaded_by=user)
+                self.fields['folder'].queryset = Folder.objects.filter(tenant=tenant, created_by=user)
+            else:
+                self.fields['assigned_to'].queryset = CustomUser.objects.none()
+                self.fields['documents'].queryset = File.objects.none()
+                self.fields['folder'].queryset = Folder.objects.none()
+
 class ReassignTaskForm(forms.ModelForm):
     class Meta:
         model = Task
@@ -151,6 +178,11 @@ class ReassignTaskForm(forms.ModelForm):
             'assigned_to': forms.Select(attrs={'class': 'form-control'}),
             'due_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'},)
         }
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
+
+        self.fields['assigned_to'].queryset = filter_by_tenant(CustomUser.objects.all(), user)
 
 class StaffProfileForm(forms.ModelForm):
     class Meta:
@@ -161,8 +193,7 @@ class StaffProfileForm(forms.ModelForm):
             "state_of_origin", "lga", "religion",
             "institution", "course", "degree", "graduation_year",
             "account_number", "bank_name", "account_name",
-            "location", "employment_date",
-            "organization", "department", "team", "designation", "official_email",
+            "location", "employment_date", "department", "team", "designation", "official_email",
             "emergency_name", "emergency_relationship", "emergency_phone",
             "emergency_address", "emergency_email",
         ]
@@ -174,7 +205,14 @@ class StaffProfileForm(forms.ModelForm):
             "emergency_address": forms.Textarea(attrs={"rows": 2}),
             "team": forms.SelectMultiple(attrs={"class": "form-control"}),
         }
+    
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
 
+        self.fields['department'].queryset = filter_by_tenant(Department.objects.all(), user)
+        self.fields['team'].queryset = filter_by_tenant(Team.objects.all(), user)
+        
 class StaffDocumentForm(forms.ModelForm):
     class Meta:
         model = StaffDocument

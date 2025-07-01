@@ -20,7 +20,18 @@ load_dotenv(dotenv_path)
 
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'insecure-key-for-dev-only')
 DEBUG = os.getenv('DJANGO_DEBUG', 'False')
-ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', ['raadaa.onrender.com', 'www.raadaa.onrender.com', 'localhost', '127.0.0.1:8000', '127.0.0.1'])
+ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', [
+    'raadaa.onrender.com', 
+    'www.raadaa.onrender.com', 
+    'localhost', 
+    '127.0.0.1:8000', 
+    '127.0.0.1',
+    '*.teammanager.ng',  # Support tenant subdomains
+    'teammanager.ng',
+    'transnet-cloud.localhost',  # Explicitly add for local testing
+    'raadaa.localhost',
+])
+
 # ALLOWED_HOSTS = ['teammanager.ng','www.teammanager.ng','raadaa.onrender.com', 'www.raadaa.onrender.com', 'localhost', '127.0.0.1:8000', '127.0.0.1']
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -96,6 +107,7 @@ INSTALLED_APPS = [
     'rest_framework.authtoken',
     # 'documents',  # Our app
     'documents.apps.DocumentsConfig',
+    'tenants', #Tenant app
     'ckeditor',
     'ckeditor_uploader',
     'django_cron',
@@ -112,6 +124,7 @@ REST_FRAMEWORK = {
 }
 
 MIDDLEWARE = [
+    'tenants.middleware.TenantMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -125,10 +138,13 @@ MIDDLEWARE = [
 # raadaa/settings.py
 CSRF_TRUSTED_ORIGINS = [
     "https://teammanager.ng",
+    "https://*.teammanager.ng",  # Support tenant subdomains
     "https://raadaa.onrender.com",
     "https://*.onrender.com",  # For subdomains, if needed
     "http://localhost:8000",
     "http://127.0.0.1:8000",
+    'http://transnet-cloud.localhost:8000',  # Explicitly add for local testing
+    'http://raadaa.localhost:8000',
 ]
 
 CSRF_COOKIE_SECURE = True
