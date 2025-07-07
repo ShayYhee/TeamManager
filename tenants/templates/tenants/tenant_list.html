@@ -1,0 +1,39 @@
+{% extends 'base.html' %}
+{% block title%}Tenant List{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2 class="mb-4">Tenant List</h2>
+    
+    {% if tenants %}
+    <div class="table-responsive">
+        <table class="table table-striped table-hover">
+            <thead class="table-dark">
+                <tr>
+                    <th>Name</th>
+                    <th>Slug</th>
+                    <th>Admin</th>
+                    <th>Created By</th>
+                    <th>Created At</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for tenant in tenants %}
+                <tr>
+                    <td>{{ tenant.name }}</td>
+                    <td>{{ tenant.slug }}</td>
+                    <td>{{ tenant.admin }}</td>
+                    <td>{{ tenant.created_by}}</td>
+                    <td>{{ tenant.created_at|date:"M d, Y H:i" }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="alert alert-info" role="alert">
+        No tenants found.
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

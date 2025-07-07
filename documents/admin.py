@@ -11,7 +11,7 @@ class CustomUserAdmin(UserAdmin):
     )
     filter_horizontal = ("roles",)  # Allows multi-select in admin
     list_display = ("tenant","username", "email", "phone_number", "is_staff", "is_active", "smtp_email")
-    list_filter = ("roles", "is_staff", "is_active")
+    list_filter = ("tenant", "roles", "is_staff", "is_active")
 
 class StaffDocumentInline(admin.TabularInline):
     model = StaffDocument
@@ -24,7 +24,6 @@ admin.site.register(CustomUser, CustomUserAdmin)
 admin.site.register(Role)
 admin.site.register(Department)
 admin.site.register(Team)
-# admin.site.unregister(StaffProfile)
 admin.site.register(StaffProfile, StaffProfileAdmin)
 admin.site.register(Event)
 admin.site.register(EventParticipant)

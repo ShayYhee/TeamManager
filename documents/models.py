@@ -1,6 +1,7 @@
 from django.db import models
 from django.db.models import Q
 from django.contrib.auth.models import User
+from django.contrib.auth.models import Permission
 from raadaa import settings
 from django.utils import timezone
 import os
@@ -62,12 +63,15 @@ from django.db import models
 
 class Role(models.Model):
     name = models.CharField(max_length=50, unique=True)
+    description = models.TextField(blank=True)
+    permissions = models.ManyToManyField(Permission, blank=True, related_name='roles')
 
     def __str__(self):
         return self.name
+    
 
 class CustomUser(AbstractUser):
-    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, blank=True, null=True)
     roles = models.ManyToManyField(Role, blank=True)
     department = models.ForeignKey('Department', on_delete=models.SET_NULL, null=True, blank=True, related_name='members')
     teams = models.ManyToManyField('Team', blank=True, related_name='members')
@@ -100,6 +104,12 @@ class CustomUser(AbstractUser):
 
     def __str__(self):
         return self.username
+    
+    def has_perm(self, perm, obj=None):
+        if obj and hasattr(obj, 'tenant'):
+            if self.tenant != obj.tenant:
+                return False
+        return super().has_perm(perm, obj)
 
 
 class Folder(models.Model):

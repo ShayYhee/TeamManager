@@ -1,0 +1,13 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Application Success</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto p-4">
+        <h1 class="text-2xl font-bold mb-4">Tenant Application Success</h1>
+        <p>Await approval. <a href="{% url 'application_status' {{username}} %}">Application Status</a></p>
+    </div>
+</body>
+</html>

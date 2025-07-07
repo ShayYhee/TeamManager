@@ -1,7 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.models import User
-from django.contrib.admin.models import LogEntry, CHANGE
+from django.contrib.admin.models import LogEntry, CHANGE, ADDITION
 from django.contrib.auth import login, get_user_model
 from django.contrib.auth.signals import user_logged_in
 from django.contrib.contenttypes.models import ContentType
@@ -15,12 +15,13 @@ from django.db.models import Q, F
 from django.dispatch import receiver
 from django.forms import formset_factory
 from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
+from django.urls import reverse
 from django.utils.text import slugify
 from django.utils import timezone
 from django.utils.timezone import now
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
-from .forms import DocumentForm, SignUpForm, CreateDocumentForm, FileUploadForm, FolderForm, TaskForm, ReassignTaskForm, StaffProfileForm, StaffDocumentForm, EmailConfigForm, UserForm, PublicFolderForm, PublicFileForm
+from .forms import DocumentForm, SignUpForm, CreateDocumentForm, FileUploadForm, FolderForm, TaskForm, ReassignTaskForm, StaffProfileForm, StaffDocumentForm, EmailConfigForm, UserForm, PublicFolderForm, PublicFileForm, DepartmentForm, TeamForm, EventForm, EventParticipantForm, NotificationForm, UserNotificationForm
 from .models import Document, CustomUser, Role, File, Folder, Task, StaffProfile, Notification, UserNotification, StaffDocument, Event, EventParticipant, Department, Team, PublicFile, PublicFolder
 from raadaa.settings import ALLOWED_HOSTS
 from .serializers import EventSerializer
@@ -117,6 +118,13 @@ def send_approval_request(document):
 
 @login_required
 def create_document(request):
+    if not hasattr(request, 'tenant') or not request.user.tenant == request.tenant:
+        # return HttpResponseForbidden("You are not authorized to perform actions for this tenant.")
+        return render(request, 'tenant_error.html', {'message': 'Access denied.', 'user': request.user,}) 
+    
+    if request.user.tenant.slug != "raadaa" or request.user.tenant.slug != "transnet-cloud":
+        return HttpResponseForbidden("Unauthorized: User can not view this page.")
+    
     DocumentFormSet = formset_factory(DocumentForm, extra=1)
     
     if request.method == "POST":
@@ -341,125 +349,9 @@ def create_document(request):
     
     return render(request, "documents/create_document.html", {"formset": formset})
 
-@user_passes_test(is_admin)
-def users_list(request):
-    # Validate that the requesting user belongs to the current tenant
-    if request.user.tenant != request.tenant:
-        return HttpResponseForbidden("Unauthorized: User does not belong to the current tenant.")
-
-    # Filter users by the current tenant
-    users = CustomUser.objects.filter(tenant=request.tenant).order_by('date_joined')
-    paginator = Paginator(users, 10)  # 10 users per page
-    page_number = request.GET.get('page')
-    page_obj = paginator.get_page(page_number)
-    return render(request, "users/users_list.html", {"users": page_obj})
-
-@user_passes_test(is_admin)
-def approve_user(request, user_id):
-    # Validate that the admin belongs to the current tenant
-    if request.user.tenant != request.tenant:
-        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
-
-    # Get the user, ensuring they belong to the same tenant
-    try:
-        user = CustomUser.objects.get(id=user_id, tenant=request.tenant)
-    except CustomUser.DoesNotExist:
-        return HttpResponseForbidden("User not found or does not belong to your tenant.")
-
-    # Activate the user
-    user.is_active = True
-    user.save()
-
-    # Use the admin's email credentials (request.user is already the admin)
-    admin_user = request.user
-    sender_email = admin_user.smtp_email
-    sender_password = admin_user.smtp_password
-
-    if not sender_email or not sender_password:
-        return HttpResponseForbidden("Your email credentials are missing. Contact admin.")
-
-    # Set up email connection
-    connection = get_connection(
-        backend="django.core.mail.backends.smtp.EmailBackend",
-        host="smtp.zoho.com",
-        port=587,
-        username=sender_email,
-        password=sender_password,
-        use_tls=True,
-    )
-
-    # Generate tenant-specific login URL
-    # Determine base domain based on environment
-    if settings.DEBUG:
-        base_domain = "127.0.0.1:8000"  # Local development
-        protocol = "http"
-    else:
-        base_domain = "teammanager.ng"  # Production
-        protocol = "https"
-
-    # Generate tenant-specific login URL
-    login_url = f"{protocol}://{request.tenant.slug}.{base_domain}/login"
-
-    # Prepare email
-    subject = f"Account Approval: {user.username}"
-    message = f"""
-    Dear {user.username},
-
-    Your account has been activated. Please click the link below to log in:
-    {login_url}
-
-    Best regards,  
-    {admin_user.get_full_name() or admin_user.username}
-    """
-
-    print("Sending mail...")
-
-    try:
-        # Send email to the user
-        send_mail(
-            subject,
-            message,
-            sender_email,
-            [user.email],
-            connection=connection,
-        )
-    except Exception as e:
-        print(f"Failed to send email: {e}")
-        return HttpResponseForbidden("Failed to send approval email. Contact admin.")
-
-    return redirect("users_list")
 
 def account_activation_sent(request):
     return render(request, "registration/account_activation_sent.html")
-
-@user_passes_test(is_admin)
-def edit_user(request, user_id):
-    # Validate that the admin belongs to the current tenant
-    if request.user.tenant != request.tenant:
-        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
-
-    # Get the user, ensuring they belong to the same tenant
-    user = get_object_or_404(CustomUser, id=user_id, tenant=request.tenant)
-
-    if request.method == "POST":
-        form = UserForm(request.POST, instance=user)
-        if form.is_valid():
-            # Ensure the tenant field cannot be changed
-            form.instance.tenant = request.tenant
-            form.save()
-            LogEntry.objects.log_action(
-                user_id=request.user.id,
-                content_type_id=ContentType.objects.get_for_model(CustomUser).pk,
-                object_id=user.id,
-                object_repr=user.username,
-                action_flag=CHANGE,
-                change_message='Edited user profile'
-            )
-            return redirect("users_list")
-    else:
-        form = UserForm(instance=user)
-    return render(request, "users/edit_user.html", {"form": form})
-
 
 def register(request):
     if request.method == "POST":
@@ -534,6 +426,9 @@ def document_list(request):
     # Validate that the user belongs to the current tenant
     if request.user.tenant != request.tenant:
         return HttpResponseForbidden("Unauthorized: User does not belong to the current tenant.")
+    
+    if request.user.tenant.slug != "raadaa" or request.user.tenant.slug != "transnet-cloud":
+        return HttpResponseForbidden("Unauthorized: User can not view this page.")
 
     # Start with documents filtered by the current tenant
     documents = Document.objects.filter(tenant=request.tenant)
@@ -1911,20 +1806,6 @@ class EventViewSet(viewsets.ModelViewSet):
         print(f"Received data: {self.request.data}")
         event = serializer.save(created_by=self.request.user, tenant=self.request.user.tenant)
 
-        # notif = Notification.objects.create(
-        #     title=f"New Event: {event.title}",
-        #     message=event.description or "You have been invited to a new event.",
-        #     type=Notification.NotificationType.EVENT,
-        #     expires_at=event.end_time,
-        #     is_active=True
-        # )
-
-        # # Step 2: Create UserNotifications for each invited user
-        # participants = self.request.data.get('participants', [])  # Should be list of user IDs
-        # for user_id in participants:
-        #     EventParticipant.objects.create(event=event, user=user_id, response="pending")
-        #     UserNotification.objects.create(user=user_id, notification=notif)
-
     def update(self, request, *args, **kwargs):
         event = self.get_object()
         if event.created_by != request.user:
@@ -1937,10 +1818,7 @@ class EventViewSet(viewsets.ModelViewSet):
             return Response({"detail": "You can only delete events you created."}, status=403)
         return super().destroy(request, *args, **kwargs)
 
-# @login_required
-# def calendar_view(request):
-#     token, created = Token.objects.get_or_create(user=request.user)
-#     return render(request, 'documents/calendar.html', {'auth_token': token.key})
+
 from django.middleware.csrf import get_token
 
 @login_required
@@ -2147,3 +2025,844 @@ def delete_public_file(request, file_id):
         return JsonResponse({'success': False, 'errors': {'file': ['You can only delete your own files']}}, status=403)
     file.delete()
     return JsonResponse({'success': True})
+
+# ...................................................................................................................
+
+# Admin views
+
+@user_passes_test(is_admin)
+def admin_dashboard(request):
+    model_links = {
+        "Departments": reverse("department_list"),
+        "Events": reverse("event_list"),
+        "Event Participants": reverse("event_participant_list"),
+        "Notifications": reverse("admin_notification_list"),
+        "Staff Profiles": reverse("staff_profile_list"),
+        "Teams": reverse("admin_team_list"),
+        "User Notifications": reverse("user_notification_list"),
+        "Users": reverse("users_list"),
+    }
+    return render(request, "admin/admin_dashboard.html", {"model_links": model_links})
+
+@user_passes_test(is_admin)
+def bulk_delete(request, model_name):
+    if request.method == "POST":
+        # Validate tenant
+        if request.user.tenant != request.tenant:
+            return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+
+        # Map model names to actual model classes and their list view names
+        model_mapping = {
+            'customuser': (CustomUser, 'users_list'),
+            'document': (Document, 'admin_document_list'),
+            'folder': (Folder, 'admin_folder_list'),
+            'file': (File, 'admin_file_list'),
+            'task': (Task, 'admin_task_list'),
+            'department': (Department, 'department_list'),
+            'team': (Team, 'admin_team_list'),
+            'event': (Event, 'event_list'),
+            'eventparticipant': (EventParticipant, 'event_participant_list'),
+            'staffprofile': (StaffProfile, 'staff_profile_list'),
+            'notification': (Notification, 'admin_notification_list'),
+            'usernotification': (UserNotification, 'user_notification_list'),
+        }
+
+        # Check if model_name is valid
+        if model_name.lower() not in model_mapping:
+            return HttpResponseForbidden("Invalid model name.")
+
+        model_class, redirect_view = model_mapping[model_name.lower()]
+
+        # Get IDs to delete
+        ids = request.POST.getlist("ids")
+        if not ids:
+            return redirect(redirect_view)
+
+        # Delete objects, ensuring they belong to the tenant
+        try:
+            model_class.objects.filter(id__in=ids, tenant=request.tenant).delete()
+        except Exception as e:
+            return HttpResponseForbidden(f"Error deleting objects: {str(e)}")
+
+        return redirect(redirect_view)
+
+    return HttpResponseForbidden("Invalid request method.")
+
+@user_passes_test(is_admin)
+def bulk_action_users(request):
+    if request.user.tenant != request.tenant:
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+    
+    if request.method != "POST":
+        return HttpResponseForbidden("Invalid request method.")
+    
+    action = request.POST.get('action')
+    ids = request.POST.getlist('ids')
+    
+    if not action or not ids:
+        return redirect("users_list")  # Silently redirect if no action or IDs
+    
+    try:
+        users = CustomUser.objects.filter(id__in=ids, tenant=request.tenant)
+        if not users.exists():
+            return HttpResponseForbidden("No valid users found for this tenant.")
+        
+        if action == "delete":
+            users.delete()
+            LogEntry.objects.log_action(
+                user_id=request.user.id,
+                content_type_id=ContentType.objects.get_for_model(CustomUser).pk,
+                object_id=None,
+                object_repr="Multiple users",
+                action_flag=CHANGE,
+                change_message=f"Bulk deleted {len(ids)} users"
+            )
+        elif action == "activate":
+            updated_count = users.update(is_active=True)
+            LogEntry.objects.log_action(
+                user_id=request.user.id,
+                content_type_id=ContentType.objects.get_for_model(CustomUser).pk,
+                object_id=None,
+                object_repr="Multiple users",
+                action_flag=CHANGE,
+                change_message=f"Bulk activated {updated_count} users"
+            )
+            # Send activation emails
+            admin_user = request.user
+            sender_email = admin_user.smtp_email
+            sender_password = admin_user.smtp_password
+            if sender_email and sender_password:
+                connection = get_connection(
+                    backend="django.core.mail.backends.smtp.EmailBackend",
+                    host="smtp.zoho.com",
+                    port=587,
+                    username=sender_email,
+                    password=sender_password,
+                    use_tls=True,
+                )
+                if settings.DEBUG:
+                    base_domain = "localhost:8000"
+                    protocol = "http"
+                else:
+                    base_domain = "teammanager.ng"
+                    protocol = "https"
+                login_url = f"{protocol}://{request.tenant.slug}.{base_domain}/login"
+                
+                for user in users:
+                    subject = f"Account Approval: {user.username}"
+                    message = f"""
+                    Dear {user.username},
+
+                    Your account has been activated. Please click the link below to log in:
+                    {login_url}
+
+                    Best regards,  
+                    {admin_user.get_full_name() or admin_user.username}
+                    """
+                    try:
+                        send_mail(
+                            subject,
+                            message,
+                            sender_email,
+                            [user.email],
+                            connection=connection,
+                        )
+                    except Exception as e:
+                        print(f"Failed to send email to {user.email}: {e}")
+                        # Continue with other users even if one email fails
+        else:
+            return HttpResponseForbidden("Invalid action specified.")
+    
+    except Exception as e:
+        return HttpResponseForbidden(f"Error processing action: {str(e)}")
+    
+    return redirect("users_list")
+
+
+@user_passes_test(is_admin)
+def users_list(request):
+    # Validate that the requesting user belongs to the current tenant
+    if request.user.tenant != request.tenant:
+        return HttpResponseForbidden("Unauthorized: User does not belong to the current tenant.")
+
+    # Filter users by the current tenant
+    users = CustomUser.objects.filter(tenant=request.tenant).order_by('date_joined')
+    paginator = Paginator(users, 10)  # 10 users per page
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    return render(request, "admin/users_list.html", {"users": page_obj})
+
+@user_passes_test(is_admin)
+def create_user(request):
+    if request.user.tenant != request.tenant:
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+    if request.method == "POST":
+        form = UserForm(request.POST)
+        if form.is_valid():
+            user = form.save(commit=False)
+            user.tenant = request.tenant
+            user.save()
+            LogEntry.objects.log_action(
+                user_id=request.user.id,
+                content_type_id=ContentType.objects.get_for_model(CustomUser).pk,
+                object_id=user.id,
+                object_repr=user.username,
+                action_flag=ADDITION,
+                change_message='Created user'
+            )
+            return redirect("users_list")
+    else:
+        form = UserForm()
+    return render(request, "admin/create_user.html", {"form": form})
+
+@user_passes_test(is_admin)
+def view_user_details(request, user_id):
+    # Validate that the admin belongs to the current tenant
+    if request.user.tenant != request.tenant:
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+
+    # Get the user, ensuring they belong to the same tenant
+    try:
+        user_view = CustomUser.objects.get(id=user_id, tenant=request.tenant)
+        details = ['username', 'first_name', 'last_name', 'email', 
+                  'is_staff', 'is_active', 'roles', 'phone_number', 
+                  'department', 'teams', 'smtp_email', 'smtp_password']
+    except CustomUser.DoesNotExist:
+        return HttpResponseForbidden("User not found or does not belong to your tenant.")
+
+    return render(request, "admin/view_user_details.html", {"user_view": user_view, "details": details})
+@user_passes_test(is_admin)
+def approve_user(request, user_id):
+    # Validate that the admin belongs to the current tenant
+    if request.user.tenant != request.tenant:
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+
+    # Get the user, ensuring they belong to the same tenant
+    try:
+        user = CustomUser.objects.get(id=user_id, tenant=request.tenant)
+    except CustomUser.DoesNotExist:
+        return HttpResponseForbidden("User not found or does not belong to your tenant.")
+
+    # Activate the user
+    user.is_active = True
+    user.save()
+
+    # Use the admin's email credentials (request.user is already the admin)
+    admin_user = request.user
+    sender_email = admin_user.smtp_email
+    sender_password = admin_user.smtp_password
+
+    if not sender_email or not sender_password:
+        return HttpResponseForbidden("Your email credentials are missing. Contact admin.")
+
+    # Set up email connection
+    connection = get_connection(
+        backend="django.core.mail.backends.smtp.EmailBackend",
+        host="smtp.zoho.com",
+        port=587,
+        username=sender_email,
+        password=sender_password,
+        use_tls=True,
+    )
+
+    # Generate tenant-specific login URL
+    # Determine base domain based on environment
+    if settings.DEBUG:
+        base_domain = "127.0.0.1:8000"  # Local development
+        protocol = "http"
+    else:
+        base_domain = "teammanager.ng"  # Production
+        protocol = "https"
+
+    # Generate tenant-specific login URL
+    login_url = f"{protocol}://{request.tenant.slug}.{base_domain}/login"
+
+    # Prepare email
+    subject = f"Account Approval: {user.username}"
+    message = f"""
+    Dear {user.username},
+
+    Your account has been activated. Please click the link below to log in:
+    {login_url}
+
+    Best regards,  
+    {admin_user.get_full_name() or admin_user.username}
+    """
+
+    print("Sending mail...")
+
+    try:
+        # Send email to the user
+        send_mail(
+            subject,
+            message,
+            sender_email,
+            [user.email],
+            connection=connection,
+        )
+    except Exception as e:
+        print(f"Failed to send email: {e}")
+        return HttpResponseForbidden("Failed to send approval email. Contact admin.")
+
+    return redirect("users_list")
+
+@user_passes_test(is_admin)
+def edit_user(request, user_id):
+    # Validate that the admin belongs to the current tenant
+    if request.user.tenant != request.tenant:
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+
+    # Get the user, ensuring they belong to the same tenant
+    user = get_object_or_404(CustomUser, id=user_id, tenant=request.tenant)
+
+    if request.method == "POST":
+        form = UserForm(request.POST, instance=user)
+        if form.is_valid():
+            # Ensure the tenant field cannot be changed
+            form.instance.tenant = request.tenant
+            form.save()
+            LogEntry.objects.log_action(
+                user_id=request.user.id,
+                content_type_id=ContentType.objects.get_for_model(CustomUser).pk,
+                object_id=user.id,
+                object_repr=user.username,
+                action_flag=CHANGE,
+                change_message='Edited user profile'
+            )
+            return redirect("users_list")
+    else:
+        form = UserForm(instance=user)
+    return render(request, "admin/edit_user.html", {"form": form})
+
+@user_passes_test(is_admin)
+def admin_documents_list(request):
+    # Validate that the admin belongs to the current tenant
+    if request.user.tenant != request.tenant:
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+
+    documents = Document.objects.filter(tenant=request.tenant)
+    paginator = Paginator(documents, 10)  # 10 users per page
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    return render(request, "admin/documents_list.html", {"documents": page_obj})
+
+@user_passes_test(is_admin)
+def admin_document_details(request, document_id):
+    # Validate that the admin belongs to the current tenant
+    if request.user.tenant != request.tenant:
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+
+    # Get the document, ensuring it belongs to the same tenant
+    try:
+        document_view = Document.objects.get(id=document_id, tenant=request.tenant)
+    except Document.DoesNotExist:
+        return HttpResponseForbidden("Document not found or does not belong to your tenant.")
+
+    return render(request, "admin/view_document_details.html", {"document_view": document_view})
+
+@user_passes_test(is_admin)
+def admin_delete_document(request, document_id):
+    if hasattr(request, 'tenant') and request.user.tenant != request.tenant:
+        return HttpResponseForbidden("You are not authorized to perform actions for this tenant.")
+    document = get_object_or_404(Document, id=document_id, tenant=request.tenant)
+
+    # Ensure document files are deleted from storage
+    if document.word_file:
+        document.word_file.delete(save=False)
+    if document.pdf_file:
+        document.pdf_file.delete(save=False)
+
+    document.delete()
+    return redirect("admin_document_list")  # Redirect back to the list
+
+@user_passes_test(is_admin)
+def admin_folder_list(request):
+    # Validate that the admin belongs to the current tenant
+    if request.user.tenant != request.tenant:
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+
+    folders = Folder.objects.filter(tenant=request.tenant)
+    paginator = Paginator(folders, 10)  # 10 users per page
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    return render(request, "admin/folder_list.html", {"folders": page_obj})
+
+@user_passes_test(is_admin)
+def admin_folder_details(request, folder_id):
+    # Validate that the admin belongs to the current tenant
+    if request.user.tenant != request.tenant:
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+
+    # Get the folder, ensuring it belongs to the same tenant
+    try:
+        folder_view = Folder.objects.get(id=folder_id, tenant=request.tenant)
+    except Folder.DoesNotExist:
+        return HttpResponseForbidden("Folder not found or does not belong to your tenant.")
+
+    return render(request, "admin/view_folder_details.html", {"folder_view": folder_view})
+
+@user_passes_test(is_admin)
+def admin_delete_folder(request, folder_id):
+    # Validate that the admin belongs to the current tenant
+    if request.user.tenant != request.tenant:
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+
+    # Get the folder, ensuring it belongs to the same tenant
+    folder = get_object_or_404(Folder, id=folder_id, created_by=request.user, tenant=request.tenant)
+    folder.delete()
+    return redirect("admin_folder_list")
+
+@user_passes_test(is_admin)
+def admin_file_list(request):
+    # Validate that the admin belongs to the current tenant
+    if request.user.tenant != request.tenant:
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+
+    files = File.objects.filter(tenant=request.tenant)
+    paginator = Paginator(files, 10)  # 10 users per page
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    return render(request, "admin/file_list.html", {"files": page_obj})
+
+@user_passes_test(is_admin)
+def admin_delete_file(request, file_id):
+    # Validate that the admin belongs to the current tenant
+    if request.user.tenant != request.tenant:
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+
+    # Get the file, ensuring it belongs to the same tenant
+    file = get_object_or_404(File, id=file_id, uploaded_by=request.user, tenant=request.tenant)
+    file.delete()
+    return redirect("admin_file_list")
+
+@user_passes_test(is_admin)
+def admin_task_list(request):
+    # Validate that the admin belongs to the current tenant
+    if request.user.tenant != request.tenant:
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+
+    tasks = Task.objects.filter(tenant=request.tenant)
+    paginator = Paginator(tasks, 10)  # 10 users per page
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    return render(request, "admin/task_list.html", {"tasks": page_obj})
+
+@user_passes_test(is_admin)
+def admin_task_detail(request, task_id):
+    # Validate that the admin belongs to the current tenant
+    if request.user.tenant != request.tenant:
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+
+    # Get the task, ensuring it belongs to the same tenant
+    try:
+        task_view = Task.objects.get(id=task_id, tenant=request.tenant)
+    except Task.DoesNotExist:
+        return HttpResponseForbidden("Task not found or does not belong to your tenant.")
+
+    return render(request, "admin/view_task_details.html", {"task_view": task_view})
+
+@user_passes_test(is_admin)
+def department_list(request):
+    # Validate that the admin belongs to the current tenant
+    if request.user.tenant != request.tenant:
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+    
+    # Fetch all departments in that tenant
+    departments = Department.objects.filter(tenant=request.tenant)
+    paginator = Paginator(departments, 10)  # 10 users per page
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    return render(request, "admin/department_list.html", {"departments": page_obj})
+
+@user_passes_test(is_admin)
+def create_department(request):
+    # Validate that the admin belongs to the current tenant
+    if request.user.tenant != request.tenant:
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+
+    if request.method == "POST":
+        form = DepartmentForm(request.POST)
+        if form.is_valid():
+            department = form.save(commit=False)
+            department.tenant = request.tenant
+            department.save()
+            return redirect("department_list")
+    else:
+        form = DepartmentForm()
+    return render(request, "admin/create_department.html", {"form": form})
+
+@user_passes_test(is_admin)
+def edit_department(request, department_id):
+    # Validate that the admin belongs to the current tenant
+    if request.user.tenant != request.tenant:
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+
+    # Get the department, ensuring it belongs to the same tenant
+    department = get_object_or_404(Department, id=department_id, tenant=request.tenant)
+
+    if request.method == "POST":
+        form = DepartmentForm(request.POST, instance=department)
+        if form.is_valid():
+            form.save()
+            return redirect("department_list")
+    else:
+        form = DepartmentForm(instance=department)
+    return render(request, "admin/edit_department.html", {"form": form})
+
+@user_passes_test(is_admin)
+def delete_department(request, department_id):
+    # Validate that the admin belongs to the current tenant
+    if request.user.tenant != request.tenant:
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+
+    # Get the department, ensuring it belongs to the same tenant
+    department = get_object_or_404(Department, id=department_id, tenant=request.tenant)
+    department.delete()
+    return redirect("department_list")
+
+@user_passes_test(is_admin)
+def admin_team_list(request):
+    # Validate that the admin belongs to the current tenant
+    if request.user.tenant != request.tenant:
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+
+    teams = Team.objects.filter(tenant=request.tenant).order_by('department')
+    paginator = Paginator(teams, 10)  # 10 users per page
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    return render(request, "admin/team_list.html", {"teams": page_obj})
+
+@user_passes_test(is_admin)
+def create_team(request):
+    # Validate that the admin belongs to the current tenant
+    if request.user.tenant != request.tenant:
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+
+    if request.method == "POST":
+        form = TeamForm(request.POST)
+        if form.is_valid():
+            team = form.save(commit=False)
+            team.tenant = request.tenant
+            team.save()
+            return redirect("admin_team_list")
+    else:
+        form = TeamForm()
+    return render(request, "admin/create_team.html", {"form": form})
+
+@user_passes_test(is_admin)
+def delete_team(request, team_id):
+    # Validate that the admin belongs to the current tenant
+    if request.user.tenant != request.tenant:
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+
+    # Get the team, ensuring it belongs to the same tenant
+    team = get_object_or_404(Team, id=team_id, tenant=request.tenant)
+    team.delete()
+    return redirect("admin_team_list")
+
+@user_passes_test(is_admin)
+def edit_team(request, team_id):
+    # Validate that the admin belongs to the current tenant
+    if request.user.tenant != request.tenant:
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+    
+    # Get the team, ensuring it belongs to the same tenant
+    team = get_object_or_404(Team, id=team_id, tenant=request.tenant)
+
+    if request.method == "POST":
+        form = TeamForm(request.POST, instance=team)
+        if form.is_valid():
+            form.save()
+            return redirect("department_list")
+    else:
+        form = TeamForm(instance=team)
+    return render(request, "admin/edit_team.html", {"form": form})
+
+@user_passes_test(is_admin)
+def event_list(request):
+    # Validate that the admin belongs to the current tenant
+    if request.user.tenant != request.tenant:
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+
+    events = Event.objects.filter(tenant=request.tenant)
+    paginator = Paginator(events, 10)  # 10 users per page
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    return render(request, "admin/event_list.html", {"events": page_obj})
+
+@user_passes_test(is_admin)
+def create_event(request):
+    # Validate that the admin belongs to the current tenant
+    if request.user.tenant != request.tenant:
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+
+    if request.method == "POST":
+        form = EventForm(request.POST)
+        if form.is_valid():
+            event = form.save(commit=False)
+            event.tenant = request.tenant
+            event.created_by = request.user
+            event.save()
+            return redirect("event_list")
+    else:
+        form = EventForm()
+    return render(request, "admin/create_event.html", {"form": form})
+
+@user_passes_test(is_admin)
+def edit_event(request, event_id):
+    # Validate that the admin belongs to the current tenant
+    if request.user.tenant != request.tenant:
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+
+    # Get the event, ensuring it belongs to the same tenant
+    event = get_object_or_404(Event, id=event_id, tenant=request.tenant)
+
+    if request.method == "POST":
+        form = EventForm(request.POST, instance=event)
+        if form.is_valid():
+            form.save()
+            return redirect("event_list")
+    else:
+        form = EventForm(instance=event)
+    return render(request, "admin/edit_event.html", {"form": form})
+
+@user_passes_test(is_admin)
+def delete_event(request, event_id):
+    # Validate that the admin belongs to the current tenant
+    if request.user.tenant != request.tenant:
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+
+    # Get the event, ensuring it belongs to the same tenant
+    event = get_object_or_404(Event, id=event_id, tenant=request.tenant)
+    event.delete()
+    return redirect("event_list")
+
+@user_passes_test(is_admin)
+def event_participant_list(request):
+    # Validate that the admin belongs to the current tenant
+    if request.user.tenant != request.tenant:
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+
+    participants = EventParticipant.objects.filter(tenant=request.tenant).order_by('event')
+    paginator = Paginator(participants, 10)  # 10 users per page
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    return render(request, "admin/event_participant_list.html", {"participants": page_obj})
+
+@user_passes_test(is_admin)
+def create_event_participant(request):
+    # Validate that the admin belongs to the current tenant
+    if request.user.tenant != request.tenant:
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+
+    if request.method == "POST":
+        form = EventParticipantForm(request.POST)
+        if form.is_valid():
+            event_participant=form.save(commit=False)
+            event_participant.tenant = request.tenant
+            event_participant.save()
+            return redirect("event_participant_list")
+    else:
+        form = EventParticipantForm()
+    return render(request, "admin/create_event_participant.html", {"form": form})
+
+@user_passes_test(is_admin)
+def event_participant_edit(request, event_participant_id):
+    # Validate that the admin belongs to the current tenant
+    if request.user.tenant != request.tenant:
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+
+    # Get the event, ensuring it belongs to the same tenant
+    event_participant = get_object_or_404(EventParticipant, id=event_participant_id, tenant=request.tenant)
+
+    if request.method == "POST":
+        form = EventParticipantForm(request.POST, instance=event_participant)
+        if form.is_valid():
+            form.save()
+            return redirect("event_participant_list")
+    else:
+        form = EventParticipantForm(instance=event_participant)
+    return render(request, "admin/edit_event_participant.html", {"form": form})
+
+@user_passes_test(is_admin)
+def event_participant_delete(request, event_participant_id):
+    # Validate that the admin belongs to the current tenant
+    if request.user.tenant != request.tenant:
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+
+    # Get the event, ensuring it belongs to the same tenant
+    event_participant = get_object_or_404(EventParticipant, id=event_participant_id, tenant=request.tenant)
+    event_participant.delete()
+    return redirect("event_participant_list")
+
+@user_passes_test(is_admin)
+def staff_profile_list(request):
+    # Validate that the admin belongs to the current tenant
+    if request.user.tenant != request.tenant:
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+
+    staff_profiles = StaffProfile.objects.filter(tenant=request.tenant)
+    paginator = Paginator(staff_profiles, 10)  # 10 users per page
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    return render(request, "admin/staff_profile_list.html", {"staff_profiles": page_obj})
+
+@user_passes_test(is_admin)
+def create_staff_profile(request):
+    # Validate that the admin belongs to the current tenant
+    if request.user.tenant != request.tenant:
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+
+    if request.method == "POST":
+        form = StaffProfileForm(request.POST)
+        if form.is_valid():
+            staff_profile=form.save(commit=False)
+            staff_profile.tenant = request.tenant
+            staff_profile.save()
+            return redirect("staff_profile_list")
+    else:
+        form = StaffProfileForm()
+    return render(request, "admin/create_staff_profile.html", {"form": form})
+
+@user_passes_test(is_admin)
+def edit_staff_profile(request, staff_profile_id):
+    # Validate that the admin belongs to the current tenant
+    if request.user.tenant != request.tenant:
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+
+    # Get the event, ensuring it belongs to the same tenant
+    staff_profile = get_object_or_404(StaffProfile, id=staff_profile_id, tenant=request.tenant)
+
+    if request.method == "POST":
+        form = StaffProfileForm(request.POST, instance=staff_profile)
+        if form.is_valid():
+            form.save()
+            return redirect("staff_profile_list")
+    else:
+        form = StaffProfileForm(instance=staff_profile)
+    return render(request, "admin/edit_staff_profile.html", {"form": form})
+
+@user_passes_test(is_admin)
+def delete_staff_profile(request, staff_profile_id):
+    # Validate that the admin belongs to the current tenant
+    if request.user.tenant != request.tenant:
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+
+    # Get the event, ensuring it belongs to the same tenant
+    staff_profile = get_object_or_404(StaffProfile, id=staff_profile_id, tenant=request.tenant)
+    staff_profile.delete()
+    return redirect("staff_profile_list")
+
+@user_passes_test(is_admin)
+def admin_notification_list(request):
+    # Validate that the admin belongs to the current tenant
+    if request.user.tenant != request.tenant:
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+
+    notifications = Notification.objects.filter(tenant=request.tenant).order_by('created_at')
+    paginator = Paginator(notifications, 10)  # 10 users per page
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    return render(request, "admin/admin_notification_list.html", {"notifications": page_obj})
+
+@user_passes_test(is_admin)
+def create_notification(request):
+    # Validate that the admin belongs to the current tenant
+    if request.user.tenant != request.tenant:
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+
+    if request.method == "POST":
+        form = NotificationForm(request.POST)
+        if form.is_valid():
+            notification = form.save(commit=False)
+            notification.tenant = request.tenant
+            notification.save()
+            return redirect("admin_notification_list")
+    else:
+        form = NotificationForm()
+    return render(request, "admin/create_notification.html", {"form": form})
+
+@user_passes_test(is_admin)
+def edit_notification(request, notification_id):
+    # Validate taht the admin belongs to the current tenant
+    if request.user.tenant != request.tenant:
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+    
+    notification = get_object_or_404(Notification, notification_id=notification_id, tenant=request.tenant)
+
+    if request.method == "POST":
+        form = NotificationForm(request.POST, instance=notification)
+        if form.is_valid():
+            form.save()
+            return redirect("admin_notification_list")
+    else:
+        form = NotificationForm(instance=notification)
+    return render(request, "admin/edit_notification.html", {"form": form})
+
+@user_passes_test(is_admin)
+def delete_notification(request, notification_id):
+    # Validate that the admin belongs to the current tenant
+    if request.user.tenant != request.tenant:
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+
+    # Get the event, ensuring it belongs to the same tenant
+    notification = get_object_or_404(Notification, notification_id=notification_id, tenant=request.tenant)
+    notification.delete()
+    return redirect("admin_notification_list")
+
+@user_passes_test(is_admin)
+def user_notification_list(request):
+    # Validate that the admin belongs to the current tenant
+    if request.user.tenant != request.tenant:
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+
+    user_notifications = UserNotification.objects.filter(tenant=request.tenant)
+    paginator = Paginator(user_notifications, 10)  # 10 users per page
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    return render(request, "admin/user_notification_list.html", {"user_notifications": page_obj})
+
+@user_passes_test(is_admin)
+def create_user_notification(request):
+    # Validate that the admin belongs to the current tenant
+    if request.user.tenant != request.tenant:
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+
+    if request.method == "POST":
+        form = UserNotificationForm(request.POST)
+        if form.is_valid():
+            user_notification = form.save(commit=False)
+            user_notification.tenant = request.tenant
+            user_notification.save()
+            return redirect("admin_notification_list")
+    else:
+        form = UserNotificationForm()
+    return render(request, "admin/create_user_notification.html", {"form": form})
+
+@user_passes_test(is_admin)
+def edit_user_notification(request, user_notification_id):
+    # Validate taht the admin belongs to the current tenant
+    if request.user.tenant != request.tenant:
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+    
+    user_notification = get_object_or_404(UserNotification, user_notification_id=user_notification_id, tenant=request.tenant)
+
+    if request.method == "POST":
+        form = UserNotificationForm(request.POST, instance=user_notification)
+        if form.is_valid():
+            form.save()
+            return redirect("user_notification_list")
+    else:
+        form = UserNotificationForm(instance=user_notification)
+    return render(request, "admin/edit_user_notification.html", {"form": form})
+
+@user_passes_test(is_admin)
+def delete_user_notification(request, user_notification_id):
+    # Validate that the admin belongs to the current tenant
+    if request.user.tenant != request.tenant:
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+
+    # Get the event, ensuring it belongs to the same tenant
+    user_notification = get_object_or_404(UserNotification, user_notification_id=user_notification_id, tenant=request.tenant)
+    user_notification.delete()
+    return redirect("user_notification_list")

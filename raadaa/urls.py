@@ -12,6 +12,8 @@ from documents.views import create_folder, upload_file, update_task_status, crea
 from documents.views import delete_folder, delete_file, rename_folder, rename_file, move_folder, move_file, task_edit, delete_task_document
 from documents.views import performance_dashboard, hod_performance_dashboard, create_public_folder, delete_public_folder, rename_public_folder
 from documents.views import public_folder_list, move_public_folder, upload_public_file, delete_public_file, rename_public_file, move_public_file
+from documents.views import view_user_details, admin_dashboard, admin_delete_document, admin_delete_file, admin_delete_folder, admin_document_details
+from documents.views import admin_folder_list, admin_folder_details, admin_file_list, department_list, bulk_delete, create_user, bulk_action_users
 from documents.views import EventViewSet
 from django.http import HttpResponse
 
@@ -25,6 +27,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path("", home, name="home"),
     path("documents/", include("documents.urls")),  # Added namespace
+    path("tenants/", include("tenants.urls")),
     path("accounts/", include("django.contrib.auth.urls")),
     # Override CKEditor upload
     path('ckeditor/upload/', custom_ckeditor_upload, name='ckeditor_upload'),
@@ -47,11 +50,6 @@ urlpatterns = [
     path('users/email-config/', email_config, name='email_config'),
     path('api/', include(router.urls)),
     path('calendar/', calendar_view, name='calendar'),
-    path('users/list/', users_list, name='users_list'),
-    path('users/approve/<int:user_id>', approve_user, name='approve_user'),
-    path('users/account-activation/', account_activation_sent, name='account_activation_sent'),
-    path('users/delete/<int:user_id>', delete_user, name='delete_user'),
-    path('users/edit/<int:user_id>', edit_user, name='edit_user'),
     path('dashboard/performance-dashboard/', performance_dashboard, name='performance_dashboard'),
     path('dashboard/hod-performance-dashboard/', hod_performance_dashboard, name='hod_performance_dashboard'),
     path('folders/', folder_list, name='folder_list'),
@@ -82,6 +80,17 @@ urlpatterns = [
     path('tasks/<int:task_id>/delete/', delete_task, name='delete_task'),
     path('tasks/<int:task_id>/edit/', task_edit, name='task_edit'),
     path('tasks/<int:task_id>/delete-task-document/<int:doc_id>/', delete_task_document, name='delete_document'),
+    path("admin/dashboard/", admin_dashboard, name="admin_dashboard"),
+    path('admin/bulk-delete/<str:model_name>/', bulk_delete, name='bulk_delete'),
+    path('users/bulk-action/', bulk_action_users, name='bulk_action_users'),
+    path('users/list/', users_list, name='users_list'),
+    path('users/create/', create_user, name='create_user'),
+    path('users/view/<int:user_id>', view_user_details, name='view_user_details'),
+    path('users/approve/<int:user_id>', approve_user, name='approve_user'),
+    path('users/account-activation/', account_activation_sent, name='account_activation_sent'),
+    path('users/delete/<int:user_id>', delete_user, name='delete_user'),
+    path('users/edit/<int:user_id>', edit_user, name='edit_user'),
+
     path('.well-known/<path:path>', handle_well_known),  # Handle .well-known requests
 ]
 

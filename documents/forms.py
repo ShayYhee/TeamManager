@@ -1,6 +1,7 @@
 from django import forms
 from django.forms import modelformset_factory
-from .models import Document, User, CustomUser, Folder, File, Task, StaffProfile, StaffDocument, Department, Team, PublicFolder, PublicFile
+from .models import Document, User, CustomUser, Folder, File, Task, StaffProfile, StaffDocument, Department, Team, PublicFolder, PublicFile, Role, Event, EventParticipant, Notification, UserNotification
+from tenants.models import Tenant
 from ckeditor.widgets import CKEditorWidget
 from ckeditor_uploader.widgets import CKEditorUploadingWidget
 from django.contrib.auth import get_user_model
@@ -119,7 +120,37 @@ class SignUpForm(forms.ModelForm):
 class UserForm(forms.ModelForm):
     class Meta:
         model = CustomUser
-        fields = '__all__'
+        fields = ['username', 'first_name', 'last_name', 'email', 
+                  'is_staff', 'is_active', 'roles', 'phone_number', 
+                  'department', 'teams', 'smtp_email', 'smtp_password']
+        widgets = {
+            'username': forms.TextInput(attrs={'class': 'form-control'}),
+            'first_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'last_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'email': forms.EmailInput(attrs={'class': 'form-control'}),
+            'is_staff': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'roles': forms.SelectMultiple(attrs={'class': 'form-control'}),
+            'phone_number': forms.TextInput(attrs={'class': 'form-control'}),
+            'department': forms.Select(attrs={'class': 'form-control'}),
+            'teams': forms.SelectMultiple(attrs={'class': 'form-control'}),
+            'smtp_email': forms.EmailInput(attrs={'class': 'form-control'}),
+            'smtp_password': forms.PasswordInput(attrs={'class': 'form-control'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
+        if user:
+            tenant = getattr(user, 'tenant', None)
+            if tenant:
+                self.fields['roles'].queryset = Role.objects.filter(tenant=tenant)
+                self.fields['department'].queryset = Department.objects.filter(tenant=tenant)
+                self.fields['teams'].queryset = Team.objects.filter(tenant=tenant)
+            else:
+                self.fields['roles'].queryset = Role.objects.none()
+                self.fields['department'].queryset = Department.objects.none()
+                self.fields['teams'].queryset = Team.objects.none()
 
 
 class FolderForm(forms.ModelForm):
@@ -210,8 +241,14 @@ class StaffProfileForm(forms.ModelForm):
         user = kwargs.pop('user', None)
         super().__init__(*args, **kwargs)
 
-        self.fields['department'].queryset = filter_by_tenant(Department.objects.all(), user)
-        self.fields['team'].queryset = filter_by_tenant(Team.objects.all(), user)
+        if user:
+            tenant = getattr(user, 'tenant', None)
+            if tenant:
+                self.fields['department'].queryset = Department.objects.filter(tenant=tenant)
+                self.fields['team'].queryset = Team.objects.filter(tenant=tenant)
+            else:
+                self.fields['department'].queryset = Department.objects.none()
+                self.fields['team'].queryset = Team.objects.none
         
 class StaffDocumentForm(forms.ModelForm):
     class Meta:
@@ -239,20 +276,26 @@ class EmailConfigForm(forms.ModelForm):
         }
 
 class PublicFolderForm(forms.ModelForm):
-    department = forms.ModelChoiceField(
-        queryset=Department.objects.all(),
-        required=False,
-        label='Department'
-    )
-    team = forms.ModelChoiceField(
-        queryset=Team.objects.all(),
-        required=False,
-        label='Team'
-    )
-
     class Meta:
         model = PublicFolder
         fields = ['name', 'parent', 'department', 'team']
+        widgets = {
+            'department': forms.Select(attrs={'class': 'form-control'}),
+            'team': forms.Select(attrs={'class': 'form-control'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
+
+        if user:
+            tenant = getattr(user, 'tenant', None)
+            if tenant:
+                self.fields['department'].queryset = Department.objects.filter(tenant=tenant)
+                self.fields['team'].queryset = Team.objects.filter(tenant=tenant)
+            else:
+                self.fields['department'].queryset = Department.objects.none()
+                self.fields['team'].queryset = Team.objects.none
 
     def clean(self):
         cleaned_data = super().clean()
@@ -275,3 +318,107 @@ class PublicFileForm(forms.ModelForm):
     class Meta:
         model = PublicFile
         fields = ['file']
+
+class DepartmentForm(forms.ModelForm):
+    class Meta:
+        model = Department
+        fields = ['name', 'hod']
+        widgets = {
+            'hod': forms.Select(attrs={'class': 'form-control'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+            user = kwargs.pop('user', None)
+            super().__init__(*args, **kwargs)
+
+            if user:
+                tenant = getattr(user, 'tenant', None)
+                if tenant:
+                    self.fields['hod'].queryset = CustomUser.objects.filter(tenant=tenant)
+                else:
+                    self.fields['hod'].queryset = CustomUser.objects.none()
+
+class TeamForm(forms.ModelForm):
+    class Meta:
+        model = Team
+        fields = ['name', 'department']
+        widgets = {
+            'department': forms.Select(attrs={'class': 'form-control'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
+
+        if user:
+            tenant = getattr(user, 'tenant', None)
+            if tenant:
+                self.fields['department'].queryset = Department.objects.filter(tenant=tenant)
+            else:
+                self.fields['department'].queryset = Department.objects.none()
+
+class EventForm(forms.ModelForm):
+    class Meta:
+        model = Event
+        fields = ['title', 'description', 'start_time', 'end_time', 'event_link']
+        widgets = {
+            "start_time": forms.DateInput(attrs={'type': 'date', 'class': 'form-control'},),
+            "end_time": forms.DateInput(attrs={'type': 'date', 'class': 'form-control'},),
+            "description": forms.Textarea(attrs={"rows": 2}),
+            "link": forms.URLInput(attrs={"class": 'form-control'}),
+        }
+
+class EventParticipantForm(forms.ModelForm):
+    
+    class Meta:
+        model = EventParticipant
+        fields = ['event', 'user', 'response']
+        widgets = {
+            'event': forms.Select(attrs={'class': 'form-control'}),
+            'user': forms.Select(attrs={'class': 'form-control'}),
+            'response': forms.Select(attrs={'class': 'form-control'}, choices=[('pending', 'Pending'), ('accepted', 'Accepted'), ('declined', 'Declined')]),
+        }
+
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
+
+        if user:
+            tenant = getattr(user, 'tenant', None)
+            if tenant:
+                self.fields['event'].queryset = Event.objects.filter(tenant=tenant)
+                self.fields['user'].queryset = CustomUser.objects.filter(tenant=tenant)
+            else:
+                self.fields['department'].queryset = CustomUser.objects.none()
+                self.fields['team'].queryset = Department.objects.none
+
+class NotificationForm(forms.ModelForm):
+    class Meta:
+        model = Notification
+        fields = ['title', 'message', 'type', 'expires_at']
+        widgets = {
+            'type': forms.Select(attrs={'class': 'form-control'}, choices=Notification.NotificationType),
+            'expires_at': forms.DateTimeInput(attrs={'type': 'datetime-local', 'class': 'form-control'}),
+        }
+
+class UserNotificationForm(forms.ModelForm):
+    class Meta:
+        model = UserNotification
+        fields = ['user', 'notification']
+        widgets = {
+            'user': forms.Select(attrs={'class': 'form-control'}),
+            'notification': forms.Select(attrs={'class': 'form-control'}),
+        }
+    
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
+
+        if user:
+            tenant = getattr(user, 'tenant', None)
+            if tenant:
+                self.fields['user'].queryset = CustomUser.objects.filter(tenant=tenant)
+                self.fields['notification'].queryset = Notification.objects.filter(tenant=tenant)
+            else:
+                self.fields['user'].queryset = CustomUser.objects.none()
+                self.fields['notification'].queryset = Notification.objects.none()

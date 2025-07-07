@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+{% block title%}Tenant Applications{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2 class="mb-4">Tenant Applications</h2>
+    
+    {% if tenants %}
+    <div class="table-responsive">
+        <table class="table table-striped table-hover">
+            <thead class="table-dark">
+                <tr>
+                    <th>Organization</th>
+                    <th>Username</th>
+                    <th>Email</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for tenant in tenants %}
+                <tr>
+                    <td>{{ tenant.organization_name }}</td>
+                    <td>{{ tenant.username }}</td>
+                    <td>{{ tenant.email }}</td>
+                    <td>
+                        <span class="badge 
+                            {% if tenant.status == 'pending' %}bg-warning text-dark
+                            {% elif tenant.status == 'approved' %}bg-success
+                            {% else %}bg-danger{% endif %}">
+                            {{ tenant.get_status_display }}
+                        </span>
+                    </td>
+                    <td>{{ tenant.created_at|date:"M d, Y H:i" }}</td>
+                    <td>
+                        {% if tenant.status == 'pending' %}
+                        <form action="{% url 'create_tenant' tenant.id %}" method="post" class="d-inline">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-sm btn-success me-2">Approve</button>
+                        </form>
+                        <form action="{% url 'reject_tenant' tenant.id %}" method="post" class="d-inline">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-sm btn-danger">Reject</button>
+                        </form>
+                        {% else %}
+                        <span class="text-muted">No actions available</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="alert alert-info" role="alert">
+        No tenant applications found.
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
