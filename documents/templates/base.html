@@ -328,6 +328,7 @@
                 {% if role.name == "Admin" %}
                     <a href="{% url 'users_list' %}" {% if request.path == '/users/' %}class="active"{% endif %}><i class="fas fa-user-shield"></i> Users</a>
                     <a href="{% url 'admin:index' %}" {% if request.path|slice:":7" == '/admin/' %}class="active"{% endif %}><i class="fas fa-key"></i> Admin Panel</a>
+                    <a href="{% url 'admin_dashboard' %}" {% if request.path|slice:":7" == '/admin/' %}class="active"{% endif %}><i class="fas fa-key"></i> Admin Dashboard</a>
                 {% endif %}
             {% endfor %}
         {% else %}
@@ -355,6 +356,7 @@
                 {% if role.name == "Admin" %}
                     <a href="{% url 'users_list' %}" {% if request.path == '/users/' %}class="active"{% endif %}><i class="fas fa-user-shield"></i> Users</a>
                     <a href="{% url 'admin:index' %}" {% if request.path|slice:":7" == '/admin/' %}class="active"{% endif %}><i class="fas fa-key"></i> Admin Panel</a>
+                    <a href="{% url 'admin_dashboard' %}" {% if request.path|slice:":7" == '/admin/' %}class="active"{% endif %}><i class="fas fa-key"></i> Admin Dashboard</a>
                 {% endif %}
             {% endfor %}
         {%endif%}
