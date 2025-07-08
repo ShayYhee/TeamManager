@@ -1,7 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.models import User
-from django.contrib.admin.models import LogEntry, CHANGE, ADDITION
+from django.contrib.admin.models import LogEntry, CHANGE, ADDITION, DELETION
 from django.contrib.auth import login, get_user_model
 from django.contrib.auth.signals import user_logged_in
 from django.contrib.contenttypes.models import ContentType
@@ -122,7 +122,7 @@ def create_document(request):
         # return HttpResponseForbidden("You are not authorized to perform actions for this tenant.")
         return render(request, 'tenant_error.html', {'message': 'Access denied.', 'user': request.user,}) 
     
-    if request.user.tenant.slug != "raadaa" or request.user.tenant.slug != "transnet-cloud":
+    if request.user.tenant.slug not in ["raadaa", "transnet-cloud"]:
         return HttpResponseForbidden("Unauthorized: User can not view this page.")
     
     DocumentFormSet = formset_factory(DocumentForm, extra=1)
@@ -427,8 +427,8 @@ def document_list(request):
     if request.user.tenant != request.tenant:
         return HttpResponseForbidden("Unauthorized: User does not belong to the current tenant.")
     
-    if request.user.tenant.slug != "raadaa" or request.user.tenant.slug != "transnet-cloud":
-        return HttpResponseForbidden("Unauthorized: User can not view this page.")
+    # if request.user.tenant.slug not in ["raadaa", "transnet-cloud"]:
+    #     return HttpResponseForbidden("Unauthorized: User can not view this page.")
 
     # Start with documents filtered by the current tenant
     documents = Document.objects.filter(tenant=request.tenant)
@@ -1721,6 +1721,7 @@ def notifications_view(request):
     for notification in all_notifications:
         user_notification, created = UserNotification.objects.get_or_create(
             user=request.user,
+            tenant=request.user.tenant,
             notification=notification,
             defaults={'seen_at': timezone.now(), 'dismissed': False}
         )
@@ -2573,7 +2574,7 @@ def edit_team(request, team_id):
         form = TeamForm(request.POST, instance=team)
         if form.is_valid():
             form.save()
-            return redirect("department_list")
+            return redirect("admin_team_list")
     else:
         form = TeamForm(instance=team)
     return render(request, "admin/edit_team.html", {"form": form})
@@ -2667,7 +2668,7 @@ def create_event_participant(request):
     return render(request, "admin/create_event_participant.html", {"form": form})
 
 @user_passes_test(is_admin)
-def event_participant_edit(request, event_participant_id):
+def edit_event_participant(request, event_participant_id):
     # Validate that the admin belongs to the current tenant
     if request.user.tenant != request.tenant:
         return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
@@ -2685,7 +2686,7 @@ def event_participant_edit(request, event_participant_id):
     return render(request, "admin/edit_event_participant.html", {"form": form})
 
 @user_passes_test(is_admin)
-def event_participant_delete(request, event_participant_id):
+def delete_event_participant(request, event_participant_id):
     # Validate that the admin belongs to the current tenant
     if request.user.tenant != request.tenant:
         return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
@@ -2788,7 +2789,7 @@ def edit_notification(request, notification_id):
     if request.user.tenant != request.tenant:
         return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
     
-    notification = get_object_or_404(Notification, notification_id=notification_id, tenant=request.tenant)
+    notification = get_object_or_404(Notification, id=notification_id, tenant=request.tenant)
 
     if request.method == "POST":
         form = NotificationForm(request.POST, instance=notification)
@@ -2806,7 +2807,7 @@ def delete_notification(request, notification_id):
         return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
 
     # Get the event, ensuring it belongs to the same tenant
-    notification = get_object_or_404(Notification, notification_id=notification_id, tenant=request.tenant)
+    notification = get_object_or_404(Notification, id=notification_id, tenant=request.tenant)
     notification.delete()
     return redirect("admin_notification_list")
 
@@ -2845,7 +2846,7 @@ def edit_user_notification(request, user_notification_id):
     if request.user.tenant != request.tenant:
         return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
     
-    user_notification = get_object_or_404(UserNotification, user_notification_id=user_notification_id, tenant=request.tenant)
+    user_notification = get_object_or_404(UserNotification, id=user_notification_id, tenant=request.tenant)
 
     if request.method == "POST":
         form = UserNotificationForm(request.POST, instance=user_notification)
@@ -2863,6 +2864,6 @@ def delete_user_notification(request, user_notification_id):
         return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
 
     # Get the event, ensuring it belongs to the same tenant
-    user_notification = get_object_or_404(UserNotification, user_notification_id=user_notification_id, tenant=request.tenant)
+    user_notification = get_object_or_404(UserNotification, id=user_notification_id, tenant=request.tenant)
     user_notification.delete()
     return redirect("user_notification_list")

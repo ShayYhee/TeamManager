@@ -18,6 +18,7 @@ def sync_user_to_profile_department(sender, instance, created, **kwargs):
         if instance.department:
             StaffProfile.objects.create(
                 user=instance,
+                tenant=instance.tenant,
                 department=instance.department,
                 first_name=instance.first_name,
                 last_name=instance.last_name

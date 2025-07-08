@@ -1,161 +1,158 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
+{% load static %}
+
 {% block title %}Apply For Tenant - Team Manager{% endblock %}
+
 {% block content %}
-<div class="register-page">
-    <div class="register card shadow-sm">
-        <div class="card-body text-center">
-            <i class="fas fa-user-plus fa-3x mb-3 text-primary" aria-hidden="true"></i>
-            <h4 class="card-title">Apply for Team Manager Tenant</h4>
-            {% if form.errors %}
-                <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                    <strong>Application Failed:</strong> Please correct the errors below.
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
-            {% endif %}
-            <form method="POST" aria-label="Registration Form">
-                {% csrf_token %}
-                {% for field in form %}
-                    <div class="mb-3 text-start">
-                        <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
-                        <input type="{{ field.field.widget.input_type }}"
-                               name="{{ field.name }}"
-                               id="{{ field.id_for_label }}"
-                               class="form-control"
-                               value="{{ field.value|default:'' }}"
-                               {% if field.field.required %}required{% endif %}
-                               {% if field.errors %}aria-invalid="true"{% endif %}>
-                        {% if field.errors %}
-                            <div class="invalid-feedback d-block">
-                                {{ field.errors|join:", " }}
+<div class="container-fluid py-4">
+    <div class="row justify-content-center">
+        <div class="col-12 col-md-8 col-lg-6">
+            <div class="card shadow-sm border-0" style="border-radius: 12px; background: #ffffff;">
+                <div class="card-body p-4 text-center">
+                    <i class="fas fa-user-plus fa-3x mb-3" style="color: #319795;" aria-hidden="true"></i>
+                    <h4 class="card-title mb-4" style="font-weight: 600; color: #2d3748;">Apply for Team Manager Tenant</h4>
+                    {% if form.errors %}
+                        <div class="alert alert-danger alert-dismissible fade show" role="alert" style="border-radius: 8px;">
+                            <strong>Application Failed:</strong> Please correct the errors below.
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    {% endif %}
+                    <form method="POST" aria-label="Tenant Application Form">
+                        {% csrf_token %}
+                        {% for field in form %}
+                            <div class="mb-3 text-start">
+                                <label for="{{ field.id_for_label }}" class="form-label" style="color: #2d3748; font-weight: 500;">
+                                    {{ field.label }}
+                                    {% if field.field.required %}
+                                        <span class="text-danger" aria-hidden="true">*</span>
+                                    {% endif %}
+                                </label>
+                                {% if field.field.widget.input_type == 'select' %}
+                                    <select name="{{ field.name }}" id="{{ field.id_for_label }}" class="form-select" {% if field.field.required %}required{% endif %} {% if field.errors %}aria-invalid="true"{% endif %}>
+                                        {% for value, label in field.field.choices %}
+                                            <option value="{{ value }}" {% if value == field.value %}selected{% endif %}>{{ label }}</option>
+                                        {% endfor %}
+                                    </select>
+                                {% else %}
+                                    <input type="{{ field.field.widget.input_type }}"
+                                           name="{{ field.name }}"
+                                           id="{{ field.id_for_label }}"
+                                           class="form-control"
+                                           value="{{ field.value|default:'' }}"
+                                           {% if field.field.required %}required{% endif %}
+                                           {% if field.errors %}aria-invalid="true"{% endif %}>
+                                {% endif %}
+                                {% if field.errors %}
+                                    <div class="invalid-feedback d-block" style="font-size: 0.85rem; color: #e53e3e;">
+                                        {{ field.errors|join:", " }}
+                                    </div>
+                                {% endif %}
                             </div>
-                        {% endif %}
-                    </div>
-                {% endfor %}
-                <button type="submit" class="btn btn-primary w-100 mb-3">Apply</button>
-                <p class="card-text text-muted">
-                    Already applied? <a href="{% url 'application_status' form.username.value %}" class="text-primary fw-medium">Check Status</a>
-                </p>
-                <div class="mt-2">
-                    <a href="{% url 'tenant_home' %}" class="btn btn-outline-secondary">Back to Home</a>
+                        {% endfor %}
+                        <button type="submit" class="btn btn-primary w-100 mb-3" style="border-radius: 8px; padding: 10px; font-weight: 500;">
+                            <i class="fas fa-paper-plane me-2"></i>Apply
+                        </button>
+                        <p class="text-muted mb-3">
+                            Already applied?
+                            <a href="{% url 'check_status' %}" class="text-primary fw-medium" style="text-decoration: none;">Check Status</a>
+                        </p>
+                        <div>
+                            <a href="{% url 'tenant_home' %}" class="btn btn-outline-secondary" style="border-radius: 8px; padding: 8px 16px;">
+                                <i class="fas fa-arrow-left me-2"></i>Back to Home
+                            </a>
+                        </div>
+                    </form>
                 </div>
-            </form>
+            </div>
         </div>
     </div>
 </div>
 
-<style scoped>
-    .register-page {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        min-height: calc(100vh - 100px); /* Match base.html's main-content height */
-        padding: 20px;
-        background: transparent; /* Inherit base.html's gradient */
+<style>
+    body.dark-mode .card {
+        background: #2d3748 !important;
+        color: #e2e8f0;
     }
-
-    .register {
-        width: 100%;
-        max-width: 500px; /* Slightly wider than login for more fields */
-        background: #ffffff;
-        border: none;
-        border-radius: 12px; /* Match base.html's rounded corners */
-        padding: 30px;
-        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    body.dark-mode .form-label {
+        color: #e2e8f0;
     }
-
-    .register:hover {
-        transform: translateY(-5px); /* Subtle lift effect */
-        box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1); /* Enhanced shadow on hover */
+    body.dark-mode .form-control,
+    body.dark-mode .form-select {
+        background: #3b4a6b;
+        color: #e2e8f0;
+        border-color: #4a5568;
     }
-
-    .register .card-title {
-        font-weight: 600;
-        color: #2d3748; /* Match base.html's text color */
-        margin-bottom: 15px;
-    }
-
-    .register .card-text {
-        font-size: 0.95rem;
-        line-height: 1.5;
-    }
-
-    .register .text-primary {
-        color: #319795 !important; /* Match base.html's primary color */
-        transition: color 0.2s ease;
-    }
-
-    .register .text-primary:hover {
-        color: #2c7a7b !important; /* Match base.html's btn-primary hover */
-    }
-
-    .register .btn-primary {
-        background-color: #319795;
-        border-color: #319795;
-        border-radius: 8px; /* Match base.html's button style */
-        padding: 10px;
-        font-weight: 500;
-        transition: background-color 0.2s ease;
-    }
-
-    .register .btn-primary:hover {
-        background-color: #2c7a7b;
-        border-color: #2c7a7b;
-    }
-
-    .register .btn-outline-secondary {
-        border-color: #e2e8f0;
-        color: #2d3748;
-        border-radius: 8px;
-        padding: 8px 20px;
-    }
-
-    .register .btn-outline-secondary:hover {
-        background-color: #e2e8f0;
-        color: #2d3748;
-    }
-
-    .register .form-control {
-        border-radius: 8px;
-        border: 1px solid #e2e8f0; /* Match base.html's border color */
-        padding: 10px;
-        font-size: 0.95rem;
-    }
-
-    .register .form-control:focus {
+    body.dark-mode .form-control:focus,
+    body.dark-mode .form-select:focus {
+        background: #3b4a6b;
+        color: #e2e8f0;
         border-color: #319795;
         box-shadow: 0 0 0 0.2rem rgba(49, 151, 149, 0.25);
     }
-
-    .register .form-control[aria-invalid="true"] {
-        border-color: #dc3545;
+    body.dark-mode .text-muted {
+        color: #a0aec0 !important;
     }
-
-    .register .invalid-feedback {
-        font-size: 0.85rem;
-        color: #dc3545;
+    body.dark-mode .text-primary {
+        color: #81e6d9 !important;
     }
-
-    /* Focus styles for accessibility */
-    .register a:focus, .register button:focus, .register input:focus {
-        outline: 2px solid #319795;
-        outline-offset: 2px;
-        border-radius: 4px;
+    .form-control, .form-select {
+        border-radius: 8px;
+        font-size: 0.95rem;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
     }
-
-    /* Responsive adjustments */
-    @media (max-width: 576px) {
-        .register {
-            padding: 20px;
-            max-width: 90%;
-        }
-
-        .register .card-title {
-            font-size: 1.25rem; /* Smaller heading on mobile */
-        }
-
-        .register .fa-user-plus {
-            font-size: 2rem; /* Smaller icon on mobile */
-        }
+    .form-control:focus, .form-select:focus {
+        border-color: #319795;
+        box-shadow: 0 0 0 0.2rem rgba(49, 151, 149, 0.25);
+    }
+    .btn-primary {
+        background-color: #319795;
+        border-color: #319795;
+        transition: background-color 0.2s ease;
+    }
+    .btn-primary:hover {
+        background-color: #2c7a7b;
+        border-color: #2c7a7b;
+    }
+    .btn-outline-primary {
+        border-color: #319795;
+        color: #319795;
+        transition: background-color 0.2s ease, color 0.2s ease;
+    }
+    .btn-outline-primary:hover {
+        background-color: #319795;
+        color: #ffffff;
+    }
+    .btn-outline-secondary {
+        border-color: #e2e8f0;
+        color: #2d3748;
+        transition: background-color 0.2s ease, color 0.2s ease;
+    }
+    body.dark-mode .btn-outline-secondary {
+        border-color: #4a5568;
+        color: #e2e8f0;
+    }
+    .btn-outline-secondary:hover {
+        background-color: #e2e8f0;
+        color: #2d3748;
+    }
+    body.dark-mode .btn-outline-secondary:hover {
+        background-color: #4a5568;
+        color: #e2e8f0;
     }
 </style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const inputs = document.querySelectorAll('.form-control, .form-select, .btn-primary, .btn-outline-secondary');
+        inputs.forEach(input => {
+            input.addEventListener('focus', function() {
+                this.style.outline = '2px solid #319795';
+                this.style.outlineOffset = '2px';
+            });
+            input.addEventListener('blur', function() {
+                this.style.outline = 'none';
+            });
+        });
+    });
+</script>
 {% endblock %}

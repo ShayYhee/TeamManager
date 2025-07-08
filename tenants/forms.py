@@ -41,3 +41,18 @@ class TenantApplicationForm(forms.ModelForm):
         if password and confirm_password and password != confirm_password:
             raise forms.ValidationError("Passwords do not match.")
         return cleaned_data
+    
+
+class TenantForm(forms.ModelForm):
+    class Meta:
+        model = Tenant
+        fields = ['name', 'slug', 'admin']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            
+            'admin': forms.Select(attrs={'class': 'form-control'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['admin'].queryset = CustomUser.objects.filter(roles__name='Admin')

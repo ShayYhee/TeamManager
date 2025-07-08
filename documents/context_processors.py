@@ -1,4 +1,4 @@
-from django.utils.timezone import now
+from django.utils.timezone import now, timedelta
 from .models import StaffProfile, Notification, UserNotification, CustomUser
 import logging
 
@@ -77,6 +77,7 @@ def notification_bar(request):
                 tenant=request.user.tenant,
                 type=Notification.NotificationType.BIRTHDAY,
                 title=f"Happy Birthday {user_profile.first_name}!",
+                expire_at=now() + timedelta(days=1),
                 defaults={
                     'message': f"Happy birthday, {user_profile.first_name}!!! Have a great year ahead! 🎉🎉🎉",
                     'created_at': now(),
@@ -96,6 +97,7 @@ def notification_bar(request):
                 tenant=request.user.tenant,
                 type=Notification.NotificationType.BIRTHDAY,
                 title="Today's Birthdays",
+                expire_at=now() + timedelta(days=1),
                 defaults={
                     'message': f"It's {celebrant_names}'s birthday today! Wish them a happy birthday!",
                     'created_at': now(),

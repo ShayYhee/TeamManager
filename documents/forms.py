@@ -1,5 +1,6 @@
 from django import forms
 from django.forms import modelformset_factory
+from django.core.exceptions import ValidationError
 from .models import Document, User, CustomUser, Folder, File, Task, StaffProfile, StaffDocument, Department, Team, PublicFolder, PublicFile, Role, Event, EventParticipant, Notification, UserNotification
 from tenants.models import Tenant
 from ckeditor.widgets import CKEditorWidget
@@ -324,19 +325,44 @@ class DepartmentForm(forms.ModelForm):
         model = Department
         fields = ['name', 'hod']
         widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
             'hod': forms.Select(attrs={'class': 'form-control'}),
         }
 
     def __init__(self, *args, **kwargs):
-            user = kwargs.pop('user', None)
-            super().__init__(*args, **kwargs)
+        # Extract user from kwargs, default to None if not provided
+        user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
 
-            if user:
-                tenant = getattr(user, 'tenant', None)
-                if tenant:
-                    self.fields['hod'].queryset = CustomUser.objects.filter(tenant=tenant)
-                else:
-                    self.fields['hod'].queryset = CustomUser.objects.none()
+        # Initialize hod queryset to empty by default
+        self.fields['hod'].queryset = CustomUser.objects.none()
+
+        if user and hasattr(user, 'tenant') and user.tenant:
+            # Filter users by tenant and HOD role
+            try:
+                self.fields['hod'].queryset = CustomUser.objects.filter(
+                    tenant=user.tenant
+                ).order_by('username')
+            except CustomUser.DoesNotExist:
+                self.fields['hod'].queryset = CustomUser.objects.none()
+
+    def clean_hod(self):
+        hod = self.cleaned_data.get('hod')
+        # If form is bound to an instance, use its tenant; otherwise, rely on user context
+        tenant = getattr(self.instance, 'tenant', None) or (self.initial.get('user') and getattr(self.initial.get('user'), 'tenant', None))
+
+        if hod and tenant:
+            # Verify the selected HOD belongs to the tenant and has the HOD role
+            if not CustomUser.objects.filter(
+                tenant=tenant,
+            ).exists():
+                raise ValidationError("The selected user is not a valid Head of Department for this tenant.")
+        return hod
+
+    def clean(self):
+        cleaned_data = super().clean()
+        # Additional cross-field validation can be added here if needed
+        return cleaned_data
 
 class TeamForm(forms.ModelForm):
     class Meta:

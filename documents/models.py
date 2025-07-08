@@ -177,7 +177,9 @@ class Department(models.Model):
 
     def save(self, *args, **kwargs):
         if self.hod and not self.hod.is_hod():
-            raise ValueError("HOD must have the 'HOD' role.")
+            # raise ValueError("HOD must have the 'HOD' role.")
+            self.hod.roles.add(Role.objects.get(name='HOD'))
+            self.hod.save()
         super().save(*args, **kwargs)
 
     def __str__(self):
@@ -283,6 +285,11 @@ class Notification(models.Model):
 
     def __str__(self):
         return f"{self.get_type_display()}: {self.title}"
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.expires_at and self.expires_at < timezone.now():
+            self.is_active = False
     
 
 class UserNotification(models.Model):
