@@ -436,14 +436,16 @@
                 <span class="d-none d-md-inline"> </span>
             {% endif %}
             <a class="navbar-brand ms-3" href="/">
-                {% if user.is_authenticated and tenant.company_profile %}
-                    {% if tenant.company_profile.photo %}
-                        <img src="{{ tenant.company_profile.photo.url }}" alt="{{ tenant.company_profile.company_name }} Logo" class="company-logo me-2" style="max-height: 40px;">
+                {% if user.is_authenticated and request.tenant.company_profile %}
+                    {% if request.tenant.company_profile.photo %}
+                        <img src="{{ request.tenant.company_profile.photo.url }}" alt="{{ request.tenant.company_profile.company_name }} Logo" class="company-logo me-2" style="max-height: 40px;">
+                    {% else %}
+                        <img src="{% static 'teammanager_logo.png' %}" alt="Team Manager Logo" class="company-logo me-2" style="max-height: 40px; object-fit: contain; background: rgba(255, 255, 255, 0.95); padding: 8px;">
                     {% endif %}
-                    <span style="color: #319795;"><strong>{{ tenant.company_profile.company_name|default:"Team Manager" }}</strong></span>
+                    <span style="color: #319795;"><strong>{{ request.tenant.company_profile.company_name|default:"Team Manager" }}</strong></span>
                 {% else %}
                     <i class="fas fa-briefcase me-2" style="color: #319795;"></i>
-                    <span style="color: #319795;"><strong>{{ tenant.name|default:"Team Manager" }}</strong></span>
+                    <span style="color: #319795;"><strong>{{ request.tenant.name|default:"Team Manager" }}</strong></span>
                 {% endif %}
             </a>
             <div class="d-flex align-items-center gap-4">

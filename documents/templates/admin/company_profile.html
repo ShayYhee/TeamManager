@@ -22,7 +22,7 @@
                             {% if tenant_profile.photo %}
                                 <img src="{{ tenant_profile.photo.url }}" alt="{{ tenant_profile.company_name }} Logo" class="img-fluid rounded-circle mb-3" style="max-width: 150px;">
                             {% else %}
-                                <img src="{% static 'images/default-logo.png' %}" alt="Default Logo" class="img-fluid rounded-circle mb-3" style="max-width: 150px;">
+                                <img src="{% static 'teammanager_logo.png' %}" alt="Default Logo" class="img-fluid rounded-circle mb-3" style="max-width: 150px;">
                             {% endif %}
                             <h3>{{ tenant_profile.company_name|default:"Your Company" }}</h3>
                         </div>
