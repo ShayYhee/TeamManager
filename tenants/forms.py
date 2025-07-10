@@ -49,7 +49,7 @@ class TenantForm(forms.ModelForm):
         fields = ['name', 'slug', 'admin']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
-            
+            'slug': forms.TextInput(attrs={'class': 'form-control'}),
             'admin': forms.Select(attrs={'class': 'form-control'}),
         }
 

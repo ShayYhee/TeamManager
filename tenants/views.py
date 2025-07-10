@@ -20,40 +20,74 @@ def apply_for_tenant(request):
     if request.method == 'POST':
         form = TenantApplicationForm(request.POST)
         if form.is_valid():
-            application = form.save()
-            # Generate status URL
-            status_url = request.build_absolute_uri(
-                redirect('application_status', identifier=str(application.id)).url
-            )
-            # Send email
-            superadmin = CustomUser.objects.get(is_superuser=True)
-            email = superadmin.smtp_email
-            password = superadmin.smtp_password
-            connection = get_connection(
-                backend="django.core.mail.backends.smtp.EmailBackend",
-                host="smtp.zoho.com",
-                port=587,
-                username=email,
-                password=password,
-                use_tls=True,
-            )
+            application = form.save(commit=False)
+            application.status = 'approved'
+            application.save()
+            
             try:
-                send_mail(
-                    subject='Your Tenant Application Status',
-                    message=(
-                        f"Thank you for applying to Team Manager!\n\n"
-                        f"Check your application status here: {status_url}\n\n"
-                        f"Keep this link safe, as you'll need it to track your application."
-                    ),
-                    connection=connection,
-                    recipient_list=[form.cleaned_data['email']],
-                    fail_silently=False,
+                # tenant_admin = CustomUser.objects.get(username=application.username)
+                tenant = Tenant.objects.create(
+                    name=application.organization_name,
+                    slug=application.slug
                 )
-                messages.success(request, "Application submitted successfully! A status link has been sent to your email.")
+                tenant.save()
+                user = CustomUser.objects.create_user(
+                        username=application.username,
+                        email=application.email,
+                        password=application.password,
+                        tenant=tenant
+                )
+                user.save()
+                logger.info(f"Created tenant: {tenant.slug}")
+                admin_role, _ = Role.objects.get_or_create(name='Admin')
+                logger.info(f"Tenant application created: {application.organization_name} by {application.username}")
+                user.roles.add(admin_role)
+                user.set_password = application.password
+                user.is_active = True
+                user.is_staff = True
+                user.save()
+                tenant.admin = user
+                tenant.save()
+                application.status = 'approved'
+                application.save()
+                logger.debug(f"Assigned Admin role to user {tenant.admin.username} for tenant {tenant.slug}")
+                return redirect('login')
             except Exception as e:
-                logger.error(f"Failed to send email: {e}")
-                messages.warning(request, "Application submitted, but we couldn't send the status link email. Please check your status manually.")
-            return redirect('application_status', identifier=str(application.id))
+                logger.error(f"Error creating tenant for application {application.organization_name}: {str(e)}")
+                return HttpResponseForbidden(f"Error creating tenant: {str(e)}")
+            # Generate status URL
+            # status_url = request.build_absolute_uri(
+            #     redirect('application_status', identifier=str(application.id)).url
+            # )
+            # # Send email
+            # superadmin = CustomUser.objects.get(is_superuser=True)
+            # email = superadmin.smtp_email
+            # password = superadmin.smtp_password
+            # connection = get_connection(
+            #     backend="django.core.mail.backends.smtp.EmailBackend",
+            #     host="smtp.zoho.com",
+            #     port=587,
+            #     username=email,
+            #     password=password,
+            #     use_tls=True,
+            # )
+            # try:
+            #     send_mail(
+            #         subject='Your Tenant Application Status',
+            #         message=(
+            #             f"Thank you for applying to Team Manager!\n\n"
+            #             f"Check your application status here: {status_url}\n\n"
+            #             f"Keep this link safe, as you'll need it to track your application."
+            #         ),
+            #         connection=connection,
+            #         recipient_list=[form.cleaned_data['email']],
+            #         fail_silently=False,
+            #     )
+            #     messages.success(request, "Application submitted successfully! A status link has been sent to your email.")
+            # except Exception as e:
+            #     logger.error(f"Failed to send email: {e}")
+            #     messages.warning(request, "Application submitted, but we couldn't send the status link email. Please check your status manually.")
+            # return redirect('application_status', identifier=str(application.id))
         else:
             logger.error(f"Tenant application form validation failed: {form.errors}")
             messages.error(request, "Application submission failed. Please correct the errors below.")
@@ -178,4 +212,12 @@ def edit_tenant(request, tenant_id):
 def delete_tenant(request, tenant_id):
     tenant = get_object_or_404(Tenant, id=tenant_id)
     tenant.delete()
+    return redirect('tenant_list')
+
+@login_required
+@user_passes_test(lambda u: u.is_superuser)
+def verify_tenant(request, tenant_id):
+    tenant = get_object_or_404(Tenant, id=tenant_id)
+    tenant.is_verified = True
+    tenant.save()
     return redirect('tenant_list')

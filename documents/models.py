@@ -391,3 +391,22 @@ class PublicFile(models.Model):
 
     def __str__(self):
         return self.original_name
+    
+
+class CompanyProfile(models.Model):
+    photo = models.ImageField(upload_to='tenant_profile/', null=True, blank=True)
+    tenant = models.OneToOneField(Tenant, on_delete=models.CASCADE, related_name="company_profile")
+    company_name = models.CharField(max_length=255)
+    description = models.TextField(blank=True, null=True)
+    date_founded = models.DateField(null=True, blank=True)
+    reg_number = models.CharField(max_length=255, null=True, blank=True)
+    address = models.TextField(blank=True, null=True)
+    email = models.EmailField(null=True, blank=True)
+    contact_details = models.TextField(null=True, blank=True)
+    website = models.URLField(null=True, blank=True)
+    num_staff = models.IntegerField(null=True, blank=True)
+    num_departments = models.IntegerField(null=True, blank=True)
+    num_teams = models.IntegerField(null=True, blank=True)
+
+    def __str__(self):
+        return self.tenant.name

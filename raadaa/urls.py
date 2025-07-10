@@ -17,7 +17,7 @@ from documents.views import admin_folder_list, admin_folder_details, admin_file_
 from documents.views import delete_department, edit_department, create_department, admin_team_list, create_team, delete_team, edit_team
 from documents.views import staff_profile_list, create_staff_profile, delete_staff_profile, edit_staff_profile, event_list, create_event, edit_event, delete_event
 from documents.views import event_participant_list, create_event_participant, edit_event_participant, delete_event_participant
-from documents.views import admin_notification_list, create_notification, edit_notification, delete_notification
+from documents.views import admin_notification_list, create_notification, edit_notification, delete_notification, edit_company_profile, view_company_profile
 from documents.views import user_notification_list, create_user_notification, edit_user_notification, delete_user_notification
 from documents.views import EventViewSet
 from django.http import HttpResponse
@@ -131,6 +131,9 @@ urlpatterns = [
     path('admins/user-notifications/create/', create_user_notification, name='create_user_notification'),
     path('admins/user-notifications/edit/<int:user_notification_id>/', edit_user_notification, name='edit_user_notification'),
     path('admins/user-notifications/delete/<int:user_notification_id>/', delete_user_notification, name='delete_user_notification'),
+    # Company Profile URLs
+    path('admins/company-profile/', edit_company_profile, name='edit_company_profile'),
+    path('company-profile/', view_company_profile, name='view_company_profile'),
 
     path('.well-known/<path:path>', handle_well_known),  # Handle .well-known requests
 ]

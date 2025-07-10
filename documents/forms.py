@@ -1,6 +1,6 @@
 from django import forms
 from django.forms import modelformset_factory
-from .models import Document, User, CustomUser, Folder, File, Task, StaffProfile, StaffDocument, Department, Team, PublicFolder, PublicFile, Role, Event, EventParticipant, Notification, UserNotification
+from .models import Document, User, CustomUser, Folder, File, Task, StaffProfile, StaffDocument, Department, Team, PublicFolder, PublicFile, Role, Event, EventParticipant, Notification, UserNotification, CompanyProfile
 from tenants.models import Tenant
 from ckeditor.widgets import CKEditorWidget
 from ckeditor_uploader.widgets import CKEditorUploadingWidget
@@ -424,3 +424,15 @@ class UserNotificationForm(forms.ModelForm):
             else:
                 self.fields['user'].queryset = CustomUser.objects.none()
                 self.fields['notification'].queryset = Notification.objects.none()
+
+class CompanyProfileForm(forms.ModelForm):
+    class Meta:
+        model = CompanyProfile
+        fields = ['photo', 'company_name',  'description', 'date_founded', 'reg_number', 
+                  'address', 'email', 'contact_details', 'website', 
+                  'num_staff', 'num_departments', 'num_teams']
+        widgets = {
+            'description' : forms.TextInput(attrs={'rows': 5, 'class': 'form-control'}),
+            'date_founded': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+            'contact_details': forms.TextInput(attrs={'rows': 4, 'class': 'form-control'})
+        }

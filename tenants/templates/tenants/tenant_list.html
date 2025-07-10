@@ -18,6 +18,7 @@
                             <th scope="col">Name</th>
                             <th scope="col">Slug</th>
                             <th scope="col">Admin</th>
+                            <th scope="col">Verified</th>
                             <th scope="col">Created By</th>
                             <th scope="col">Created At</th>
                             <th scope="col">Actions</th>
@@ -29,6 +30,19 @@
                             <td>{{ tenant.name }}</td>
                             <td>{{ tenant.slug }}</td>
                             <td>{{ tenant.admin }}</td>
+                            <td>
+                                {% if tenant.is_verified %}
+                                    <i class="fas fa-check-circle text-success" aria-hidden="true" title="Active"></i>
+                                {% else %}
+                                    <form action="{% url 'verify_tenant' tenant.id %}" method="POST" class="d-inline">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-primary btn-sm" title="Activate User" id="activate-{{ user.id }}">
+                                            <i class="fas fa-check me-1"></i> Verify
+                                            <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                                        </button>
+                                    </form>
+                                {% endif %}
+                            </td>
                             <td>{{ tenant.created_by }}</td>
                             <td>{{ tenant.created_at|date:"M d, Y H:i" }}</td>
                             <td>

@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}Home - Team Manager{% endblock %}
+{% block title %}Home - {{ tenant.company_profile.company_name|default:"Team Manager" }}{% endblock %}
 
 {% block content %}
 <!-- Hero Section -->
@@ -12,18 +12,36 @@
             <div class="calendar-month-year"></div>
         </div>
         <div class="hero-content animate__animated animate__fadeInUp">
-            <h1 class="display-4 fw-bold">Streamline Your Workplace</h1>
-            <p class="lead mb-4">Automate, manage, and collaborate on documents and tasks with ease.</p>
-            <div class="cta-buttons">
-                {% if user.is_authenticated %}
-                    <a href="{% url 'folder_list' %}" class="btn btn-primary btn-lg me-2">Go to Folders</a>
-                    <a href="{% url 'create_document' %}" class="btn btn-outline-light btn-lg">Create Document</a>
-                {% else %}
-                    <a href="{% url 'login' %}" class="btn btn-primary btn-lg me-2">Login</a>
-                    <a href="{% url 'register' %}" class="btn btn-outline-light btn-lg">Sign Up</a></br>
-                    <span>Sign Up for Company? <a href="{% url 'tenant_home' %}" class="btn btn-outline-light btn-lg">Apply for Tenant</a>
-                {% endif %}
-            </div>
+            {% if user.is_authenticated and tenant.company_profile %}
+                <div class="company-profile text-center">
+                    {% if tenant.company_profile.photo %}
+                        <div class="company-logo-container mb-3">
+                            <img src="{{ tenant.company_profile.photo.url }}" alt="{{ tenant.company_profile.company_name }} Logo" class="company-logo rounded-circle shadow-sm" style="max-width: 100px; max-height: 100px; object-fit: contain; background: rgba(255, 255, 255, 0.95); padding: 8px;">
+                        </div>
+                    {% endif %}
+                    <h1 class="display-4 fw-bold">{{ tenant.company_profile.company_name }}</h1>
+                    {% if tenant.company_profile.description %}
+                        <p class="lead mb-4 mx-auto" style="max-width: 600px;">{{ tenant.company_profile.description|truncatewords:20 }}</p>
+                    {% endif %}
+                    <div class="cta-buttons">
+                        <a href="{% url 'folder_list' %}" class="btn btn-primary btn-lg me-2">Go to Folders</a>
+                        <a href="{% url 'create_document' %}" class="btn btn-outline-light btn-lg">Create Document</a>
+                    </div>
+                </div>
+            {% else %}
+                <h1 class="display-4 fw-bold">Streamline Your Workplace</h1>
+                <p class="lead mb-4 mx-auto" style="max-width: 600px;">Automate, manage, and collaborate on documents and tasks with ease.</p>
+                <div class="cta-buttons">
+                    {% if user.is_authenticated %}
+                        <a href="{% url 'folder_list' %}" class="btn btn-primary btn-lg me-2">Go to Folders</a>
+                        <a href="{% url 'create_document' %}" class="btn btn-outline-light btn-lg">Create Document</a>
+                    {% else %}
+                        <a href="{% url 'login' %}" class="btn btn-primary btn-lg me-2">Login</a>
+                        <a href="{% url 'register' %}" class="btn btn-outline-light btn-lg">Sign Up</a><br>
+                        <span>Sign Up for Company? <a href="{% url 'tenant_home' %}" class="btn btn-outline-light btn-lg">Apply for Tenant</a></span>
+                    {% endif %}
+                </div>
+            {% endif %}
         </div>
     </div>
     <div class="wave-pattern"></div>
@@ -136,6 +154,15 @@
     .hero-content .lead {
         font-size: 1.2rem;
         font-weight: 400;
+    }
+    .company-logo-container {
+        display: inline-block;
+    }
+    .company-logo {
+        transition: transform 0.3s ease;
+    }
+    .company-logo:hover {
+        transform: scale(1.05);
     }
     .cta-buttons .btn-primary {
         background-color: #319795;
@@ -284,6 +311,10 @@
         .quick-links-section h2,
         .features-section h2 {
             font-size: 1.5rem;
+        }
+        .company-logo {
+            max-width: 80px;
+            max-height: 80px;
         }
     }
 </style>

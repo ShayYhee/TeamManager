@@ -1,0 +1,72 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Company Profile - {{ tenant_profile.company_name|default:"Team Manager" }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <!-- Main Content -->
+        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+            <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+                <h1 class="h2">Company Profile</h1>
+                {% if user.is_staff %}
+                    <a href="{% url 'edit_company_profile' %}" class="btn btn-primary">Edit Profile</a>
+                {% endif %}
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4 text-center">
+                            {% if tenant_profile.photo %}
+                                <img src="{{ tenant_profile.photo.url }}" alt="{{ tenant_profile.company_name }} Logo" class="img-fluid rounded-circle mb-3" style="max-width: 150px;">
+                            {% else %}
+                                <img src="{% static 'images/default-logo.png' %}" alt="Default Logo" class="img-fluid rounded-circle mb-3" style="max-width: 150px;">
+                            {% endif %}
+                            <h3>{{ tenant_profile.company_name|default:"Your Company" }}</h3>
+                        </div>
+                        <div class="col-md-8">
+                            {% if tenant_profile.description %}
+                                <p>{{ tenant_profile.description|linebreaksbr }}</p>
+                            {% else %}
+                                <p>No description provided.</p>
+                            {% endif %}
+                            <hr>
+                            <ul class="list-unstyled">
+                                {% if tenant_profile.date_founded %}
+                                    <li><strong>Founded:</strong> {{ tenant_profile.date_founded|date:"F Y" }}</li>
+                                {% endif %}
+                                {% if tenant_profile.reg_number %}
+                                    <li><strong>Registration Number:</strong> {{ tenant_profile.reg_number }}</li>
+                                {% endif %}
+                                {% if tenant_profile.address %}
+                                    <li><strong>Address:</strong> {{ tenant_profile.address }}</li>
+                                {% endif %}
+                                {% if tenant_profile.email %}
+                                    <li><strong>Email:</strong> <a href="mailto:{{ tenant_profile.email }}">{{ tenant_profile.email }}</a></li>
+                                {% endif %}
+                                {% if tenant_profile.contact_details %}
+                                    <li><strong>Contact Details:</strong> {{ tenant_profile.contact_details }}</li>
+                                {% endif %}
+                                {% if tenant_profile.website %}
+                                    <li><strong>Website:</strong> <a href="{{ tenant_profile.website }}" target="_blank">{{ tenant_profile.website }}</a></li>
+                                {% endif %}
+                                {% if tenant_profile.num_staff %}
+                                    <li><strong>Staff:</strong> {{ tenant_profile.num_staff }} employees</li>
+                                {% endif %}
+                                {% if tenant_profile.num_departments %}
+                                    <li><strong>Departments:</strong> {{ tenant_profile.num_departments }}</li>
+                                {% endif %}
+                                {% if tenant_profile.num_teams %}
+                                    <li><strong>Teams:</strong> {{ tenant_profile.num_teams }}</li>
+                                {% endif %}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+{% endblock %}

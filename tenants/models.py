@@ -40,6 +40,7 @@ class Tenant(models.Model):
         blank=True,
         related_name='admin_tenants'
     )
+    is_verified = models.BooleanField(default=False)
 
     def __str__(self):
         return self.name

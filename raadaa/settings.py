@@ -61,8 +61,13 @@ CSRF_TRUSTED_ORIGINS = (
 )
 
 # Temporarily disable CSRF_COOKIE_SECURE for HTTP testing
-CSRF_COOKIE_SECURE = os.getenv('CSRF_COOKIE_SECURE', 'True')
-SESSION_COOKIE_SECURE = os.getenv('SESSION_COOKIE_SECURE', 'True')
+CSRF_COOKIE_SECURE = os.getenv('CSRF_COOKIE_SECURE', 'False') == 'True'
+SESSION_COOKIE_SECURE = os.getenv('SESSION_COOKIE_SECURE', 'False') == 'True'
+SECURE_SSL_REDIRECT = os.getenv('SECURE_SSL_REDIRECT', 'False') == 'True'  # Redirect HTTP to HTTPS
+# CSRF_COOKIE_SECURE = False
+# SESSION_COOKIE_SECURE = False
+# SECURE_SSL_REDIRECT = False
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -280,6 +285,3 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-
-# SECURE_SSL_REDIRECT = True  # Redirect HTTP to HTTPS
-SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")

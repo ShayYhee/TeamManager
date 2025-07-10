@@ -21,8 +21,8 @@ from django.utils import timezone
 from django.utils.timezone import now
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
-from .forms import DocumentForm, SignUpForm, CreateDocumentForm, FileUploadForm, FolderForm, TaskForm, ReassignTaskForm, StaffProfileForm, StaffDocumentForm, EmailConfigForm, UserForm, PublicFolderForm, PublicFileForm, DepartmentForm, TeamForm, EventForm, EventParticipantForm, NotificationForm, UserNotificationForm
-from .models import Document, CustomUser, Role, File, Folder, Task, StaffProfile, Notification, UserNotification, StaffDocument, Event, EventParticipant, Department, Team, PublicFile, PublicFolder
+from .forms import DocumentForm, SignUpForm, CreateDocumentForm, FileUploadForm, FolderForm, TaskForm, ReassignTaskForm, StaffProfileForm, StaffDocumentForm, EmailConfigForm, UserForm, PublicFolderForm, PublicFileForm, DepartmentForm, TeamForm, EventForm, EventParticipantForm, NotificationForm, UserNotificationForm, CompanyProfileForm
+from .models import Document, CustomUser, Role, File, Folder, Task, StaffProfile, Notification, UserNotification, StaffDocument, Event, EventParticipant, Department, Team, PublicFile, PublicFolder, CompanyProfile
 from raadaa.settings import ALLOWED_HOSTS
 from .serializers import EventSerializer
 from .placeholders import replace_placeholders
@@ -508,7 +508,10 @@ def document_list(request):
     })
 
 def home(request):
-    return render(request, "home.html")
+    tenant = request.tenant
+    return render(request, "home.html", {'tenant': tenant})
+    # company_profile = get_object_or_404(CompanyProfile, tenant=request.tenant)
+    # return render(request, "home.html", {'company_profile': company_profile})
 
 
 @login_required
@@ -2867,3 +2870,37 @@ def delete_user_notification(request, user_notification_id):
     user_notification = get_object_or_404(UserNotification, id=user_notification_id, tenant=request.tenant)
     user_notification.delete()
     return redirect("user_notification_list")
+
+
+@login_required
+def view_company_profile(request):
+    if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+        logger.error(f"Unauthorized access by user {request.user.username}: tenant mismatch")
+        return HttpResponseForbidden("You are not authorized for this tenant.")
+    
+    tenant_profile, created = CompanyProfile.objects.get_or_create(
+        tenant=request.tenant,
+        defaults={'company_name': request.tenant.name}  # Set default company_name to tenant name
+    )
+    return render(request, 'admin/company_profile.html', {'tenant_profile': tenant_profile})
+
+@login_required
+@user_passes_test(is_admin)
+def edit_company_profile(request):
+    if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+        logger.error(f"Unauthorized access by user {request.user.username}: tenant mismatch")
+        return HttpResponseForbidden("You are not authorized for this tenant.")
+    
+    company_profile, created = CompanyProfile.objects.get_or_create(
+        tenant=request.tenant,
+        defaults={'company_name': request.tenant.name}
+    )
+    
+    if request.method == "POST":
+        form = CompanyProfileForm(request.POST, request.FILES, instance=company_profile)
+        if form.is_valid():
+            form.save()
+            return redirect("view_company_profile")
+    else:
+        form = CompanyProfileForm(instance=company_profile)
+    return render(request, "admin/edit_company_profile.html", {"form": form})
