@@ -20,8 +20,54 @@ load_dotenv(dotenv_path)
 
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'insecure-key-for-dev-only')
 DEBUG = os.getenv('DJANGO_DEBUG', 'False')
-ALLOWED_HOSTS = os.getenv('DJANGO_ALLOWED_HOSTS', ['raadaa.onrender.com', 'www.raadaa.onrender.com', 'localhost', '127.0.0.1:8000', '127.0.0.1'])
-# ALLOWED_HOSTS = ['teammanager.ng','www.teammanager.ng','raadaa.onrender.com', 'www.raadaa.onrender.com', 'localhost', '127.0.0.1:8000', '127.0.0.1']
+# ALLOWED_HOSTS configuration
+# If DJANGO_ALLOWED_HOSTS is a comma-separated string in .env, split it into a list
+allowed_hosts_str = os.getenv('DJANGO_ALLOWED_HOSTS')
+ALLOWED_HOSTS = (
+    allowed_hosts_str.split(',') if allowed_hosts_str
+    else [
+        'raadaa.onrender.com',
+        'www.raadaa.onrender.com',
+        'localhost',
+        '*.localhost',
+        '127.0.0.1',
+        '*.teammanager.ng',
+        'teammanager.ng',
+        'transnet-cloud.localhost',
+        'raadaa.localhost',
+        'miniago.localhost',
+        '13.220.249.10',  # Add test host IP
+    ]
+)
+
+# CSRF_TRUSTED_ORIGINS configuration
+# If CSRF_TRUSTED_ORIGINS is a comma-separated string in .env, split it into a list
+csrf_trusted_origins_str = os.getenv('CSRF_TRUSTED_ORIGINS')
+CSRF_TRUSTED_ORIGINS = (
+    csrf_trusted_origins_str.split(',') if csrf_trusted_origins_str
+    else [
+        'https://teammanager.ng',
+        'https://*.teammanager.ng',
+        'https://raadaa.onrender.com',
+        'https://*.onrender.com',
+        'http://localhost:8000',
+        'http://*.localhost:8000',
+        'http://127.0.0.1:8000',
+        'http://transnet-cloud.localhost:8000',
+        'http://raadaa.localhost:8000',
+        'http://miniago.localhost:8000',
+        'http://13.220.249.10:8000',  # Add test host IP
+    ]
+)
+
+# Temporarily disable CSRF_COOKIE_SECURE for HTTP testing
+CSRF_COOKIE_SECURE = os.getenv('CSRF_COOKIE_SECURE', 'False') == 'True'
+SESSION_COOKIE_SECURE = os.getenv('SESSION_COOKIE_SECURE', 'False') == 'True'
+SECURE_SSL_REDIRECT = os.getenv('SECURE_SSL_REDIRECT', 'False') == 'True'  # Redirect HTTP to HTTPS
+# CSRF_COOKIE_SECURE = False
+# SESSION_COOKIE_SECURE = False
+# SECURE_SSL_REDIRECT = False
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -38,7 +84,7 @@ STATICFILES_DIRS = [
 ]
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
-LOGIN_REDIRECT_URL = "document_list"  # Redirect to dashboard after login
+LOGIN_REDIRECT_URL = "home"  # Redirect to dashboard after login
 LOGOUT_REDIRECT_URL = "login"  # Redirect to login after logout
 # PDFKIT_CONFIG = {
 #     'wkhtmltopdf': r"C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe"
@@ -84,7 +130,6 @@ LOGGING = {
 
 
 # Application definition
-
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -92,10 +137,10 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'rest_framework',  # API support
+    'rest_framework',
     'rest_framework.authtoken',
-    # 'documents',  # Our app
     'documents.apps.DocumentsConfig',
+    'tenants',
     'ckeditor',
     'ckeditor_uploader',
     'django_cron',
@@ -119,20 +164,9 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'tenants.middleware.TenantMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
 ]
-
-# raadaa/settings.py
-CSRF_TRUSTED_ORIGINS = [
-    "https://teammanager.ng",
-    "https://raadaa.onrender.com",
-    "https://*.onrender.com",  # For subdomains, if needed
-    "http://localhost:8000",
-    "http://127.0.0.1:8000",
-]
-
-CSRF_COOKIE_SECURE = True
-SESSION_COOKIE_SECURE = True
 
 ROOT_URLCONF = 'raadaa.urls'
 
@@ -251,6 +285,3 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-
-# SECURE_SSL_REDIRECT = True  # Redirect HTTP to HTTPS
-SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")

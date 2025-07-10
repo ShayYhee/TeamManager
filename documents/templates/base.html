@@ -10,10 +10,11 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.17/index.global.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="apple-touch-icon" sizes="180x180" href="{% static 'favicon_io/apple-touch-icon.png' %}">
-    <link rel="icon" type="image/png" sizes="32x32" href="{% static 'favicon_io/favicon-32x32.png' %}">
-    <link rel="icon" type="image/png" sizes="16x16" href="{% static 'favicon_io/favicon-16x16.png' %}">
-    <link rel="manifest" href="{% static 'favicon_io/site.webmanifest' %}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{% static "favicon_io/apple-touch-icon.png" %}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{% static "favicon_io/favicon-32x32.png" %}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{% static "favicon_io/favicon-16x16.png" %}"> 
+    {% comment %} <link rel="icon" href="{% static "Team Manager icon.png" %}"> {% endcomment %}
+    <link rel="manifest" href="{% static "favicon_io/site.webmanifest" %}">
     <style>
         body {
             margin: 0;
@@ -71,9 +72,6 @@
         .sidebar a i {
             margin-right: 10px;
         }
-        {% comment %} body.dark-mode h1, h2, h3, h4, h5, h6 {
-            color: #ffffff;
-        } {% endcomment %}
         .main-content {
             margin-left: 260px;
             padding: 30px;
@@ -161,6 +159,29 @@
         body.unauthenticated .navbar {
             margin-left: 0 !important;
         }
+        /* Improved navbar alignment for no tenant or superuser */
+        .navbar.no-tenant .container-fluid {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 15px;
+        }
+        .navbar.no-tenant .navbar-brand {
+            flex: 0 1 auto;
+        }
+        .navbar.no-tenant .navbar-nav {
+            flex-direction: row;
+            gap: 15px;
+        }
+        .navbar.no-tenant .navbar-nav .nav-link {
+            padding: 8px 12px;
+            font-size: 0.95rem;
+        }
+        .navbar.no-tenant .auth-section {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
         @media (max-width: 768px) {
             .sidebar {
                 width: 0;
@@ -184,8 +205,15 @@
                 width: 40px;
                 height: 40px;
             }
+            .navbar.no-tenant .navbar-nav {
+                flex-direction: column;
+                gap: 10px;
+            }
+            .navbar.no-tenant .auth-section {
+                flex-direction: column;
+                gap: 10px;
+            }
         }
-        
         .modal-content {
             border-radius: 12px;
             border: none;
@@ -259,7 +287,6 @@
             outline-offset: 2px;
             border-radius: 4px;
         }
-        /* Dark mode toggle button */
         .theme-toggle-btn {
             background: none;
             border: none;
@@ -295,45 +322,130 @@
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
     {% if user.is_authenticated %}
     <div class="sidebar" id="sidebar">
-        <h4 class="text-white text-center mb-4"><i class="fas fa-briefcase mr-2"></i> Team Manager</h4>
-        <a href="{% url 'document_list' %}" {% if request.path == '/documents/' %}class="active"{% endif %}><i class="fas fa-file-alt"></i> Document List</a>
-        <a href="{% url 'create_document' %}" {% if request.path == '/documents/create/' %}class="active"{% endif %}><i class="fas fa-bolt"></i> Generate Document</a>
-        <a href="{% url 'create_from_editor' %}" {% if request.path == '/documents/editor/' %}class="active"{% endif %}><i class="fas fa-edit"></i> Document Editor</a>
-        <a href="{% url 'folder_list' %}" {% if request.path|slice:":10" == '/folders/' %}class="active"{% endif %}><i class="fas fa-folder"></i> Folders</a>
-        <a href="{% url 'public_folder_list' %}" {% if request.path|slice:":10" == '/public-folders/' %}class="active"{% endif %}><i class="fas fa-folder-open"></i> Public Folders</a>
-        <a href="{% url 'task_list' %}" {% if request.path == '/tasks/' %}class="active"{% endif %}><i class="fas fa-tasks"></i> Tasks</a>
-        <a href="{% url 'performance_dashboard' %}" {% if request.path == '/dashboard/performance-dashboard' %}class="active"{% endif %}><i class="fas fa-chart-line" style="color: #ffffff;"></i> Performance</a>
-        {% for role in user.roles.all %}
-            {% if role.name == "HOD" %}
-                <a href="{% url 'hod_performance_dashboard' %}" {% if request.path == '/dashboard/hod-performance-dashboard' %}class="active"{% endif %}><i class="fas fa-chart-bar"></i> Department Performance</a>
-            {% endif %}
-        {% endfor %}
-        <a href="{% url 'notifications' %}" {% if request.path == '/notifications/' %}class="active"{% endif %}><i class="fas fa-bell"></i> Notifications</a>
-        {% for role in user.roles.all %}
-            {% if role.name == "Admin" %}
-                <a href="{% url 'staff_directory' %}" {% if request.path == '/staff/directory/' %}class="active"{% endif %}><i class="fas fa-users"></i> Staff Directory</a>
-            {% endif %}
-        {% endfor %}
-        <a href="{% url 'calendar' %}" {% if request.path == '/calendar/' %}class="active"{% endif %}><i class="fas fa-calendar"></i> Calendar</a>
-        <a href="{% url 'view_my_profile' %}" {% if request.path == '/profile/' %}class="active"{% endif %}><i class="fas fa-user"></i> My Profile</a>
-        <a href="{% url 'staff_list' %}" {% if request.path == '/staff/' %}class="active"{% endif %}><i class="fas fa-user-friends"></i> Staff List</a>
-        <a href="{% url 'email_config' %}" {% if request.path == '/settings/' %}class="active"{% endif %}><i class="fas fa-cog"></i> Settings</a>
-        {% for role in user.roles.all %}
-            {% if role.name == "Admin" %}
-                <a href="{% url 'users_list' %}" {% if request.path == '/users/' %}class="active"{% endif %}><i class="fas fa-user-shield"></i> Users</a>
-                <a href="{% url 'admin:index' %}" {% if request.path|slice:":7" == '/admin/' %}class="active"{% endif %}><i class="fas fa-key"></i> Admin Panel</a>
-            {% endif %}
-        {% endfor %}
+        <h4 class="text-white text-center mb-4"><i class="fas fa-briefcase mr-2"></i> {{ tenant.name|default:"Team Manager" }}</h4>
+        {% if user.is_superuser %}
+            <a href="{% url 'tenant_applications' %}" {% if request.path == '/tenants/tenant-applications/'%}class="active"{% endif %}><i class="fas fa-user-shield"></i>Tenant Applications</a>
+            <a href="{% url 'tenant_list' %}" {% if request.path == '/tenants/list/' %}class="active"{% endif %}><i class="fas fa-user-shield"></i>Tenants</a>
+            <a href="{% url 'admin:index' %}" {% if request.path|slice:":7" == '/admin/' %}class="active"{% endif %}><i class="fas fa-key"></i> Admin Panel</a>
+        {% elif user.tenant.slug == "raadaa" or user.tenant.slug == "transnet-cloud" %}
+            <a href="{% url 'document_list' %}" {% if request.path == '/documents/' %}class="active"{% endif %}><i class="fas fa-file-alt"></i> Document List</a>
+            <a href="{% url 'create_document' %}" {% if request.path == '/documents/create/' %}class="active"{% endif %}><i class="fas fa-bolt"></i> Generate Document</a>
+            <a href="{% url 'create_from_editor' %}" {% if request.path == '/documents/editor/' %}class="active"{% endif %}><i class="fas fa-edit"></i> Document Editor</a>
+            <a href="{% url 'folder_list' %}" {% if request.path|slice:":10" == '/folders/' %}class="active"{% endif %}><i class="fas fa-folder"></i> Folders</a>
+            <a href="{% url 'public_folder_list' %}" {% if request.path|slice:":10" == '/public-folders/' %}class="active"{% endif %}><i class="fas fa-folder-open"></i> Public Folders</a>
+            <a href="{% url 'task_list' %}" {% if request.path == '/tasks/' %}class="active"{% endif %}><i class="fas fa-tasks"></i> Tasks</a>
+            <a href="{% url 'performance_dashboard' %}" {% if request.path == '/dashboard/performance-dashboard' %}class="active"{% endif %}><i class="fas fa-chart-line" style="color: #ffffff;"></i> Performance</a>
+            {% for role in user.roles.all %}
+                {% if role.name == "HOD" %}
+                    <a href="{% url 'hod_performance_dashboard' %}" {% if request.path == '/dashboard/hod-performance-dashboard' %}class="active"{% endif %}><i class="fas fa-chart-bar"></i> Department Performance</a>
+                {% endif %}
+            {% endfor %}
+            <a href="{% url 'notifications' %}" {% if request.path == '/notifications/' %}class="active"{% endif %}><i class="fas fa-bell"></i> Notifications</a>
+            {% for role in user.roles.all %}
+                {% if role.name == "Admin" %}
+                    <a href="{% url 'staff_directory' %}" {% if request.path == '/staff/directory/' %}class="active"{% endif %}><i class="fas fa-users"></i> Staff Directory</a>
+                {% endif %}
+            {% endfor %}
+            <a href="{% url 'calendar' %}" {% if request.path == '/calendar/' %}class="active"{% endif %}><i class="fas fa-calendar"></i> Calendar</a>
+            <a href="{% url 'view_my_profile' %}" {% if request.path == '/profile/' %}class="active"{% endif %}><i class="fas fa-user"></i> My Profile</a>
+            <a href="{% url 'staff_list' %}" {% if request.path == '/staff/' %}class="active"{% endif %}><i class="fas fa-user-friends"></i> Staff List</a>
+            <a href="{% url 'view_company_profile' %}" {% if request.path == '/company-profile/' %}class="active"{% endif %}><i class="fas fa-building"></i> Company Profile</a>
+            <a href="{% url 'email_config' %}" {% if request.path == '/settings/' %}class="active"{% endif %}><i class="fas fa-cog"></i> Settings</a>
+            {% for role in user.roles.all %}
+                {% if role.name == "Admin" %}
+                    {% comment %} <a href="{% url 'users_list' %}" {% if request.path == '/users/' %}class="active"{% endif %}><i class="fas fa-user-shield"></i> Users</a> {% endcomment %}
+                    <a href="{% url 'admin_dashboard' %}" {% if request.path|slice:":7" == '/admin/' %}class="active"{% endif %}><i class="fas fa-key"></i> Admin Dashboard</a>
+                {% endif %}
+            {% endfor %}
+        {% else %}
+            <a href="{% url 'document_list' %}" {% if request.path == '/documents/' %}class="active"{% endif %}><i class="fas fa-file-alt"></i> Document List</a>
+            <a href="{% url 'create_from_editor' %}" {% if request.path == '/documents/editor/' %}class="active"{% endif %}><i class="fas fa-edit"></i> Document Editor</a>
+            <a href="{% url 'folder_list' %}" {% if request.path|slice:":10" == '/folders/' %}class="active"{% endif %}><i class="fas fa-folder"></i> Folders</a>
+            <a href="{% url 'public_folder_list' %}" {% if request.path|slice:":10" == '/public-folders/' %}class="active"{% endif %}><i class="fas fa-folder-open"></i> Public Folders</a>
+            <a href="{% url 'task_list' %}" {% if request.path == '/tasks/' %}class="active"{% endif %}><i class="fas fa-tasks"></i> Tasks</a>
+            <a href="{% url 'performance_dashboard' %}" {% if request.path == '/dashboard/performance-dashboard' %}class="active"{% endif %}><i class="fas fa-chart-line" style="color: #ffffff;"></i> Performance</a>
+            {% for role in user.roles.all %}
+                {% if role.name == "HOD" %}
+                    <a href="{% url 'hod_performance_dashboard' %}" {% if request.path == '/dashboard/hod-performance-dashboard' %}class="active"{% endif %}><i class="fas fa-chart-bar"></i> Department Performance</a>
+                {% endif %}
+            {% endfor %}
+            <a href="{% url 'notifications' %}" {% if request.path == '/notifications/' %}class="active"{% endif %}><i class="fas fa-bell"></i> Notifications</a>
+            {% for role in user.roles.all %}
+                {% if role.name == "Admin" %}
+                    <a href="{% url 'staff_directory' %}" {% if request.path == '/staff/directory/' %}class="active"{% endif %}><i class="fas fa-users"></i> Staff Directory</a>
+                {% endif %}
+            {% endfor %}
+            <a href="{% url 'calendar' %}" {% if request.path == '/calendar/' %}class="active"{% endif %}><i class="fas fa-calendar"></i> Calendar</a>
+            <a href="{% url 'view_my_profile' %}" {% if request.path == '/profile/' %}class="active"{% endif %}><i class="fas fa-user"></i> My Profile</a>
+            <a href="{% url 'staff_list' %}" {% if request.path == '/staff/' %}class="active"{% endif %}><i class="fas fa-user-friends"></i> Staff List</a>
+            <a href="{% url 'view_company_profile' %}" {% if request.path == '/company-profile/' %}class="active"{% endif %}><i class="fas fa-building"></i> Company Profile</a>
+            <a href="{% url 'email_config' %}" {% if request.path == '/settings/' %}class="active"{% endif %}><i class="fas fa-cog"></i> Settings</a>
+            {% for role in user.roles.all %}
+                {% if role.name == "Admin" %}
+                    {% comment %} <a href="{% url 'users_list' %}" {% if request.path == '/users/' %}class="active"{% endif %}><i class="fas fa-user-shield"></i> Users</a> {% endcomment %}
+                    <a href="{% url 'admin_dashboard' %}" {% if request.path|slice:":7" == '/admin/' %}class="active"{% endif %}><i class="fas fa-key"></i> Admin Dashboard</a>
+                {% endif %}
+            {% endfor %}
+        {%endif%}
     </div>
     {% endif %}
+    {% if not user.tenant or user.is_superuser %}
+        <nav class="navbar navbar-light bg-light fixed-top no-tenant" id="navbar">
+            <div class="container-fluid">
+                <a class="navbar-brand ms-3" href="{% url 'tenant_home' %}"><i class="fas fa-briefcase mr-4" style="color: #319795;"></i> <span style="color: #319795;"><strong>Team Manager</strong></span></a>
+                <div class="d-flex align-items-center gap-2">
+                    <button class="theme-toggle-btn" id="themeToggleBtn" title="Toggle Dark Mode" aria-label="Toggle Dark Mode">
+                        <i class="fas fa-moon"></i>
+                    </button>
+                    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                        <span class="navbar-toggler-icon"></span>
+                    </button>
+                </div>
+                <div class="collapse navbar-collapse" id="navbarNav">
+                    <ul class="navbar-nav">
+                        <li class="nav-item">
+                            <a class="nav-link" href="#features">Features</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" href="#why-join">Why Join</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link btn btn-primary text-white" href="{% url 'apply_for_tenant' %}">Apply for Your Company</a>
+                        </li>
+                    </ul>
+                    <div class="auth-section ms-auto">
+                        {% if user.is_authenticated and user.is_superuser %}
+                            <span class="text-muted me-3">Welcome, {{ user.username }}</span>
+                            <form action="{% url 'logout' %}" method="post" style="display: inline;">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-link text-primary" style="padding: 0; text-decoration: none;">Logout</button>
+                            </form>
+                        {% else %}
+                            <a href="{% url 'login' %}" class="btn btn-primary">Login</a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </nav>
+    {% else %}
     <nav class="navbar navbar-light bg-light fixed-top" id="navbar">
         <div class="container-fluid">
             {% if user.is_authenticated %}
                 <button class="btn btn-outline-primary" onclick="toggleSidebar()" aria-label="Toggle Sidebar"><i class="fas fa-bars"></i></button>
             {% else %}
-                <span class="d-none d-md-inline"> </span> <!-- Placeholder for alignment -->
+                <span class="d-none d-md-inline"> </span>
             {% endif %}
-            <a class="navbar-brand ms-3" href="/"><i class="fas fa-briefcase mr-4" style="color: #319795;"></i> Team Manager</a>
+            <a class="navbar-brand ms-3" href="/">
+                {% if user.is_authenticated and tenant.company_profile %}
+                    {% if tenant.company_profile.photo %}
+                        <img src="{{ tenant.company_profile.photo.url }}" alt="{{ tenant.company_profile.company_name }} Logo" class="company-logo me-2" style="max-height: 40px;">
+                    {% endif %}
+                    <span style="color: #319795;"><strong>{{ tenant.company_profile.company_name|default:"Team Manager" }}</strong></span>
+                {% else %}
+                    <i class="fas fa-briefcase me-2" style="color: #319795;"></i>
+                    <span style="color: #319795;"><strong>{{ tenant.name|default:"Team Manager" }}</strong></span>
+                {% endif %}
+            </a>
             <div class="d-flex align-items-center gap-4">
                 <button class="theme-toggle-btn" id="themeToggleBtn" title="Toggle Dark Mode" aria-label="Toggle Dark Mode">
                     <i class="fas fa-moon"></i>
@@ -362,6 +474,7 @@
             </div>
         </div>
     </nav>
+    {% endif %}
     {% if notification_bar_items %}
         <div id="notification-bar" style="background: #fefcbf; padding: 10px; font-size: 0.9rem; border-bottom: 1px solid #e2e8f0; text-align: center; position: relative;">
             {% for note in notification_bar_items %}
@@ -424,7 +537,6 @@
                 navbar.style.marginLeft = sidebar.classList.contains("closed") ? "30px" : "250px";
             }
         }
-        // Initialize layout based on authentication and screen size
         window.addEventListener('load', function() {
             var sidebar = document.getElementById("sidebar");
             var mainContent = document.getElementById("main-content");
@@ -434,11 +546,9 @@
                 if (navbar) navbar.style.marginLeft = "0px";
             }
         });
-        // Dark mode toggle functionality
         document.addEventListener('DOMContentLoaded', function() {
             const themeToggleBtn = document.getElementById('themeToggleBtn');
             const body = document.body;
-            // Check for saved theme preference or system preference
             const savedTheme = localStorage.getItem('theme');
             const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
             if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
@@ -453,8 +563,6 @@
             });
         });
     </script>
-
-    <!-- Media Preview Modal -->
     <div class="modal fade" id="mediaModal" tabindex="-1" aria-labelledby="mediaModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg modal-dialog-centered">
             <div class="modal-content">
@@ -464,7 +572,6 @@
                 </div>
                 <div class="modal-body text-center">
                     <div id="mediaContainer" style="max-height: 60vh; overflow: auto;">
-                        <!-- Media content will be injected here -->
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -477,9 +584,7 @@
             </div>
         </div>
     </div>
-
     <script>
-        // Handle media modal display
         document.querySelectorAll('[data-media-url]').forEach(link => {
             link.addEventListener('click', function(e) {
                 e.preventDefault();
@@ -489,15 +594,9 @@
                 const mediaContainer = document.getElementById('mediaContainer');
                 const modalTitle = document.getElementById('mediaModalLabel');
                 const downloadLink = document.getElementById('mediaDownloadLink');
-
-                // Update modal title and download link
                 modalTitle.textContent = mediaName;
                 downloadLink.href = mediaUrl;
-
-                // Clear previous content
                 mediaContainer.innerHTML = '';
-
-                // Render media based on type
                 if (mediaType === 'image') {
                     mediaContainer.innerHTML = `<img src="${mediaUrl}" alt="${mediaName}" class="img-fluid" style="max-width: 100%;">`;
                 } else if (mediaType === 'pdf') {
@@ -505,14 +604,10 @@
                 } else {
                     mediaContainer.innerHTML = `<p class="text-muted">Unsupported media type.</p>`;
                 }
-
-                // Show modal
                 const mediaModal = new bootstrap.Modal(document.getElementById('mediaModal'));
                 mediaModal.show();
             });
         });
-
-        // Handle fullscreen toggle
         document.getElementById('mediaFullscreenBtn').addEventListener('click', function() {
             const mediaContainer = document.getElementById('mediaContainer');
             if (!document.fullscreenElement) {
@@ -525,8 +620,6 @@
                 this.innerHTML = '<i class="fas fa-expand"></i> Fullscreen';
             }
         });
-
-        // Reset fullscreen button text when modal closes
         document.getElementById('mediaModal').addEventListener('hidden.bs.modal', function() {
             document.getElementById('mediaFullscreenBtn').innerHTML = '<i class="fas fa-expand"></i> Fullscreen';
         });

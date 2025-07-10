@@ -1,12 +1,13 @@
 from django.db import models
 from django.db.models import Q
 from django.contrib.auth.models import User
+from django.contrib.auth.models import Permission
 from raadaa import settings
 from django.utils import timezone
 import os
 from django.core.exceptions import ValidationError
 from cryptography.fernet import Fernet
-import os
+from tenants.models import Tenant
 
 # Generate or load encryption key for SMTP password
 ENCRYPTION_KEY = os.getenv('ENCRYPTION_KEY', Fernet.generate_key())
@@ -31,6 +32,7 @@ class Document(models.Model):
         ('editor', 'Created in Editor'),
     ]
 
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
     document_type = models.CharField(max_length=20, choices=DOCUMENT_TYPE_CHOICES)
     company_name = models.CharField(max_length=255)
     company_address = models.TextField()
@@ -61,11 +63,15 @@ from django.db import models
 
 class Role(models.Model):
     name = models.CharField(max_length=50, unique=True)
+    description = models.TextField(blank=True)
+    permissions = models.ManyToManyField(Permission, blank=True, related_name='roles')
 
     def __str__(self):
         return self.name
+    
 
 class CustomUser(AbstractUser):
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, blank=True, null=True)
     roles = models.ManyToManyField(Role, blank=True)
     department = models.ForeignKey('Department', on_delete=models.SET_NULL, null=True, blank=True, related_name='members')
     teams = models.ManyToManyField('Team', blank=True, related_name='members')
@@ -98,9 +104,16 @@ class CustomUser(AbstractUser):
 
     def __str__(self):
         return self.username
+    
+    def has_perm(self, perm, obj=None):
+        if obj and hasattr(obj, 'tenant'):
+            if self.tenant != obj.tenant:
+                return False
+        return super().has_perm(perm, obj)
 
 
 class Folder(models.Model):
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
     name = models.CharField(max_length=255)
     parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='subfolders')
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
@@ -115,6 +128,7 @@ def upload_to_folder(instance, filename):
 
 
 class File(models.Model):
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
     folder = models.ForeignKey(Folder, on_delete=models.CASCADE, related_name='files')
     uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     file = models.FileField(upload_to=upload_to_folder)
@@ -134,9 +148,10 @@ class Task(models.Model):
         ('cancelled', 'Cancelled'),
     ]
 
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
     title = models.CharField(max_length=255)
     description = models.TextField()
-    documents = models.ManyToManyField('Document', blank=True)
+    documents = models.ManyToManyField('File', blank=True)
     folder = models.ForeignKey('Folder', on_delete=models.SET_NULL, null=True, blank=True)
     assigned_to = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='created_tasks')
@@ -149,26 +164,29 @@ class Task(models.Model):
         return self.title
 
 
-class Organization(models.Model):
-    name = models.CharField(max_length=255, unique=True)
+# class Organization(models.Model):
+#     name = models.CharField(max_length=255, unique=True)
 
-    def __str__(self):
-        return self.name
+#     def __str__(self):
+#         return self.name
     
 class Department(models.Model):
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
     name = models.CharField(max_length=255, unique=True)
-    organization = models.ForeignKey('Organization', on_delete=models.CASCADE, null=True, blank=True)
     hod = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='hod_department')
 
     def save(self, *args, **kwargs):
         if self.hod and not self.hod.is_hod():
-            raise ValueError("HOD must have the 'HOD' role.")
+            # raise ValueError("HOD must have the 'HOD' role.")
+            self.hod.roles.add(Role.objects.get(name='HOD'))
+            self.hod.save()
         super().save(*args, **kwargs)
 
     def __str__(self):
         return self.name
     
 class Team(models.Model):
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
     name = models.CharField(max_length=255, unique=True)
     department = models.ForeignKey(Department, on_delete=models.CASCADE, blank=True, null=True)
     team_leader = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='team_leader')
@@ -203,6 +221,7 @@ class StaffProfile(models.Model):
         ('widowed', 'Widowed'),
     ]
 
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="staff_profile")
     photo = models.ImageField(upload_to='staff_photos/', null=True, blank=True)
     first_name = models.CharField(max_length=255)
@@ -228,7 +247,6 @@ class StaffProfile(models.Model):
     location = models.CharField(max_length=100, null=True, blank=True)
     employment_date = models.DateField(null=True, blank=True)
     official_email = models.EmailField(null=True, blank=True)
-    organization = models.ForeignKey('Organization', on_delete=models.SET_NULL, null=True, blank=True)
     department = models.ForeignKey('Department', on_delete=models.SET_NULL, null=True, blank=True, related_name='staff')
     team = models.ManyToManyField('Team', blank=True)
     emergency_name = models.CharField(max_length=100, null=True, blank=True)
@@ -245,6 +263,7 @@ class StaffProfile(models.Model):
         return f"{self.first_name} {self.last_name}".strip()
 
 class Notification(models.Model):
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
     title = models.CharField(max_length=255)
     message = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -267,8 +286,14 @@ class Notification(models.Model):
     def __str__(self):
         return f"{self.get_type_display()}: {self.title}"
     
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.expires_at and self.expires_at < timezone.now():
+            self.is_active = False
+    
 
 class UserNotification(models.Model):
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     notification = models.ForeignKey(Notification, on_delete=models.CASCADE)
     dismissed = models.BooleanField(default=False)
@@ -288,6 +313,7 @@ class StaffDocument(models.Model):
         ('other', 'Other'),
     ]
 
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
     staff_profile = models.ForeignKey(
         'StaffProfile', 
         on_delete=models.CASCADE, 
@@ -307,6 +333,7 @@ class StaffDocument(models.Model):
     
 
 class Event(models.Model):
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True)
     start_time = models.DateTimeField()
@@ -319,6 +346,7 @@ class Event(models.Model):
         return f"{self.title} ({self.start_time} - {self.end_time})"
 
 class EventParticipant(models.Model):
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
     event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name='participants')
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     response = models.CharField(max_length=10, choices=[('pending', 'Pending'), ('accepted', 'Accepted'), ('declined', 'Declined')], default='pending')
@@ -328,6 +356,7 @@ class EventParticipant(models.Model):
         unique_together = ('event', 'user')
 
 class PublicFolder(models.Model):
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
     name = models.CharField(max_length=255)
     parent = models.ForeignKey('self', null=True, blank=True, on_delete=models.CASCADE, related_name='subfolders')
     department = models.ForeignKey('Department', null=True, blank=True, on_delete=models.SET_NULL, related_name='public_folders')
@@ -352,6 +381,7 @@ def upload_to_public_folder(instance, filename):
     return os.path.join('uploads/public', folder_name, filename)
 
 class PublicFile(models.Model):
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
     original_name = models.CharField(max_length=255)
     file = models.FileField(upload_to=upload_to_public_folder)
     folder = models.ForeignKey(PublicFolder, null=True, blank=True, on_delete=models.CASCADE, related_name='public_files')
@@ -361,3 +391,22 @@ class PublicFile(models.Model):
 
     def __str__(self):
         return self.original_name
+    
+
+class CompanyProfile(models.Model):
+    photo = models.ImageField(upload_to='tenant_profile/', null=True, blank=True)
+    tenant = models.OneToOneField(Tenant, on_delete=models.CASCADE, related_name="company_profile")
+    company_name = models.CharField(max_length=255)
+    description = models.TextField(blank=True, null=True)
+    date_founded = models.DateField(null=True, blank=True)
+    reg_number = models.CharField(max_length=255, null=True, blank=True)
+    address = models.TextField(blank=True, null=True)
+    email = models.EmailField(null=True, blank=True)
+    contact_details = models.TextField(null=True, blank=True)
+    website = models.URLField(null=True, blank=True)
+    num_staff = models.IntegerField(null=True, blank=True)
+    num_departments = models.IntegerField(null=True, blank=True)
+    num_teams = models.IntegerField(null=True, blank=True)
+
+    def __str__(self):
+        return self.tenant.name

@@ -12,6 +12,13 @@ from documents.views import create_folder, upload_file, update_task_status, crea
 from documents.views import delete_folder, delete_file, rename_folder, rename_file, move_folder, move_file, task_edit, delete_task_document
 from documents.views import performance_dashboard, hod_performance_dashboard, create_public_folder, delete_public_folder, rename_public_folder
 from documents.views import public_folder_list, move_public_folder, upload_public_file, delete_public_file, rename_public_file, move_public_file
+from documents.views import view_user_details, admin_dashboard, admin_delete_document, admin_delete_file, admin_delete_folder, admin_document_details
+from documents.views import admin_folder_list, admin_folder_details, admin_file_list, department_list, bulk_delete, create_user, bulk_action_users
+from documents.views import delete_department, edit_department, create_department, admin_team_list, create_team, delete_team, edit_team
+from documents.views import staff_profile_list, create_staff_profile, delete_staff_profile, edit_staff_profile, event_list, create_event, edit_event, delete_event
+from documents.views import event_participant_list, create_event_participant, edit_event_participant, delete_event_participant
+from documents.views import admin_notification_list, create_notification, edit_notification, delete_notification, edit_company_profile, view_company_profile
+from documents.views import user_notification_list, create_user_notification, edit_user_notification, delete_user_notification
 from documents.views import EventViewSet
 from django.http import HttpResponse
 
@@ -25,6 +32,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path("", home, name="home"),
     path("documents/", include("documents.urls")),  # Added namespace
+    path("tenants/", include("tenants.urls")),
     path("accounts/", include("django.contrib.auth.urls")),
     # Override CKEditor upload
     path('ckeditor/upload/', custom_ckeditor_upload, name='ckeditor_upload'),
@@ -47,11 +55,6 @@ urlpatterns = [
     path('users/email-config/', email_config, name='email_config'),
     path('api/', include(router.urls)),
     path('calendar/', calendar_view, name='calendar'),
-    path('users/list/', users_list, name='users_list'),
-    path('users/approve/<int:user_id>', approve_user, name='approve_user'),
-    path('users/account-activation/', account_activation_sent, name='account_activation_sent'),
-    path('users/delete/<int:user_id>', delete_user, name='delete_user'),
-    path('users/edit/<int:user_id>', edit_user, name='edit_user'),
     path('dashboard/performance-dashboard/', performance_dashboard, name='performance_dashboard'),
     path('dashboard/hod-performance-dashboard/', hod_performance_dashboard, name='hod_performance_dashboard'),
     path('folders/', folder_list, name='folder_list'),
@@ -82,6 +85,56 @@ urlpatterns = [
     path('tasks/<int:task_id>/delete/', delete_task, name='delete_task'),
     path('tasks/<int:task_id>/edit/', task_edit, name='task_edit'),
     path('tasks/<int:task_id>/delete-task-document/<int:doc_id>/', delete_task_document, name='delete_document'),
+    path("admins/dashboard/", admin_dashboard, name="admin_dashboard"),
+    path('admins/bulk-delete/<str:model_name>/', bulk_delete, name='bulk_delete'),
+    # Users URLs
+    path('admins/users/bulk-action/', bulk_action_users, name='bulk_action_users'),
+    path('admins/users/list/', users_list, name='users_list'),
+    path('admins/users/create/', create_user, name='create_user'),
+    path('admins/users/view/<int:user_id>', view_user_details, name='view_user_details'),
+    path('admins/users/approve/<int:user_id>', approve_user, name='approve_user'),
+    path('admins/users/account-activation/', account_activation_sent, name='account_activation_sent'),
+    path('admins/users/delete/<int:user_id>', delete_user, name='delete_user'),
+    path('admins/users/edit/<int:user_id>', edit_user, name='edit_user'),
+    # Department URLs
+    path('admins/departments/', department_list, name='department_list'),
+    path('admins/departments/create/', create_department, name='create_department'),
+    path('admins/departments/edit/<int:department_id>/', edit_department, name='edit_department'),
+    path('admins/departments/delete/<int:department_id>/', delete_department, name='delete_department'),
+    # Team URLs
+    path('admins/teams/', admin_team_list, name='admin_team_list'),
+    path('admins/teams/create/', create_team, name='create_team'),
+    path('admins/teams/edit/<int:team_id>/', edit_team, name='edit_team'),
+    path('admins/teams/delete/<int:team_id>/', delete_team, name='delete_team'),
+    # Staff Profile URLs
+    path('admins/staff-profiles/', staff_profile_list, name='staff_profile_list'),
+    path('admins/staff-profiles/create/', create_staff_profile, name='create_staff_profile'),
+    path('admins/staff-profiles/edit/<int:staff_profile_id>/', edit_staff_profile, name='edit_staff_profile'),
+    path('admins/staff-profiles/delete/<int:staff_profile_id>/', delete_staff_profile, name='delete_staff_profile'),
+    # Events URLs
+    path('admins/events/', event_list, name='event_list'),
+    path('admins/events/create/', create_event, name='create_event'),
+    path('admins/events/edit/<int:event_id>/', edit_event, name='edit_event'),
+    path('admins/events/delete/<int:event_id>/', delete_event, name='delete_event'),
+    # Event Participants URLs
+    path('admins/event-participants/', event_participant_list, name='event_participant_list'),
+    path('admins/event-participants/create/', create_event_participant, name='create_event_participant'),
+    path('admins/event-participants/edit/<int:event_participant_id>/', edit_event_participant, name='edit_event_participant'),
+    path('admins/event-participants/delete/<int:event_participant_id>/', delete_event_participant, name='delete_event_participant'),
+    # Notifications URLs
+    path('admins/notifications/list/', admin_notification_list, name='admin_notification_list'),
+    path('admins/notifications/create/', create_notification, name='create_notification'),
+    path('admins/notifications/edit/<int:notification_id>/', edit_notification, name='edit_notification'),
+    path('admins/notifications/delete/<int:notification_id>/', delete_notification, name='delete_notification'),
+    # User Notifications URLs
+    path('admins/user-notifications/', user_notification_list, name='user_notification_list'),
+    path('admins/user-notifications/create/', create_user_notification, name='create_user_notification'),
+    path('admins/user-notifications/edit/<int:user_notification_id>/', edit_user_notification, name='edit_user_notification'),
+    path('admins/user-notifications/delete/<int:user_notification_id>/', delete_user_notification, name='delete_user_notification'),
+    # Company Profile URLs
+    path('admins/company-profile/', edit_company_profile, name='edit_company_profile'),
+    path('company-profile/', view_company_profile, name='view_company_profile'),
+
     path('.well-known/<path:path>', handle_well_known),  # Handle .well-known requests
 ]
 
