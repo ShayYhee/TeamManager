@@ -18,6 +18,10 @@
                         <div class="company-logo-container mb-3">
                             <img src="{{ tenant.company_profile.photo.url }}" alt="{{ tenant.company_profile.company_name }} Logo" class="company-logo rounded-circle shadow-sm" style="max-width: 100px; max-height: 100px; object-fit: contain; background: rgba(255, 255, 255, 0.95); padding: 8px;">
                         </div>
+                    {% else%}
+                        <div class="company-logo-container mb-3">
+                            <img src="{% static 'teammanager_logo.png' %}" alt="Team Manager Logo" class="company-logo rounded-circle shadow-sm" style="max-width: 100px; max-height: 100px; object-fit: contain; background: rgba(255, 255, 255, 0.95); padding: 8px;">
+                        </div>
                     {% endif %}
                     <h1 class="display-4 fw-bold">{{ tenant.company_profile.company_name }}</h1>
                     {% if tenant.company_profile.description %}
