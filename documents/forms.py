@@ -343,9 +343,10 @@ class DepartmentForm(forms.ModelForm):
 class TeamForm(forms.ModelForm):
     class Meta:
         model = Team
-        fields = ['name', 'department']
+        fields = ['name', 'department', 'team_leader']
         widgets = {
             'department': forms.Select(attrs={'class': 'form-control'}),
+            'team_leader': forms.Select(attrs={'class': 'form-control'}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -356,8 +357,10 @@ class TeamForm(forms.ModelForm):
             tenant = getattr(user, 'tenant', None)
             if tenant:
                 self.fields['department'].queryset = Department.objects.filter(tenant=tenant)
+                self.fields['team_leader'].queryset = CustomUser.objects.filter(tenant=tenant)
             else:
                 self.fields['department'].queryset = Department.objects.none()
+                self.fields['team_leader'].queryset = CustomUser.objects.none()
 
 class EventForm(forms.ModelForm):
     class Meta:
