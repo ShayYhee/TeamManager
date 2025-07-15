@@ -129,7 +129,7 @@ def create_document(request):
     
     if request.method == "POST":
         print("POST request received")
-        formset = DocumentFormSet(request.POST, request.FILES)
+        formset = DocumentFormSet(request.POST, request.FILES, user=request.user)
         print("Formset data:", request.POST)
         print("Files:", request.FILES)
 
@@ -815,7 +815,7 @@ def create_from_editor(request):
         return HttpResponseForbidden("Unauthorized: User does not belong to the current tenant.")
 
     if request.method == "POST":
-        form = CreateDocumentForm(request.POST)
+        form = CreateDocumentForm(request.POST, user=request.user)
         if form.is_valid():
             title = form.cleaned_data["title"]
             content = form.cleaned_data["content"]
@@ -1020,7 +1020,7 @@ def folder_list(request, parent_id=None):
 @login_required
 def create_folder(request):
     if request.method == 'POST':
-        form = FolderForm(request.POST)
+        form = FolderForm(request.POST, user=request.user)
         if form.is_valid():
             folder = form.save(commit=False)
             folder.created_by = request.user
@@ -1906,7 +1906,7 @@ def public_folder_list(request, public_folder_id=None):
 @login_required
 @require_POST
 def create_public_folder(request):
-    form = PublicFolderForm(request.POST)
+    form = PublicFolderForm(request.POST, user=request.user)
     if form.is_valid():
         folder = form.save(commit=False)
         folder.created_by = request.user
@@ -2485,14 +2485,14 @@ def create_department(request):
         return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
 
     if request.method == "POST":
-        form = DepartmentForm(request.POST)
+        form = DepartmentForm(request.POST, user=request.user)
         if form.is_valid():
             department = form.save(commit=False)
             department.tenant = request.tenant
             department.save()
             return redirect("department_list")
     else:
-        form = DepartmentForm()
+        form = DepartmentForm(user=request.user)
     return render(request, "admin/create_department.html", {"form": form})
 
 @user_passes_test(is_admin)
@@ -2505,12 +2505,12 @@ def edit_department(request, department_id):
     department = get_object_or_404(Department, id=department_id, tenant=request.tenant)
 
     if request.method == "POST":
-        form = DepartmentForm(request.POST, instance=department)
+        form = DepartmentForm(request.POST, instance=department, user=request.user)
         if form.is_valid():
             form.save()
             return redirect("department_list")
     else:
-        form = DepartmentForm(instance=department)
+        form = DepartmentForm(instance=department, user=request.user)
     return render(request, "admin/edit_department.html", {"form": form})
 
 @user_passes_test(is_admin)
@@ -2543,14 +2543,14 @@ def create_team(request):
         return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
 
     if request.method == "POST":
-        form = TeamForm(request.POST)
+        form = TeamForm(request.POST, user=request.user)
         if form.is_valid():
             team = form.save(commit=False)
             team.tenant = request.tenant
             team.save()
             return redirect("admin_team_list")
     else:
-        form = TeamForm()
+        form = TeamForm(user=request.user)
     return render(request, "admin/create_team.html", {"form": form})
 
 @user_passes_test(is_admin)
@@ -2574,12 +2574,12 @@ def edit_team(request, team_id):
     team = get_object_or_404(Team, id=team_id, tenant=request.tenant)
 
     if request.method == "POST":
-        form = TeamForm(request.POST, instance=team)
+        form = TeamForm(request.POST, instance=team, user=request.user)
         if form.is_valid():
             form.save()
             return redirect("admin_team_list")
     else:
-        form = TeamForm(instance=team)
+        form = TeamForm(instance=team, user=request.user)
     return render(request, "admin/edit_team.html", {"form": form})
 
 @user_passes_test(is_admin)
@@ -2601,7 +2601,7 @@ def create_event(request):
         return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
 
     if request.method == "POST":
-        form = EventForm(request.POST)
+        form = EventForm(request.POST, user=request.user)
         if form.is_valid():
             event = form.save(commit=False)
             event.tenant = request.tenant
@@ -2609,7 +2609,7 @@ def create_event(request):
             event.save()
             return redirect("event_list")
     else:
-        form = EventForm()
+        form = EventForm(user=request.user)
     return render(request, "admin/create_event.html", {"form": form})
 
 @user_passes_test(is_admin)
@@ -2622,12 +2622,12 @@ def edit_event(request, event_id):
     event = get_object_or_404(Event, id=event_id, tenant=request.tenant)
 
     if request.method == "POST":
-        form = EventForm(request.POST, instance=event)
+        form = EventForm(request.POST, instance=event, user=request.user)
         if form.is_valid():
             form.save()
             return redirect("event_list")
     else:
-        form = EventForm(instance=event)
+        form = EventForm(instance=event, user=request.user)
     return render(request, "admin/edit_event.html", {"form": form})
 
 @user_passes_test(is_admin)
@@ -2660,14 +2660,14 @@ def create_event_participant(request):
         return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
 
     if request.method == "POST":
-        form = EventParticipantForm(request.POST)
+        form = EventParticipantForm(request.POST, user=request.user)
         if form.is_valid():
             event_participant=form.save(commit=False)
             event_participant.tenant = request.tenant
             event_participant.save()
             return redirect("event_participant_list")
     else:
-        form = EventParticipantForm()
+        form = EventParticipantForm(user=request.user)
     return render(request, "admin/create_event_participant.html", {"form": form})
 
 @user_passes_test(is_admin)
@@ -2680,12 +2680,12 @@ def edit_event_participant(request, event_participant_id):
     event_participant = get_object_or_404(EventParticipant, id=event_participant_id, tenant=request.tenant)
 
     if request.method == "POST":
-        form = EventParticipantForm(request.POST, instance=event_participant)
+        form = EventParticipantForm(request.POST, instance=event_participant, user=request.user)
         if form.is_valid():
             form.save()
             return redirect("event_participant_list")
     else:
-        form = EventParticipantForm(instance=event_participant)
+        form = EventParticipantForm(instance=event_participant, user=request.user)
     return render(request, "admin/edit_event_participant.html", {"form": form})
 
 @user_passes_test(is_admin)
@@ -2718,14 +2718,14 @@ def create_staff_profile(request):
         return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
 
     if request.method == "POST":
-        form = StaffProfileForm(request.POST)
+        form = StaffProfileForm(request.POST, user=request.user)
         if form.is_valid():
             staff_profile=form.save(commit=False)
             staff_profile.tenant = request.tenant
             staff_profile.save()
             return redirect("staff_profile_list")
     else:
-        form = StaffProfileForm()
+        form = StaffProfileForm(user=request.user)
     return render(request, "admin/create_staff_profile.html", {"form": form})
 
 @user_passes_test(is_admin)
@@ -2738,12 +2738,12 @@ def edit_staff_profile(request, staff_profile_id):
     staff_profile = get_object_or_404(StaffProfile, id=staff_profile_id, tenant=request.tenant)
 
     if request.method == "POST":
-        form = StaffProfileForm(request.POST, instance=staff_profile)
+        form = StaffProfileForm(request.POST, instance=staff_profile, user=request.user)
         if form.is_valid():
             form.save()
             return redirect("staff_profile_list")
     else:
-        form = StaffProfileForm(instance=staff_profile)
+        form = StaffProfileForm(instance=staff_profile, user=request.user)
     return render(request, "admin/edit_staff_profile.html", {"form": form})
 
 @user_passes_test(is_admin)
@@ -2776,14 +2776,14 @@ def create_notification(request):
         return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
 
     if request.method == "POST":
-        form = NotificationForm(request.POST)
+        form = NotificationForm(request.POST, user=request.user)
         if form.is_valid():
             notification = form.save(commit=False)
             notification.tenant = request.tenant
             notification.save()
             return redirect("admin_notification_list")
     else:
-        form = NotificationForm()
+        form = NotificationForm(user=request.user)
     return render(request, "admin/create_notification.html", {"form": form})
 
 @user_passes_test(is_admin)
@@ -2795,12 +2795,12 @@ def edit_notification(request, notification_id):
     notification = get_object_or_404(Notification, id=notification_id, tenant=request.tenant)
 
     if request.method == "POST":
-        form = NotificationForm(request.POST, instance=notification)
+        form = NotificationForm(request.POST, instance=notification, user=request.user)
         if form.is_valid():
             form.save()
             return redirect("admin_notification_list")
     else:
-        form = NotificationForm(instance=notification)
+        form = NotificationForm(instance=notification, user=request.user)
     return render(request, "admin/edit_notification.html", {"form": form})
 
 @user_passes_test(is_admin)
@@ -2833,14 +2833,14 @@ def create_user_notification(request):
         return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
 
     if request.method == "POST":
-        form = UserNotificationForm(request.POST)
+        form = UserNotificationForm(request.POST, user=request.user)
         if form.is_valid():
             user_notification = form.save(commit=False)
             user_notification.tenant = request.tenant
             user_notification.save()
             return redirect("admin_notification_list")
     else:
-        form = UserNotificationForm()
+        form = UserNotificationForm(user=request.user)
     return render(request, "admin/create_user_notification.html", {"form": form})
 
 @user_passes_test(is_admin)
@@ -2852,12 +2852,12 @@ def edit_user_notification(request, user_notification_id):
     user_notification = get_object_or_404(UserNotification, id=user_notification_id, tenant=request.tenant)
 
     if request.method == "POST":
-        form = UserNotificationForm(request.POST, instance=user_notification)
+        form = UserNotificationForm(request.POST, instance=user_notification, user=request.user)
         if form.is_valid():
             form.save()
             return redirect("user_notification_list")
     else:
-        form = UserNotificationForm(instance=user_notification)
+        form = UserNotificationForm(instance=user_notification, user=request.user)
     return render(request, "admin/edit_user_notification.html", {"form": form})
 
 @user_passes_test(is_admin)
@@ -2902,5 +2902,5 @@ def edit_company_profile(request):
             form.save()
             return redirect("view_company_profile")
     else:
-        form = CompanyProfileForm(instance=company_profile)
+        form = CompanyProfileForm(instance=company_profile, user=request.user)
     return render(request, "admin/edit_company_profile.html", {"form": form})
