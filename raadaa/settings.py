@@ -30,13 +30,14 @@ ALLOWED_HOSTS = (
         'www.raadaa.onrender.com',
         'localhost',
         '*.localhost',
+        '.localhost',
         '127.0.0.1',
-        '*.teammanager.ng',
+        '.teammanager.ng',
         'teammanager.ng',
         'transnet-cloud.localhost',
         'raadaa.localhost',
         'miniago.localhost',
-        '13.220.249.10',  # Add test host IP
+        '13.61.189.68',  # Add test host IP
     ]
 )
 
@@ -47,16 +48,17 @@ CSRF_TRUSTED_ORIGINS = (
     csrf_trusted_origins_str.split(',') if csrf_trusted_origins_str
     else [
         'https://teammanager.ng',
-        'https://*.teammanager.ng',
+        'https://.teammanager.ng',
         'https://raadaa.onrender.com',
         'https://*.onrender.com',
         'http://localhost:8000',
         'http://*.localhost:8000',
+        'http://.localhost:8000',
         'http://127.0.0.1:8000',
         'http://transnet-cloud.localhost:8000',
         'http://raadaa.localhost:8000',
         'http://miniago.localhost:8000',
-        'http://13.220.249.10:8000',  # Add test host IP
+        'http://13.61.189.68:8000',  # Add test host IP
     ]
 )
 
