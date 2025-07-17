@@ -2,11 +2,7 @@
 {% load static %}
 
 {% block title %}
-    {% if error_code %}
-        {{ error_code }} Error - Team Manager
-    {% else %}
-        Error - Team Manager
-    {% endif %}
+    403 Forbidden - Access Denied
 {% endblock %}
 
 {% block content %}
@@ -16,26 +12,14 @@
             <div class="card shadow-sm border-0 mt-4" style="border-radius: 12px;">
                 <div class="card-header bg-transparent">
                     <h1 class="mb-0"><i class="fas fa-exclamation-circle me-2 text-primary"></i> 
-                        {% if error_code %}
-                            {{ error_code }} Error
-                        {% else %}
-                            Error
-                        {% endif %}
+                        403 Error
                     </h1>
                 </div>
                 <div class="card-body text-center">
                     <p class="text-gray-700">
-                        {% if error_code == '403' %}
-                            {{ message|default:"You are not authorized to access this page." }}
-                        {% elif error_code == '404' %}
-                            {{ message|default:"The page you are looking for could not be found." }}
-                        {% elif error_code == '500' %}
-                            {{ message|default:"An unexpected server error occurred. Please try again later." }}
-                        {% else %}
-                            {{ message|default:"An error occurred. Please try again." }}
-                        {% endif %}
+                        You are not authorized to access this page. 
                     </p>
-                    {% if not user.is_authenticated or user.is_superuser %}
+                    {% if not request.user.is_authenticated or request.user.is_superuser %}
                         <a href="{% url 'tenant_home' %}" class="btn btn-primary btn-sm mt-3" data-bs-toggle="tooltip" title="Return to Home">
                             <i class="fas fa-arrow-left me-1"></i> Back to Home
                         </a>

@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.shortcuts import render
 from django.conf import settings
 from django.conf.urls.static import static
 from django.urls import path, include
@@ -19,6 +20,7 @@ from documents.views import staff_profile_list, create_staff_profile, delete_sta
 from documents.views import event_participant_list, create_event_participant, edit_event_participant, delete_event_participant
 from documents.views import admin_notification_list, create_notification, edit_notification, delete_notification, edit_company_profile, view_company_profile
 from documents.views import user_notification_list, create_user_notification, edit_user_notification, delete_user_notification
+from documents.views import custom_404, custom_403, custom_500, custom_400
 from documents.views import EventViewSet
 from django.http import HttpResponse
 
@@ -27,6 +29,11 @@ router.register('events', EventViewSet, basename='events')
 
 def handle_well_known(request, path):
     return HttpResponse(status=204)  # Return 204 No Content
+
+handler404 = custom_404
+handler403 = custom_403
+handler400 = custom_400
+handler500 = custom_500
 
 urlpatterns = [
     path('admin/', admin.site.urls),

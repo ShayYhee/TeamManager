@@ -8,7 +8,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.contrib import messages
 from django.core.mail import send_mail, EmailMessage, get_connection
 from django.core.paginator import Paginator
-from django.core.exceptions import ValidationError
+from django.core.exceptions import ValidationError, PermissionDenied
 from django.conf import settings
 from django.db import transaction
 from django.db.models import Q, F
@@ -65,6 +65,18 @@ def is_admin(user):
 
     # return user.is_staff
 
+def custom_404(request, exception):
+    return render(request, '404.html', {'subdomain': request.get_host().split('.')[0]}, status=404)
+
+def custom_403(request, exception):
+    return render(request, '403.html', {'message': str(exception)}, status=403)
+
+def custom_400(request, exception):
+    return render(request, '400.html', status=400)
+
+def custom_500(request):
+    return render(request, '500.html', status=500)
+
 def send_approval_request(document):
     # Get all BDM emails for the document's tenant
     bdm_emails = CustomUser.objects.filter(
@@ -78,7 +90,11 @@ def send_approval_request(document):
     
     # Ensure the document's creator is from the same tenant
     if document.created_by.tenant != document.tenant:
-        return HttpResponseForbidden("Unauthorized: Creator does not belong to the document's tenant.")
+        # return HttpResponseForbidden("Unauthorized: Creator does not belong to the document's tenant.")
+        return render('error.html', {
+        'error_code': '403',
+        'message': 'Unauthorized: Creator does not belong to the document\'s tenant.'
+    }, status=403)
 
     sender_email = document.created_by.smtp_email
     sender_password = document.created_by.smtp_password
@@ -123,7 +139,8 @@ def create_document(request):
         return render(request, 'tenant_error.html', {'message': 'Access denied.', 'user': request.user,}) 
     
     if request.user.tenant.slug not in ["raadaa", "transnet-cloud"]:
-        return HttpResponseForbidden("Unauthorized: User can not view this page.")
+        # return HttpResponseForbidden("Unauthorized: User can not view this page.")
+        raise PermissionDenied()
     
     DocumentFormSet = formset_factory(DocumentForm, extra=1)
     
@@ -2490,6 +2507,8 @@ def create_department(request):
             department = form.save(commit=False)
             department.tenant = request.tenant
             department.save()
+            department.hod.department = department
+            department.hod.save()
             return redirect("department_list")
     else:
         form = DepartmentForm(user=request.user)
@@ -2507,7 +2526,10 @@ def edit_department(request, department_id):
     if request.method == "POST":
         form = DepartmentForm(request.POST, instance=department, user=request.user)
         if form.is_valid():
-            form.save()
+            department=form.save(commit=False)
+            department.hod.department = department
+            department.hod.save()
+            department.save()
             return redirect("department_list")
     else:
         form = DepartmentForm(instance=department, user=request.user)
@@ -2876,13 +2898,29 @@ def delete_user_notification(request, user_notification_id):
 def view_company_profile(request):
     if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
         logger.error(f"Unauthorized access by user {request.user.username}: tenant mismatch")
-        return HttpResponseForbidden("You are not authorized for this tenant.")
+        # return HttpResponseForbidden("You are not authorized for this tenant.")
+        return render(request, 'tenant_error.html', {
+            'error_code': '403',
+            'message': 'You are not authorized for this tenant.'
+        }, status=403)
     
     tenant_profile, created = CompanyProfile.objects.get_or_create(
         tenant=request.tenant,
         defaults={'company_name': request.tenant.name}  # Set default company_name to tenant name
     )
-    return render(request, 'admin/company_profile.html', {'tenant_profile': tenant_profile})
+    
+    num_staff = CustomUser.objects.filter(tenant=request.tenant).count()
+    num_departments = Department.objects.filter(tenant=request.tenant).count()
+    num_teams = Team.objects.filter(tenant=request.tenant).count()
+
+    tenant_profile.num_staff = num_staff
+    tenant_profile.num_departments = num_departments
+    tenant_profile.num_teams = num_teams
+    tenant_profile.save()
+
+    depts = Department.objects.filter(tenant=request.tenant)
+    teams = Team.objects.filter(tenant=request.tenant)
+    return render(request, 'admin/company_profile.html', {'tenant_profile': tenant_profile, 'depts': depts, 'teams': teams})
 
 @login_required
 @user_passes_test(is_admin)
@@ -2902,5 +2940,5 @@ def edit_company_profile(request):
             form.save()
             return redirect("view_company_profile")
     else:
-        form = CompanyProfileForm(instance=company_profile, user=request.user)
+        form = CompanyProfileForm(instance=company_profile)
     return render(request, "admin/edit_company_profile.html", {"form": form})
