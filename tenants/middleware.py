@@ -1,10 +1,8 @@
 import logging
-from django.http import HttpResponseNotFound, HttpResponseForbidden, Http404
+from django.http import HttpResponseNotFound, HttpResponseForbidden
+from django.conf import settings
 from documents.models import CustomUser
 from tenants.models import Tenant
-from django.conf import settings
-from django.core.exceptions import PermissionDenied, ObjectDoesNotExist
-from django.shortcuts import render
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -14,21 +12,31 @@ class TenantMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
-        if request.path == '/favicon.ico':
-            return self.get_response(request)
         # Initialize tenant as None
-        tenant = None
+        request.tenant = None
 
         # Early return for superusers to bypass tenant logic
         if hasattr(request, 'user') and request.user.is_authenticated and request.user.is_superuser:
-            request.tenant = None
             logger.debug("Superuser detected, bypassing tenant assignment")
             return self.get_response(request)
 
-        # Extract subdomain from host
-        host = request.get_host().split(':')[0]
-        subdomain = host.split('.')[0]
-        logger.debug(f"Host: {host}, Subdomain: {subdomain}")
+        # Extract host and determine if it's the main domain
+        host = request.get_host().split(':')[0]  # Remove port if present
+        domain_parts = host.split('.')
+        main_domain = settings.MAIN_DOMAIN  # e.g., 'example.com' or 'localhost'
+
+        # Check if the request is for the main domain (no subdomain)
+        if host == main_domain or host == 'localhost':
+            logger.debug("Request to main domain or localhost, no tenant required")
+            request.tenant = None
+            return self.get_response(request)
+
+        # Extract subdomain (assumes format like tenant.example.com)
+        if len(domain_parts) > 1:
+            subdomain = domain_parts[0]
+        else:
+            logger.warning(f"Invalid host format: {host}")
+            return HttpResponseNotFound("Invalid host format")
 
         # Try to find tenant by subdomain
         try:
@@ -46,19 +54,14 @@ class TenantMiddleware:
                 logger.error(f"Tenant with subdomain '{subdomain}' not found in production.")
                 return HttpResponseNotFound(f"Tenant with subdomain '{subdomain}' not found.")
 
-        # Set tenant for authenticated non-superusers
+        # Set tenant for the request
+        request.tenant = tenant
+
+        # Restrict access for authenticated non-superusers
         if hasattr(request, 'user') and request.user.is_authenticated:
-            request.tenant = tenant
             if not CustomUser.objects.filter(id=request.user.id, tenant=tenant).exists():
                 logger.warning(f"User {request.user.username} not associated with tenant {tenant.slug}")
                 return HttpResponseForbidden("You are not authorized to access this tenant.")
-                # raise PermissionDenied()
-                    # return render(request, '403.html', {}, status=403)
-            # except ObjectDoesNotExist:
-            #     logger.warning(f"User {request.user.username} not associated with tenant {tenant.slug}")
-            #     raise Http404("You are not authorized to access this tenant.")
-        else:
-            request.tenant = tenant  # Set for unauthenticated users
 
         logger.debug(f"Set request.tenant to: {tenant.slug if tenant else 'None'}")
         return self.get_response(request)
