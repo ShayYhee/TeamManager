@@ -20,12 +20,15 @@ load_dotenv(dotenv_path)
 
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'insecure-key-for-dev-only')
 DEBUG = os.getenv('DJANGO_DEBUG', 'False') == 'True'
+MAIN_DOMAIN = os.getenv('MAIN_DOMAIN', 'http://localhost:8000')
 # ALLOWED_HOSTS configuration
 # If DJANGO_ALLOWED_HOSTS is a comma-separated string in .env, split it into a list
 allowed_hosts_str = os.getenv('DJANGO_ALLOWED_HOSTS')
 ALLOWED_HOSTS = (
     allowed_hosts_str.split(',') if allowed_hosts_str
     else [
+        MAIN_DOMAIN,
+        '.' + MAIN_DOMAIN,
         'raadaa.onrender.com',
         'www.raadaa.onrender.com',
         'localhost',
