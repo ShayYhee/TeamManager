@@ -1,8 +1,10 @@
 import logging
-from django.http import HttpResponseNotFound, HttpResponseForbidden
+from django.http import HttpResponseNotFound, HttpResponseForbidden, Http404
 from documents.models import CustomUser
 from tenants.models import Tenant
 from django.conf import settings
+from django.core.exceptions import PermissionDenied, ObjectDoesNotExist
+from django.shortcuts import render
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -12,6 +14,8 @@ class TenantMiddleware:
         self.get_response = get_response
 
     def __call__(self, request):
+        if request.path == '/favicon.ico':
+            return self.get_response(request)
         # Initialize tenant as None
         tenant = None
 
@@ -48,6 +52,11 @@ class TenantMiddleware:
             if not CustomUser.objects.filter(id=request.user.id, tenant=tenant).exists():
                 logger.warning(f"User {request.user.username} not associated with tenant {tenant.slug}")
                 return HttpResponseForbidden("You are not authorized to access this tenant.")
+                # raise PermissionDenied()
+                    # return render(request, '403.html', {}, status=403)
+            # except ObjectDoesNotExist:
+            #     logger.warning(f"User {request.user.username} not associated with tenant {tenant.slug}")
+            #     raise Http404("You are not authorized to access this tenant.")
         else:
             request.tenant = tenant  # Set for unauthenticated users
 

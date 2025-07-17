@@ -33,6 +33,65 @@
                                 <p>No description provided.</p>
                             {% endif %}
                             <hr>
+                            <div class="row mb-3">
+                                {% if tenant_profile.num_staff %}
+                                    <div class="col-md-4">
+                                        <div class="card text-center shadow-sm" style="cursor: pointer;" onclick="goToStaffList()">
+                                            <div class="card-body">
+                                                <h5 class="card-title">Staff</h5>
+                                                <p class="card-text">{{ tenant_profile.num_staff }} employees</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% endif %}
+                                {% if tenant_profile.num_departments %}
+                                    <div class="col-md-4">
+                                        <div class="card text-center shadow-sm" style="cursor: pointer;" onclick="toggleDepartments()">
+                                            <div class="card-body">
+                                                <h5 class="card-title">Departments</h5>
+                                                <p class="card-text">{{ tenant_profile.num_departments }}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% endif %}
+                                {% if tenant_profile.num_teams %}
+                                    <div class="col-md-4">
+                                        <div class="card text-center shadow-sm" style="cursor: pointer;" onclick="toggleTeams()">
+                                            <div class="card-body">
+                                                <h5 class="card-title">Teams</h5>
+                                                <p class="card-text">{{ tenant_profile.num_teams }}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% endif %}
+                            </div>
+                            <!-- Departments List (Initially Hidden) -->
+                            <div id="departmentsList" style="display: none;">
+                                <h4>Departments</h4>
+                                {% if depts %}
+                                    <ul class="list-group">
+                                        {% for dept in depts %}
+                                            <li class="list-group-item">{{ dept.name }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                {% else %}
+                                    <p>No departments found.</p>
+                                {% endif %}
+                            </div>
+                            <!-- Teams List (Initially Hidden) -->
+                            <div id="teamsList" style="display: none;">
+                                <h4>Teams</h4>
+                                {% if depts %}
+                                    <ul class="list-group">
+                                        {% for team in teams %}
+                                            <li class="list-group-item">{{ team.name }}</li>
+                                        {% endfor %}
+                                    </ul>
+                                {% else %}
+                                    <p>No teams found.</p>
+                                {% endif %}
+                            </div>
+                            <hr>
                             <ul class="list-unstyled">
                                 {% if tenant_profile.date_founded %}
                                     <li><strong>Founded:</strong> {{ tenant_profile.date_founded|date:"F Y" }}</li>
@@ -52,15 +111,6 @@
                                 {% if tenant_profile.website %}
                                     <li><strong>Website:</strong> <a href="{{ tenant_profile.website }}" target="_blank">{{ tenant_profile.website }}</a></li>
                                 {% endif %}
-                                {% if tenant_profile.num_staff %}
-                                    <li><strong>Staff:</strong> {{ tenant_profile.num_staff }} employees</li>
-                                {% endif %}
-                                {% if tenant_profile.num_departments %}
-                                    <li><strong>Departments:</strong> {{ tenant_profile.num_departments }}</li>
-                                {% endif %}
-                                {% if tenant_profile.num_teams %}
-                                    <li><strong>Teams:</strong> {{ tenant_profile.num_teams }}</li>
-                                {% endif %}
                             </ul>
                         </div>
                     </div>
@@ -69,4 +119,32 @@
         </main>
     </div>
 </div>
+
+<script>
+function toggleDepartments() {
+    var deptList = document.getElementById('departmentsList');
+    if (deptList.style.display === 'none') {
+        deptList.style.display = 'block';
+    } else {
+        deptList.style.display = 'none';
+    }
+}
+function toggleTeams() {
+    var deptList = document.getElementById('teamsList');
+    if (deptList.style.display === 'none') {
+        deptList.style.display = 'block';
+    } else {
+        deptList.style.display = 'none';
+    }
+}
+function goToStaffList() {
+    window.location.href = '{% url "staff_list" %}'
+}
+</script>
+
+<style scoped>
+    .card-title:hover {
+        color: #2c7a7b;
+    }
+</style>
 {% endblock %}
