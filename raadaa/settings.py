@@ -28,6 +28,7 @@ ALLOWED_HOSTS = (
     allowed_hosts_str.split(',') if allowed_hosts_str
     else [
         MAIN_DOMAIN,
+        '.' + MAIN_DOMAIN,
         'raadaa.onrender.com',
         'www.raadaa.onrender.com',
         'localhost',
