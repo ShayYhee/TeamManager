@@ -1,5 +1,5 @@
 import logging
-from django.http import HttpResponseNotFound, HttpResponseForbidden
+from django.http import HttpResponseNotFound, HttpResponseForbidden, HttpResponseServerError
 from django.conf import settings
 from documents.models import CustomUser
 from tenants.models import Tenant
@@ -17,51 +17,58 @@ class TenantMiddleware:
 
         # Early return for superusers to bypass tenant logic
         if hasattr(request, 'user') and request.user.is_authenticated and request.user.is_superuser:
-            logger.debug("Superuser detected, bypassing tenant assignment")
+            print("Superuser detected, bypassing tenant assignment")
             return self.get_response(request)
 
-        # Extract host and determine if it's the main domain
-        host = request.get_host().split(':')[0]  # Remove port if present
-        domain_parts = host.split('.')
-        main_domain = settings.MAIN_DOMAIN  # e.g., 'example.com' or 'localhost'
+        # Extract host and remove port if present
+        host = request.get_host().split(':')[0]
+        print(f"Raw host: {request.get_host()}, Processed host: {host}, REMOTE_ADDR: {request.META.get('REMOTE_ADDR')}")
 
         # Check if the request is for the main domain (no subdomain)
+        main_domain = settings.MAIN_DOMAIN.split(':')[0]  # Remove port from MAIN_DOMAIN
         if host == main_domain or host == 'localhost':
-            logger.debug("Request to main domain or localhost, no tenant required")
+            print("Request to main domain or localhost, no tenant required")
             request.tenant = None
             return self.get_response(request)
 
-        # Extract subdomain (assumes format like tenant.example.com)
+        # Extract subdomain (assumes format like tenant.teammanager.com)
+        domain_parts = host.split('.')
         if len(domain_parts) > 1:
             subdomain = domain_parts[0]
+            # Validate subdomain to ensure it's not  (prevent issues like ip addresses '13')
+            if isinstance(subdomain, int):
+                print(f"Invalid subdomain detected: {subdomain}")
+                return HttpResponseNotFound("Invalid subdomain format")
         else:
-            logger.warning(f"Invalid host format: {host}")
-            return HttpResponseNotFound("Invalid host format")
+            print(f"Invalid host format or no subdomain: {host}")
+            return HttpResponseNotFound("Invalid host format or no subdomain")
 
         # Try to find tenant by subdomain
         try:
             tenant = Tenant.objects.get(slug=subdomain)
-            logger.debug(f"Found tenant: {tenant.slug}")
+            print(f"Found tenant: {tenant.slug}")
+            request.tenant = tenant
         except Tenant.DoesNotExist:
-            logger.warning(f"No tenant found for subdomain: {subdomain}")
+            print(f"Tenant with subdomain '{subdomain}' not found.")
             if settings.DEBUG:
                 tenant = Tenant.objects.first()
-                if not tenant:
-                    logger.error("No tenants found in the database.")
+                if tenant:
+                    print(f"Falling back to default tenant: {tenant.slug}")
+                    request.tenant = tenant
+                else:
+                    print("No tenants found in the database.")
                     return HttpResponseNotFound("No tenants found in the database.")
-                logger.debug(f"Falling back to default tenant: {tenant.slug}")
             else:
-                logger.error(f"Tenant with subdomain '{subdomain}' not found in production.")
                 return HttpResponseNotFound(f"Tenant with subdomain '{subdomain}' not found.")
-
-        # Set tenant for the request
-        request.tenant = tenant
+        except Exception as e:
+            print(f"Unexpected error in tenant lookup: {e}")
+            return HttpResponseServerError("An unexpected server error occurred.")
 
         # Restrict access for authenticated non-superusers
         if hasattr(request, 'user') and request.user.is_authenticated:
-            if not CustomUser.objects.filter(id=request.user.id, tenant=tenant).exists():
-                logger.warning(f"User {request.user.username} not associated with tenant {tenant.slug}")
+            if not CustomUser.objects.filter(id=request.user.id, tenant=request.tenant).exists():
+                print(f"User {request.user.username} not associated with tenant {request.tenant.slug}")
                 return HttpResponseForbidden("You are not authorized to access this tenant.")
 
-        logger.debug(f"Set request.tenant to: {tenant.slug if tenant else 'None'}")
+        print(f"Set request.tenant to: {request.tenant.slug if request.tenant else 'None'}")
         return self.get_response(request)

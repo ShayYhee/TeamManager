@@ -328,12 +328,16 @@
             <a href="{% url 'tenant_list' %}" {% if request.path == '/tenants/list/' %}class="active"{% endif %}><i class="fas fa-user-shield"></i>Tenants</a>
             <a href="{% url 'admin:index' %}" {% if request.path|slice:":7" == '/admin/' %}class="active"{% endif %}><i class="fas fa-key"></i> Admin Panel</a>
         {% elif user.tenant.slug == "raadaa" or user.tenant.slug == "transnet-cloud" %}
+            <a href="{% url 'calendar' %}" {% if request.path == '/calendar/' %}class="active"{% endif %}><i class="fas fa-calendar"></i> Calendar</a>
+            <a href="{% url 'view_my_profile' %}" {% if request.path == '/profile/' %}class="active"{% endif %}><i class="fas fa-user"></i> My Profile</a>
+            <a href="{% url 'staff_list' %}" {% if request.path == '/staff/' %}class="active"{% endif %}><i class="fas fa-user-friends"></i> Staff List</a>
+            <a href="{% url 'view_company_profile' %}" {% if request.path == '/company-profile/' %}class="active"{% endif %}><i class="fas fa-building"></i> Company Profile</a>
+            <a href="{% url 'task_list' %}" {% if request.path == '/tasks/' %}class="active"{% endif %}><i class="fas fa-tasks"></i> Tasks</a>
             <a href="{% url 'document_list' %}" {% if request.path == '/documents/' %}class="active"{% endif %}><i class="fas fa-file-alt"></i> Document List</a>
             <a href="{% url 'create_document' %}" {% if request.path == '/documents/create/' %}class="active"{% endif %}><i class="fas fa-bolt"></i> Generate Document</a>
             <a href="{% url 'create_from_editor' %}" {% if request.path == '/documents/editor/' %}class="active"{% endif %}><i class="fas fa-edit"></i> Document Editor</a>
             <a href="{% url 'folder_list' %}" {% if request.path|slice:":10" == '/folders/' %}class="active"{% endif %}><i class="fas fa-folder"></i> Folders</a>
             <a href="{% url 'public_folder_list' %}" {% if request.path|slice:":10" == '/public-folders/' %}class="active"{% endif %}><i class="fas fa-folder-open"></i> Public Folders</a>
-            <a href="{% url 'task_list' %}" {% if request.path == '/tasks/' %}class="active"{% endif %}><i class="fas fa-tasks"></i> Tasks</a>
             <a href="{% url 'performance_dashboard' %}" {% if request.path == '/dashboard/performance-dashboard' %}class="active"{% endif %}><i class="fas fa-chart-line" style="color: #ffffff;"></i> Performance</a>
             {% for role in user.roles.all %}
                 {% if role.name == "HOD" %}
@@ -346,10 +350,6 @@
                     <a href="{% url 'staff_directory' %}" {% if request.path == '/staff/directory/' %}class="active"{% endif %}><i class="fas fa-users"></i> Staff Directory</a>
                 {% endif %}
             {% endfor %}
-            <a href="{% url 'calendar' %}" {% if request.path == '/calendar/' %}class="active"{% endif %}><i class="fas fa-calendar"></i> Calendar</a>
-            <a href="{% url 'view_my_profile' %}" {% if request.path == '/profile/' %}class="active"{% endif %}><i class="fas fa-user"></i> My Profile</a>
-            <a href="{% url 'staff_list' %}" {% if request.path == '/staff/' %}class="active"{% endif %}><i class="fas fa-user-friends"></i> Staff List</a>
-            <a href="{% url 'view_company_profile' %}" {% if request.path == '/company-profile/' %}class="active"{% endif %}><i class="fas fa-building"></i> Company Profile</a>
             <a href="{% url 'email_config' %}" {% if request.path == '/settings/' %}class="active"{% endif %}><i class="fas fa-cog"></i> Settings</a>
             {% for role in user.roles.all %}
                 {% if role.name == "Admin" %}
@@ -358,11 +358,15 @@
                 {% endif %}
             {% endfor %}
         {% else %}
+            <a href="{% url 'calendar' %}" {% if request.path == '/calendar/' %}class="active"{% endif %}><i class="fas fa-calendar"></i> Calendar</a>
+            <a href="{% url 'view_my_profile' %}" {% if request.path == '/profile/' %}class="active"{% endif %}><i class="fas fa-user"></i> My Profile</a>
+            <a href="{% url 'staff_list' %}" {% if request.path == '/staff/' %}class="active"{% endif %}><i class="fas fa-user-friends"></i> Staff List</a>
+            <a href="{% url 'view_company_profile' %}" {% if request.path == '/company-profile/' %}class="active"{% endif %}><i class="fas fa-building"></i> Company Profile</a>
+            <a href="{% url 'task_list' %}" {% if request.path == '/tasks/' %}class="active"{% endif %}><i class="fas fa-tasks"></i> Tasks</a>
             <a href="{% url 'document_list' %}" {% if request.path == '/documents/' %}class="active"{% endif %}><i class="fas fa-file-alt"></i> Document List</a>
             <a href="{% url 'create_from_editor' %}" {% if request.path == '/documents/editor/' %}class="active"{% endif %}><i class="fas fa-edit"></i> Document Editor</a>
             <a href="{% url 'folder_list' %}" {% if request.path|slice:":10" == '/folders/' %}class="active"{% endif %}><i class="fas fa-folder"></i> Folders</a>
             <a href="{% url 'public_folder_list' %}" {% if request.path|slice:":10" == '/public-folders/' %}class="active"{% endif %}><i class="fas fa-folder-open"></i> Public Folders</a>
-            <a href="{% url 'task_list' %}" {% if request.path == '/tasks/' %}class="active"{% endif %}><i class="fas fa-tasks"></i> Tasks</a>
             <a href="{% url 'performance_dashboard' %}" {% if request.path == '/dashboard/performance-dashboard' %}class="active"{% endif %}><i class="fas fa-chart-line" style="color: #ffffff;"></i> Performance</a>
             {% for role in user.roles.all %}
                 {% if role.name == "HOD" %}
@@ -375,10 +379,6 @@
                     <a href="{% url 'staff_directory' %}" {% if request.path == '/staff/directory/' %}class="active"{% endif %}><i class="fas fa-users"></i> Staff Directory</a>
                 {% endif %}
             {% endfor %}
-            <a href="{% url 'calendar' %}" {% if request.path == '/calendar/' %}class="active"{% endif %}><i class="fas fa-calendar"></i> Calendar</a>
-            <a href="{% url 'view_my_profile' %}" {% if request.path == '/profile/' %}class="active"{% endif %}><i class="fas fa-user"></i> My Profile</a>
-            <a href="{% url 'staff_list' %}" {% if request.path == '/staff/' %}class="active"{% endif %}><i class="fas fa-user-friends"></i> Staff List</a>
-            <a href="{% url 'view_company_profile' %}" {% if request.path == '/company-profile/' %}class="active"{% endif %}><i class="fas fa-building"></i> Company Profile</a>
             <a href="{% url 'email_config' %}" {% if request.path == '/settings/' %}class="active"{% endif %}><i class="fas fa-cog"></i> Settings</a>
             {% for role in user.roles.all %}
                 {% if role.name == "Admin" %}

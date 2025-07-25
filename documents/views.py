@@ -526,10 +526,9 @@ def document_list(request):
 
 def home(request):
     tenant = request.tenant
+    print("This is home")
     return render(request, "home.html", {'tenant': tenant})
-    # company_profile = get_object_or_404(CompanyProfile, tenant=request.tenant)
-    # return render(request, "home.html", {'company_profile': company_profile})
-
+   
 
 @login_required
 def approve_document(request, document_id):
@@ -2898,29 +2897,30 @@ def delete_user_notification(request, user_notification_id):
 def view_company_profile(request):
     if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
         logger.error(f"Unauthorized access by user {request.user.username}: tenant mismatch")
-        # return HttpResponseForbidden("You are not authorized for this tenant.")
-        return render(request, 'tenant_error.html', {
-            'error_code': '403',
-            'message': 'You are not authorized for this tenant.'
-        }, status=403)
-    
+        return HttpResponseForbidden("You are not authorized for this tenant.")
+    print(f"User tenant: {request.user.tenant}. Request tenant: {request.tenant.name}")
     tenant_profile, created = CompanyProfile.objects.get_or_create(
         tenant=request.tenant,
-        defaults={'company_name': request.tenant.name}  # Set default company_name to tenant name
+        defaults={'company_name': request.tenant}  # Set default company_name to tenant name
     )
     
-    num_staff = CustomUser.objects.filter(tenant=request.tenant).count()
-    num_departments = Department.objects.filter(tenant=request.tenant).count()
-    num_teams = Team.objects.filter(tenant=request.tenant).count()
+    try:
+        num_staff = CustomUser.objects.filter(tenant=request.tenant).count()
+        num_departments = Department.objects.filter(tenant=request.tenant).count()
+        num_teams = Team.objects.filter(tenant=request.tenant).count()
 
-    tenant_profile.num_staff = num_staff
-    tenant_profile.num_departments = num_departments
-    tenant_profile.num_teams = num_teams
-    tenant_profile.save()
+        tenant_profile.num_staff = num_staff
+        tenant_profile.num_departments = num_departments
+        tenant_profile.num_teams = num_teams
+        tenant_profile.save()
 
-    depts = Department.objects.filter(tenant=request.tenant)
-    teams = Team.objects.filter(tenant=request.tenant)
-    return render(request, 'admin/company_profile.html', {'tenant_profile': tenant_profile, 'depts': depts, 'teams': teams})
+        depts = Department.objects.filter(tenant=request.tenant)
+        teams = Team.objects.filter(tenant=request.tenant)
+        return render(request, 'admin/company_profile.html', {'tenant_profile': tenant_profile, 'depts': depts, 'teams': teams})
+    except Exception as e:
+        logger.error(f"Error in view_company_profile: {e}")
+        # return render(request, 'tenant_error.html', {'message': 'An unexpected error occurred'}, status=500)
+        return HttpResponse("An unexpected error occurred")
 
 @login_required
 @user_passes_test(is_admin)
