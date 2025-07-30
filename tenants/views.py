@@ -10,6 +10,7 @@ from documents.models import CustomUser, Role
 from django.contrib.auth import authenticate, login
 from django.db.models import Q
 import logging
+from raadaa import settings
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +52,12 @@ def apply_for_tenant(request):
                 application.status = 'approved'
                 application.save()
                 logger.debug(f"Assigned Admin role to user {tenant.admin.username} for tenant {tenant.slug}")
-                return redirect('login')
+                # Login redirect
+                base_domain = "localhost:8000" if settings.DEBUG else "teammanager.ng"
+                protocol = "http" if settings.DEBUG else "https"
+                login_url = f"{protocol}://{application.slug}.{base_domain}/accounts/login"
+                # return redirect('login')
+                return render(request, 'tenants/login_redirect.html', {'login_url': login_url})
             except Exception as e:
                 logger.error(f"Error creating tenant for application {application.organization_name}: {str(e)}")
                 return HttpResponseForbidden(f"Error creating tenant: {str(e)}")
@@ -182,6 +188,11 @@ def tenant_applications(request):
     else:
         HttpResponseForbidden(f'You are not authorized to view this')
     return render(request, 'tenants/tenant_applications.html', {'tenants': tenant_apps})
+
+def delete_tenant_app(request, tenant_application_id):
+    tenant_app = get_object_or_404(TenantApplication, id=tenant_application_id)
+    tenant_app.delete()
+    return redirect('tenant_applications')
 
 @login_required
 def tenant_list(request):

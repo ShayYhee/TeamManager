@@ -116,6 +116,9 @@
             background: #3b4a6b !important;
             border-bottom: 1px solid #4a5568;
         }
+        body.dark-mode .text-muted {
+            color: #b8bfceff !important;
+        }
         .notification-message {
             text-align: center;
             display: flex;
@@ -329,6 +332,8 @@
             <a href="{% url 'admin:index' %}" {% if request.path|slice:":7" == '/admin/' %}class="active"{% endif %}><i class="fas fa-key"></i> Admin Panel</a>
         {% elif user.tenant.slug == "raadaa" or user.tenant.slug == "transnet-cloud" %}
             <a href="{% url 'calendar' %}" {% if request.path == '/calendar/' %}class="active"{% endif %}><i class="fas fa-calendar"></i> Calendar</a>
+            <a href="{% url 'contact_list' %}" {% if request.path == '/dashboard/contacts/' %}class="active"{% endif %}><i class="fas fa-address-book"></i> Contacts</a>
+            <a href="{% url 'email_list' %}" {% if request.path == '/dashboard/emails/' %}class="active"{% endif %}><i class="fas fa-envelope"></i> Emails</a>
             <a href="{% url 'view_my_profile' %}" {% if request.path == '/profile/' %}class="active"{% endif %}><i class="fas fa-user"></i> My Profile</a>
             <a href="{% url 'staff_list' %}" {% if request.path == '/staff/' %}class="active"{% endif %}><i class="fas fa-user-friends"></i> Staff List</a>
             <a href="{% url 'view_company_profile' %}" {% if request.path == '/company-profile/' %}class="active"{% endif %}><i class="fas fa-building"></i> Company Profile</a>
@@ -359,6 +364,8 @@
             {% endfor %}
         {% else %}
             <a href="{% url 'calendar' %}" {% if request.path == '/calendar/' %}class="active"{% endif %}><i class="fas fa-calendar"></i> Calendar</a>
+            <a href="{% url 'contact_list' %}" {% if request.path == '/dashboard/contacts/' %}class="active"{% endif %}><i class="fas fa-address-book"></i> Contacts</a>
+            <a href="{% url 'email_list' %}" {% if request.path == '/dashboard/emails/' %}class="active"{% endif %}><i class="fas fa-envelope"></i> Emails</a>
             <a href="{% url 'view_my_profile' %}" {% if request.path == '/profile/' %}class="active"{% endif %}><i class="fas fa-user"></i> My Profile</a>
             <a href="{% url 'staff_list' %}" {% if request.path == '/staff/' %}class="active"{% endif %}><i class="fas fa-user-friends"></i> Staff List</a>
             <a href="{% url 'view_company_profile' %}" {% if request.path == '/company-profile/' %}class="active"{% endif %}><i class="fas fa-building"></i> Company Profile</a>

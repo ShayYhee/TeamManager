@@ -1,32 +1,89 @@
 {% load static %}
-{% load custom_filters%}
+{% load custom_filters %}
 
 {% block title %}Profile Details{% endblock %}
 
 {% block content %}
 <div class="container">
     <div class="row justify-content-center">
-        <!-- Profile Photo -->
-        <div class="col-12 col-md-3 text-center mb-4">
-            <div class="card shadow-sm" style="border-radius: 12px;">
-                <div class="card-body">
-                    {% if 'photo' in visible_fields and profile.photo %}
-                        <img src="{{ profile.photo.url }}" alt="Profile Photo" class="pfp img-fluid rounded-circle" style="width: 150px; height: 150px; object-fit: cover;">
-                    {% else %}
-                        <img src="{% static 'raadaa/no_photo.jpeg' %}" alt="Default Profile Photo" class="pfp img-fluid rounded-circle" style="width: 150px; height: 150px; object-fit: cover;">
-                    {% endif %}
+        <div class="col-lg-8 col-md-10">
+            <!-- Personal Information -->
+            <div class="card shadow-sm border-0 mb-4" style="border-radius: 12px;">
+                <div class="card-header bg-transparent d-flex align-items-center justify-content-between" onclick="toggleVisibility(this)" role="button" aria-expanded="true" aria-controls="personalInfoCollapse">
+                    <h3 class="mb-0"><i class="fas fa-user me-2"></i> Personal Information</h3>
+                    <span class="caret"><i class="fas fa-chevron-right"></i></span>
                 </div>
-            </div>
-        </div>
-
-        <!-- Profile Details -->
-        <div class="col-12 col-md-9">
-            <div class="card shadow-sm" style="border-radius: 12px;">
-                <div class="card-body">
-                    <h4 class="card-title mb-4">Profile Details</h4>
+                <div class="card-body collapse show" id="personalInfoCollapse">
+                    <div class="text-center mb-4">
+                        {% if 'photo' in visible_fields and profile.photo %}
+                            <img src="{{ profile.photo.url }}" alt="Profile Photo" class="pfp img-fluid rounded-circle" style="width: 150px; height: 150px; object-fit: cover;">
+                        {% else %}
+                            <img src="{% static 'raadaa/no_photo.jpeg' %}" alt="Default Profile Photo" class="pfp img-fluid rounded-circle" style="width: 150px; height: 150px; object-fit: cover;">
+                        {% endif %}
+                    </div>
                     <ul class="list-group list-group-flush">
                         {% for vis in visible_fields %}
-                            {% if vis != 'photo' %}
+                            {% if vis in 'first_name,last_name,middle_name,date_of_birth,sex,religion,marital_status,state_of_origin,lga' %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <strong>{{ vis|capfirst|title }}:</strong>
+                                    <span>{{ profile|dict_get:vis|default:"N/A" }}</span>
+                                </li>
+                            {% endif %}
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Contact Information -->
+            <div class="card shadow-sm border-0 mb-4" style="border-radius: 12px;">
+                <div class="card-header bg-transparent d-flex align-items-center justify-content-between" onclick="toggleVisibility(this)" role="button" aria-expanded="false" aria-controls="contactInfoCollapse">
+                    <h3 class="mb-0"><i class="fas fa-address-book me-2"></i> Contact Information</h3>
+                    <span class="caret"><i class="fas fa-chevron-right"></i></span>
+                </div>
+                <div class="card-body collapse" id="contactInfoCollapse">
+                    <ul class="list-group list-group-flush">
+                        {% for vis in visible_fields %}
+                            {% if vis in 'phone_number,email,home_address' %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <strong>{{ vis|capfirst|title }}:</strong>
+                                    <span>{{ profile|dict_get:vis|default:"N/A" }}</span>
+                                </li>
+                            {% endif %}
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Education -->
+            <div class="card shadow-sm border-0 mb-4" style="border-radius: 12px;">
+                <div class="card-header bg-transparent d-flex align-items-center justify-content-between" onclick="toggleVisibility(this)" role="button" aria-expanded="false" aria-controls="educationCollapse">
+                    <h3 class="mb-0"><i class="fas fa-graduation-cap me-2"></i> Education</h3>
+                    <span class="caret"><i class="fas fa-chevron-right"></i></span>
+                </div>
+                <div class="card-body collapse" id="educationCollapse">
+                    <ul class="list-group list-group-flush">
+                        {% for vis in visible_fields %}
+                            {% if vis in 'institution,course,degree,graduation_year' %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <strong>{{ vis|capfirst|title }}:</strong>
+                                    <span>{{ profile|dict_get:vis|default:"N/A" }}</span>
+                                </li>
+                            {% endif %}
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Employment Details -->
+            <div class="card shadow-sm border-0 mb-4" style="border-radius: 12px;">
+                <div class="card-header bg-transparent d-flex align-items-center justify-content-between" onclick="toggleVisibility(this)" role="button" aria-expanded="false" aria-controls="employmentCollapse">
+                    <h3 class="mb-0"><i class="fas fa-briefcase me-2"></i> Employment Details</h3>
+                    <span class="caret"><i class="fas fa-chevron-right"></i></span>
+                </div>
+                <div class="card-body collapse" id="employmentCollapse">
+                    <ul class="list-group list-group-flush">
+                        {% for vis in visible_fields %}
+                            {% if vis in 'account_number,bank_name,account_name,designation,location,employment_date,official_email,department,team' %}
                                 <li class="list-group-item d-flex justify-content-between align-items-center">
                                     <strong>{{ vis|capfirst|title }}:</strong>
                                     <span>
@@ -42,46 +99,69 @@
                     </ul>
                 </div>
             </div>
-        </div>
-    </div>
 
-    <!-- Documents Section -->
-    <div class="row mt-5">
-        <div class="col-12">
-            <h4 class="mb-3">Documents</h4>
-            {% if profile.documents.all %}
-                <div class="row" id="documentList">
-                    {% for document in profile.documents.all %}
-                        <div class="col-12 col-sm-6 col-md-4 mb-3 document-card" data-document-id="{{ document.id }}">
-                            <div class="card h-100 shadow-sm" style="border-radius: 12px; transition: transform 0.2s ease;">
-                                <div class="card-body position-relative">
-                                    <h5 class="card-title">{{ document.description|default:document.document_type }}</h5>
-                                    <p class="card-text">
-                                        <a href="{{ document.file.url }}" 
-                                           data-media-url="{{ document.file.url }}" 
-                                           data-media-type="{% if document.file.name|lower|slice:'-4:' == '.pdf' %}pdf{% else %}image{% endif %}" 
-                                           data-media-name="{{ document.description|default:document.document_type }}" 
-                                           class="text-primary text-decoration-none">
-                                            {{ document.file.name|slice:"20:"|default:"View Document" }}
-                                        </a><br>
-                                        <small class="text-muted">Uploaded: {{ document.uploaded_at|date:"F d, Y" }}</small>
-                                    </p>
-                                    <button class="btn btn-danger btn-sm delete-document" 
-                                            style="position: absolute; top: 10px; right: 10px;"
-                                            data-document-id="{{ document.id }}"
-                                            aria-label="Delete Document">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
+            <!-- Emergency Contact -->
+            <div class="card shadow-sm border-0 mb-4" style="border-radius: 12px;">
+                <div class="card-header bg-transparent d-flex align-items-center justify-content-between" onclick="toggleVisibility(this)" role="button" aria-expanded="false" aria-controls="emergencyCollapse">
+                    <h3 class="mb-0"><i class="fas fa-phone-alt me-2"></i> Emergency Contact</h3>
+                    <span class="caret"><i class="fas fa-chevron-right"></i></span>
+                </div>
+                <div class="card-body collapse" id="emergencyCollapse">
+                    <ul class="list-group list-group-flush">
+                        {% for vis in visible_fields %}
+                            {% if vis in 'emergency_name,emergency_relationship,emergency_phone,emergency_address,emergency_email' %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <strong>{{ vis|capfirst|title }}:</strong>
+                                    <span>{{ profile|dict_get:vis|default:"N/A" }}</span>
+                                </li>
+                            {% endif %}
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Documents Section -->
+            <div class="card shadow-sm border-0 mb-4" style="border-radius: 12px;">
+                <div class="card-header bg-transparent d-flex align-items-center justify-content-between" onclick="toggleVisibility(this)" role="button" aria-expanded="true" aria-controls="documentsCollapse">
+                    <h3 class="mb-0"><i class="fas fa-file-alt me-2"></i> Documents</h3>
+                    <span class="caret"><i class="fas fa-chevron-right"></i></span>
+                </div>
+                <div class="card-body collapse show" id="documentsCollapse">
+                    {% if profile.documents.all %}
+                        <div class="row" id="documentList">
+                            {% for document in profile.documents.all %}
+                                <div class="col-12 col-sm-6 col-md-4 mb-3 document-card" data-document-id="{{ document.id }}">
+                                    <div class="card h-100 shadow-sm" style="border-radius: 12px; transition: transform 0.2s ease;">
+                                        <div class="card-body position-relative">
+                                            <h5 class="card-title">{{ document.description|default:document.document_type }}</h5>
+                                            <p class="card-text">
+                                                <a href="{{ document.file.url }}" 
+                                                   data-media-url="{{ document.file.url }}" 
+                                                   data-media-type="{% if document.file.name|lower|slice:'-4:' == '.pdf' %}pdf{% else %}image{% endif %}" 
+                                                   data-media-name="{{ document.description|default:document.document_type }}" 
+                                                   class="text-primary text-decoration-none">
+                                                    {{ document.file.name|slice:"20:"|default:"View Document" }}
+                                                </a><br>
+                                                <small class="text-muted">Uploaded: {{ document.uploaded_at|date:"F d, Y" }}</small>
+                                            </p>
+                                            <button class="btn btn-danger btn-sm delete-document" 
+                                                    style="position: absolute; top: 10px; right: 10px;"
+                                                    data-document-id="{{ document.id }}"
+                                                    aria-label="Delete Document">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
+                            {% endfor %}
                         </div>
-                    {% endfor %}
+                    {% else %}
+                        <div class="alert alert-info" role="alert">
+                            No documents uploaded.
+                        </div>
+                    {% endif %}
                 </div>
-            {% else %}
-                <div class="alert alert-info" role="alert">
-                    No documents uploaded.
-                </div>
-            {% endif %}
+            </div>
         </div>
     </div>
 </div>
@@ -98,8 +178,32 @@
     .pfp:hover {
         transform: scale(1.05);
     }
-    .card:hover {
-        transform: translateY(-5px);
+    .card {
+        border-radius: 12px;
+        transition: all 0.3s ease;
+    }
+    body.dark-mode .card {
+        background: #2d3748;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    }
+    .card-header {
+        cursor: pointer;
+        transition: background-color 0.2s ease;
+    }
+    body.dark-mode .card-header {
+        background: #3b4a6b !important;
+    }
+    .card-header:hover {
+        background-color: #e2e8f0;
+    }
+    body.dark-mode .card-header:hover {
+        background-color: #4a5568 !important;
+    }
+    .caret {
+        transition: transform 0.3s ease;
+    }
+    .caret.rotated {
+        transform: rotate(90deg);
     }
     .list-group-item {
         background: transparent;
@@ -108,14 +212,14 @@
         font-size: 0.95rem;
     }
     body.dark-mode .list-group-item {
-        color: #000000;
+        color: #e2e8f0;
     }
     .card-title {
         font-weight: 600;
         color: #2d3748;
     }
     body.dark-mode .card-title {
-        color: #000000;
+        color: #e2e8f0;
     }
     .btn-danger {
         background-color: #e53e3e;
@@ -134,35 +238,47 @@
         .card-title {
             font-size: 1.1rem;
         }
+        h3 {
+            font-size: 1.25rem;
+        }
     }
 </style>
 
 <script>
-    $(document).ready(function() {
-        // Delete document confirmation
-        $('.delete-document').on('click', function() {
-            const documentId = $(this).data('document-id');
-            if (confirm('Are you sure you want to delete this document?')) {
-                $.ajax({
-                    url: `/documents/delete/${documentId}/`,
-                    method: 'POST',
-                    data: {
-                        csrfmiddlewaretoken: '{{ csrf_token }}'
-                    },
-                    success: function(response) {
-                        $(`.document-card[data-document-id="${documentId}"]`).fadeOut(300, function() {
-                            $(this).remove();
-                            if ($('#documentList').children().length === 0) {
-                                $('#documentList').replaceWith('<div class="alert alert-info" role="alert">No documents uploaded.</div>');
-                            }
-                        });
-                    },
-                    error: function() {
-                        alert('Error deleting document. Please try again.');
-                    }
-                });
-            }
-        });
+$(document).ready(function() {
+    // Delete document confirmation
+    $('.delete-document').on('click', function() {
+        const documentId = $(this).data('document-id');
+        if (confirm('Are you sure you want to delete this document?')) {
+            $.ajax({
+                url: `/documents/delete/${documentId}/`,
+                method: 'POST',
+                data: {
+                    csrfmiddlewaretoken: '{{ csrf_token }}'
+                },
+                success: function(response) {
+                    $(`.document-card[data-document-id="${documentId}"]`).fadeOut(300, function() {
+                        $(this).remove();
+                        if ($('#documentList').children().length === 0) {
+                            $('#documentList').replaceWith('<div class="alert alert-info" role="alert">No documents uploaded.</div>');
+                        }
+                    });
+                },
+                error: function() {
+                    alert('Error deleting document. Please try again.');
+                }
+            });
+        }
     });
+});
+
+function toggleVisibility(header) {
+    const next = header.nextElementSibling;
+    const caret = header.querySelector('.caret i');
+    const isExpanded = next.classList.contains('show');
+    $(next).collapse('toggle');
+    caret.className = isExpanded ? 'fas fa-chevron-right' : 'fas fa-chevron-down';
+    header.setAttribute('aria-expanded', !isExpanded);
+}
 </script>
 {% endblock %}

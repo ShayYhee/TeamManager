@@ -20,7 +20,8 @@ from documents.views import staff_profile_list, create_staff_profile, delete_sta
 from documents.views import event_participant_list, create_event_participant, edit_event_participant, delete_event_participant
 from documents.views import admin_notification_list, create_notification, edit_notification, delete_notification, edit_company_profile, view_company_profile
 from documents.views import user_notification_list, create_user_notification, edit_user_notification, delete_user_notification
-from documents.views import custom_404, custom_403, custom_500, custom_400
+from documents.views import custom_404, custom_403, custom_500, custom_400, post_login_redirect, contact_list, create_contact, edit_contact, delete_contact, view_contact_detail
+from documents.views import email_list, send_email, edit_email, delete_email, email_detail, save_draft
 from documents.views import EventViewSet
 from django.http import HttpResponse
 
@@ -37,6 +38,7 @@ handler500 = custom_500
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('post-login/', post_login_redirect, name='post_login_redirect'),
     path("", home, name="home"),
     path("documents/", include("documents.urls")),  # Added namespace
     path("tenants/", include("tenants.urls")),
@@ -64,6 +66,17 @@ urlpatterns = [
     path('calendar/', calendar_view, name='calendar'),
     path('dashboard/performance-dashboard/', performance_dashboard, name='performance_dashboard'),
     path('dashboard/hod-performance-dashboard/', hod_performance_dashboard, name='hod_performance_dashboard'),
+    path('dashboard/contacts/', contact_list, name='contact_list'),
+    path('dashboard/contacts/create/', create_contact, name='create_contact'),
+    path('dashboard/contacts/<int:contact_id>/', view_contact_detail, name='view_contact_detail'),
+    path('dashboard/contacts/edit/<int:contact_id>/', edit_contact, name='edit_contact'),
+    path('dashboard/contacts/delete/<int:contact_id>/', delete_contact, name='delete_contact'),
+    path('dashboard/emails/', email_list, name='email_list'),
+    path('dashboard/emails/<int:email_id>', email_detail, name='email_detail'),
+    path('dashboard/emails/save-draft/', save_draft, name='save_draft'),
+    path('dashboard/emails/send/', send_email, name='send_email'),
+    path('dashboard/emails/edit/<int:email_id>', edit_email, name='edit_email'),
+    path('dashboard/emails/delete/<int:email_id>', delete_email, name='delete_email'),
     path('folders/', folder_list, name='folder_list'),
     path('folders/<int:parent_id>/', folder_list, name='folder_list'),
     path('folders/create/', create_folder, name='create_folder'),
