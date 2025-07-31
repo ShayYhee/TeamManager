@@ -21,6 +21,7 @@
                             <th scope="col">Status</th>
                             <th scope="col">Created</th>
                             <th scope="col">Actions</th>
+                            <th scope="col">Delete</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -54,6 +55,14 @@
                                 {% else %}
                                 <span class="text-muted">No actions available</span>
                                 {% endif %}
+                            </td>
+                            <td>
+                                <form action="{% url 'delete_tenant_app' tenant.id %}" method="post" class="d-inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-danger" title="Delete Tenant" aria-label="Approve Tenant">
+                                        <i class="fas fa-trash me-1"></i>Delete
+                                    </button>
+                                </form>
                             </td>
                         </tr>
                         {% endfor %}

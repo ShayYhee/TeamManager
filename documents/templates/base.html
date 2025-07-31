@@ -116,6 +116,9 @@
             background: #3b4a6b !important;
             border-bottom: 1px solid #4a5568;
         }
+        body.dark-mode .text-muted {
+            color: #b8bfceff !important;
+        }
         .notification-message {
             text-align: center;
             display: flex;
@@ -329,61 +332,65 @@
             <a href="{% url 'admin:index' %}" {% if request.path|slice:":7" == '/admin/' %}class="active"{% endif %}><i class="fas fa-key"></i> Admin Panel</a>
         {% elif user.tenant.slug == "raadaa" or user.tenant.slug == "transnet-cloud" %}
             <a href="{% url 'calendar' %}" {% if request.path == '/calendar/' %}class="active"{% endif %}><i class="fas fa-calendar"></i> Calendar</a>
-            <a href="{% url 'view_my_profile' %}" {% if request.path == '/profile/' %}class="active"{% endif %}><i class="fas fa-user"></i> My Profile</a>
-            <a href="{% url 'staff_list' %}" {% if request.path == '/staff/' %}class="active"{% endif %}><i class="fas fa-user-friends"></i> Staff List</a>
+            <a href="{% url 'contact_list' %}" {% if request.path == '/dashboard/contacts/' %}class="active"{% endif %}><i class="fas fa-address-book"></i> Contacts</a>
+            <a href="{% url 'email_list' %}" {% if request.path == '/dashboard/emails/' %}class="active"{% endif %}><i class="fas fa-envelope"></i> Emails</a>
+            <a href="{% url 'view_my_profile' %}" {% if request.path == '/dashboard/my-profile/' %}class="active"{% endif %}><i class="fas fa-user"></i> My Profile</a>
+            <a href="{% url 'staff_list' %}" {% if request.path == '/staff/list/' %}class="active"{% endif %}><i class="fas fa-user-friends"></i> Staff List</a>
             <a href="{% url 'view_company_profile' %}" {% if request.path == '/company-profile/' %}class="active"{% endif %}><i class="fas fa-building"></i> Company Profile</a>
             <a href="{% url 'task_list' %}" {% if request.path == '/tasks/' %}class="active"{% endif %}><i class="fas fa-tasks"></i> Tasks</a>
-            <a href="{% url 'document_list' %}" {% if request.path == '/documents/' %}class="active"{% endif %}><i class="fas fa-file-alt"></i> Document List</a>
+            <a href="{% url 'document_list' %}" {% if request.path == '/documents/list/' %}class="active"{% endif %}><i class="fas fa-file-alt"></i> Document List</a>
             <a href="{% url 'create_document' %}" {% if request.path == '/documents/create/' %}class="active"{% endif %}><i class="fas fa-bolt"></i> Generate Document</a>
-            <a href="{% url 'create_from_editor' %}" {% if request.path == '/documents/editor/' %}class="active"{% endif %}><i class="fas fa-edit"></i> Document Editor</a>
-            <a href="{% url 'folder_list' %}" {% if request.path|slice:":10" == '/folders/' %}class="active"{% endif %}><i class="fas fa-folder"></i> Folders</a>
-            <a href="{% url 'public_folder_list' %}" {% if request.path|slice:":10" == '/public-folders/' %}class="active"{% endif %}><i class="fas fa-folder-open"></i> Public Folders</a>
-            <a href="{% url 'performance_dashboard' %}" {% if request.path == '/dashboard/performance-dashboard' %}class="active"{% endif %}><i class="fas fa-chart-line" style="color: #ffffff;"></i> Performance</a>
+            <a href="{% url 'create_from_editor' %}" {% if request.path == '/documents/create-editor/' %}class="active"{% endif %}><i class="fas fa-edit"></i> Document Editor</a>
+            <a href="{% url 'folder_list' %}" {% if request.path == '/folders/' %}class="active"{% endif %}><i class="fas fa-folder"></i> Folders</a>
+            <a href="{% url 'public_folder_list' %}" {% if request.path == '/public-folders/' %}class="active"{% endif %}><i class="fas fa-folder-open"></i> Public Folders</a>
+            <a href="{% url 'performance_dashboard' %}" {% if request.path == '/dashboard/performance-dashboard/' %}class="active"{% endif %}><i class="fas fa-chart-line" style="color: #ffffff;"></i> Performance</a>
             {% for role in user.roles.all %}
                 {% if role.name == "HOD" %}
-                    <a href="{% url 'hod_performance_dashboard' %}" {% if request.path == '/dashboard/hod-performance-dashboard' %}class="active"{% endif %}><i class="fas fa-chart-bar"></i> Department Performance</a>
+                    <a href="{% url 'hod_performance_dashboard' %}" {% if request.path == '/dashboard/hod-performance-dashboard/' %}class="active"{% endif %}><i class="fas fa-chart-bar"></i> Department Performance</a>
                 {% endif %}
             {% endfor %}
             <a href="{% url 'notifications' %}" {% if request.path == '/notifications/' %}class="active"{% endif %}><i class="fas fa-bell"></i> Notifications</a>
             {% for role in user.roles.all %}
                 {% if role.name == "Admin" %}
-                    <a href="{% url 'staff_directory' %}" {% if request.path == '/staff/directory/' %}class="active"{% endif %}><i class="fas fa-users"></i> Staff Directory</a>
+                    <a href="{% url 'staff_directory' %}" {% if request.path == '/staff/' %}class="active"{% endif %}><i class="fas fa-users"></i> Staff Directory</a>
                 {% endif %}
             {% endfor %}
-            <a href="{% url 'email_config' %}" {% if request.path == '/settings/' %}class="active"{% endif %}><i class="fas fa-cog"></i> Settings</a>
+            <a href="{% url 'email_config' %}" {% if request.path == '/dashboard/email-config/' %}class="active"{% endif %}><i class="fas fa-cog"></i> Settings</a>
             {% for role in user.roles.all %}
                 {% if role.name == "Admin" %}
                     {% comment %} <a href="{% url 'users_list' %}" {% if request.path == '/users/' %}class="active"{% endif %}><i class="fas fa-user-shield"></i> Users</a> {% endcomment %}
-                    <a href="{% url 'admin_dashboard' %}" {% if request.path|slice:":7" == '/admin/' %}class="active"{% endif %}><i class="fas fa-key"></i> Admin Dashboard</a>
+                    <a href="{% url 'admin_dashboard' %}" {% if request.path == '/admins/dashboard/' %}class="active"{% endif %}><i class="fas fa-key"></i> Admin Dashboard</a>
                 {% endif %}
             {% endfor %}
         {% else %}
             <a href="{% url 'calendar' %}" {% if request.path == '/calendar/' %}class="active"{% endif %}><i class="fas fa-calendar"></i> Calendar</a>
-            <a href="{% url 'view_my_profile' %}" {% if request.path == '/profile/' %}class="active"{% endif %}><i class="fas fa-user"></i> My Profile</a>
-            <a href="{% url 'staff_list' %}" {% if request.path == '/staff/' %}class="active"{% endif %}><i class="fas fa-user-friends"></i> Staff List</a>
+            <a href="{% url 'contact_list' %}" {% if request.path == '/dashboard/contacts/' %}class="active"{% endif %}><i class="fas fa-address-book"></i> Contacts</a>
+            <a href="{% url 'email_list' %}" {% if request.path == '/dashboard/emails/' %}class="active"{% endif %}><i class="fas fa-envelope"></i> Emails</a>
+            <a href="{% url 'view_my_profile' %}" {% if request.path == '/dashboard/my-profile/' %}class="active"{% endif %}><i class="fas fa-user"></i> My Profile</a>
+            <a href="{% url 'staff_list' %}" {% if request.path == '/staff/list/' %}class="active"{% endif %}><i class="fas fa-user-friends"></i> Staff List</a>
             <a href="{% url 'view_company_profile' %}" {% if request.path == '/company-profile/' %}class="active"{% endif %}><i class="fas fa-building"></i> Company Profile</a>
             <a href="{% url 'task_list' %}" {% if request.path == '/tasks/' %}class="active"{% endif %}><i class="fas fa-tasks"></i> Tasks</a>
-            <a href="{% url 'document_list' %}" {% if request.path == '/documents/' %}class="active"{% endif %}><i class="fas fa-file-alt"></i> Document List</a>
-            <a href="{% url 'create_from_editor' %}" {% if request.path == '/documents/editor/' %}class="active"{% endif %}><i class="fas fa-edit"></i> Document Editor</a>
-            <a href="{% url 'folder_list' %}" {% if request.path|slice:":10" == '/folders/' %}class="active"{% endif %}><i class="fas fa-folder"></i> Folders</a>
-            <a href="{% url 'public_folder_list' %}" {% if request.path|slice:":10" == '/public-folders/' %}class="active"{% endif %}><i class="fas fa-folder-open"></i> Public Folders</a>
-            <a href="{% url 'performance_dashboard' %}" {% if request.path == '/dashboard/performance-dashboard' %}class="active"{% endif %}><i class="fas fa-chart-line" style="color: #ffffff;"></i> Performance</a>
+            <a href="{% url 'document_list' %}" {% if request.path == '/documents/list/' %}class="active"{% endif %}><i class="fas fa-file-alt"></i> Document List</a>
+            <a href="{% url 'create_from_editor' %}" {% if request.path == '/documents/create-editor/' %}class="active"{% endif %}><i class="fas fa-edit"></i> Document Editor</a>
+            <a href="{% url 'folder_list' %}" {% if request.path == '/folders/' %}class="active"{% endif %}><i class="fas fa-folder"></i> Folders</a>
+            <a href="{% url 'public_folder_list' %}" {% if request.path == '/public-folders/' %}class="active"{% endif %}><i class="fas fa-folder-open"></i> Public Folders</a>
+            <a href="{% url 'performance_dashboard' %}" {% if request.path == '/dashboard/performance-dashboard/' %}class="active"{% endif %}><i class="fas fa-chart-line" style="color: #ffffff;"></i> Performance</a>
             {% for role in user.roles.all %}
                 {% if role.name == "HOD" %}
-                    <a href="{% url 'hod_performance_dashboard' %}" {% if request.path == '/dashboard/hod-performance-dashboard' %}class="active"{% endif %}><i class="fas fa-chart-bar"></i> Department Performance</a>
+                    <a href="{% url 'hod_performance_dashboard' %}" {% if request.path == '/dashboard/hod-performance-dashboard/' %}class="active"{% endif %}><i class="fas fa-chart-bar"></i> Department Performance</a>
                 {% endif %}
             {% endfor %}
             <a href="{% url 'notifications' %}" {% if request.path == '/notifications/' %}class="active"{% endif %}><i class="fas fa-bell"></i> Notifications</a>
             {% for role in user.roles.all %}
                 {% if role.name == "Admin" %}
-                    <a href="{% url 'staff_directory' %}" {% if request.path == '/staff/directory/' %}class="active"{% endif %}><i class="fas fa-users"></i> Staff Directory</a>
+                    <a href="{% url 'staff_directory' %}" {% if request.path == '/staff/' %}class="active"{% endif %}><i class="fas fa-users"></i> Staff Directory</a>
                 {% endif %}
             {% endfor %}
-            <a href="{% url 'email_config' %}" {% if request.path == '/settings/' %}class="active"{% endif %}><i class="fas fa-cog"></i> Settings</a>
+            <a href="{% url 'email_config' %}" {% if request.path == '/dashboard/email-config/' %}class="active"{% endif %}><i class="fas fa-cog"></i> Settings</a>
             {% for role in user.roles.all %}
                 {% if role.name == "Admin" %}
                     {% comment %} <a href="{% url 'users_list' %}" {% if request.path == '/users/' %}class="active"{% endif %}><i class="fas fa-user-shield"></i> Users</a> {% endcomment %}
-                    <a href="{% url 'admin_dashboard' %}" {% if request.path|slice:":7" == '/admin/' %}class="active"{% endif %}><i class="fas fa-key"></i> Admin Dashboard</a>
+                    <a href="{% url 'admin_dashboard' %}" {% if request.path == '/admins/dashboard/' %}class="active"{% endif %}><i class="fas fa-key"></i> Admin Dashboard</a>
                 {% endif %}
             {% endfor %}
         {%endif%}

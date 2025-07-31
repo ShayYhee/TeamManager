@@ -21,8 +21,8 @@ from django.utils import timezone
 from django.utils.timezone import now
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
-from .forms import DocumentForm, SignUpForm, CreateDocumentForm, FileUploadForm, FolderForm, TaskForm, ReassignTaskForm, StaffProfileForm, StaffDocumentForm, EmailConfigForm, UserForm, PublicFolderForm, PublicFileForm, DepartmentForm, TeamForm, EventForm, EventParticipantForm, NotificationForm, UserNotificationForm, CompanyProfileForm
-from .models import Document, CustomUser, Role, File, Folder, Task, StaffProfile, Notification, UserNotification, StaffDocument, Event, EventParticipant, Department, Team, PublicFile, PublicFolder, CompanyProfile
+from .forms import DocumentForm, SignUpForm, CreateDocumentForm, FileUploadForm, FolderForm, TaskForm, ReassignTaskForm, StaffProfileForm, StaffDocumentForm, EmailConfigForm, UserForm, PublicFolderForm, PublicFileForm, DepartmentForm, TeamForm, EventForm, EventParticipantForm, NotificationForm, UserNotificationForm, CompanyProfileForm, ContactForm, EmailForm, AttachmentFormSet
+from .models import Document, CustomUser, Role, File, Folder, Task, StaffProfile, Notification, UserNotification, StaffDocument, Event, EventParticipant, Department, Team, PublicFile, PublicFolder, CompanyProfile, Contact, Email, Attachment
 from raadaa.settings import ALLOWED_HOSTS
 from .serializers import EventSerializer
 from .placeholders import replace_placeholders
@@ -400,7 +400,7 @@ def register(request):
                     )
                     base_domain = "127.0.0.1:8000" if settings.DEBUG else "teammanager.ng"
                     protocol = "http" if settings.DEBUG else "https"
-                    login_url = f"{protocol}://{request.tenant.slug}.{base_domain}/login"
+                    login_url = f"{protocol}://{request.tenant.slug}.{base_domain}/accounts/login"
                     subject = f"Account Pending Approval: {user.username}"
                     message = f"""
                     Dear {user.username},
@@ -437,6 +437,11 @@ def delete_user(request, user_id):
 
     user.delete()
     return redirect("users_list")
+
+def post_login_redirect(request):
+    if not request.user.is_authenticated or request.user.is_superuser:
+        return redirect('tenant_home')
+    return redirect('home')
 
 @login_required
 def document_list(request):
@@ -2166,7 +2171,7 @@ def bulk_action_users(request):
                 else:
                     base_domain = "teammanager.ng"
                     protocol = "https"
-                login_url = f"{protocol}://{request.tenant.slug}.{base_domain}/login"
+                login_url = f"{protocol}://{request.tenant.slug}.{base_domain}/accounts/login"
                 
                 for user in users:
                     subject = f"Account Approval: {user.username}"
@@ -2295,7 +2300,7 @@ def approve_user(request, user_id):
         protocol = "https"
 
     # Generate tenant-specific login URL
-    login_url = f"{protocol}://{request.tenant.slug}.{base_domain}/login"
+    login_url = f"{protocol}://{request.tenant.slug}.{base_domain}/accounts/login"
 
     # Prepare email
     subject = f"Account Approval: {user.username}"
@@ -2942,3 +2947,295 @@ def edit_company_profile(request):
     else:
         form = CompanyProfileForm(instance=company_profile)
     return render(request, "admin/edit_company_profile.html", {"form": form})
+
+
+# Contact List, Billing and Mass Mailing Section
+
+@login_required
+def contact_list(request):
+    if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+        print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
+        return HttpResponseForbidden("You are not authorized for this tenant.")
+    contact_list_dept = Contact.objects.filter(tenant=request.tenant, department=request.user.department, is_public=True)
+    contact_list_personal = Contact.objects.filter(tenant=request.tenant, created_by=request.user)
+    contact_list = contact_list_dept | contact_list_personal
+    paginator = Paginator(contact_list, 10)  # 10 users per page
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    paginator_dept = Paginator(contact_list_dept, 10)  # 10 users per page
+    page_obj_dept = paginator_dept.get_page(page_number)
+    paginator_personal = Paginator(contact_list_personal, 10)  # 10 users per page
+    page_obj_personal = paginator_personal.get_page(page_number)
+    return render(request, 'dashboard/contact_list.html', {'contact_list': page_obj, 'contact_list_dept': page_obj_dept, 'contact_list_personal': page_obj_personal})
+
+@login_required
+def create_contact(request):
+    if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+        print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
+        # return HttpResponseForbidden("You are not authorized for this tenant.")
+        return render(request, 'error.html', {'message': 'You are not authorized for this tenant.'})
+    if request.method == "POST":
+        form = ContactForm(request.POST)
+        if form.is_valid():
+            contact = form.save(commit=False)
+            contact.tenant = request.tenant
+            contact.department = request.user.department
+            contact.team = request.user.teams.first()
+            contact.created_by = request.user
+            contact.save()
+            return redirect("contact_list")
+    else:
+        form = ContactForm()
+    return render(request, "dashboard/create_contact.html", {"form": form})
+
+@login_required
+def view_contact_detail(request, contact_id):
+    contact = get_object_or_404(Contact, id=contact_id, tenant=request.tenant)
+    data = {
+        'id': contact.id,
+        'name': contact.name,
+        'email': contact.email,
+        'phone': contact.phone or '',
+        'organization': contact.organization or '',
+        'designation': contact.designation or '',
+        'priority': contact.priority or '',
+        'department': contact.department.name if contact.department else None,
+        'team': contact.team.name if contact.team else None,
+        'is_public': contact.is_public,
+        'created_by': contact.created_by.username,
+        'created_at': contact.created_at.isoformat(),
+        'updated_by': contact.updated_by.username if contact.updated_by else None,
+        'updated_at': contact.updated_at.isoformat()
+    }
+    return JsonResponse(data)
+
+@login_required
+def edit_contact(request, contact_id):
+    if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+        print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
+        # return HttpResponseForbidden("You are not authorized for this tenant.")
+        return render(request, 'error.html', {'message': 'You are not authorized for this tenant.'})
+    contact = get_object_or_404(Contact, id=contact_id, tenant=request.tenant)
+    print(f"Contact to edit: {contact}")
+    if request.method == "POST":
+        form = ContactForm(request.POST, instance=contact)
+        if form.is_valid():
+            contact = form.save(commit=False)
+            contact.tenant = request.tenant
+            contact.updated_by = request.user
+            contact.save()
+            return redirect("contact_list")
+    else:
+        form = ContactForm(instance=contact)
+    return render(request, "dashboard/edit_contact.html", {"form": form})
+
+@login_required
+def delete_contact(request, contact_id):
+    if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+        print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
+        # return HttpResponseForbidden("You are not authorized for this tenant.")
+        return render(request, 'error.html', {'message': 'You are not authorized for this tenant.'})
+    contact = get_object_or_404(Contact, id=contact_id, tenant=request.tenant)
+    if contact.created_by != request.user:
+        return JsonResponse({'success': False, 'errors': {'folder': ['You can only delete your own contacts']}}, status=403)
+    contact.delete()
+    return redirect("contact_list")
+
+@login_required
+def email_list(request):
+    if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+        print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
+        # return HttpResponseForbidden("You are not authorized for this tenant.")
+        return render(request, 'error.html', {'message': 'You are not authorized for this tenant.'})
+        
+    email_list = Email.objects.filter(tenant=request.tenant, sender=request.user)
+    email_list_draft = Email.objects.filter(tenant=request.tenant, sender=request.user, sent=False)
+    email_list_sent = Email.objects.filter(tenant=request.tenant, sender=request.user, sent=True)
+    page_number = request.GET.get('page')
+    paginator = Paginator(email_list, 10)  # 10 emails per page
+    page_obj = paginator.get_page(page_number)
+    paginator_draft = Paginator(email_list_draft, 10)  # 10 emails per page
+    page_obj_draft = paginator_draft.get_page(page_number)
+    paginator_sent = Paginator(email_list_sent, 10)  # 10 emails per page
+    page_obj_sent = paginator_sent.get_page(page_number)
+    return render(request, 'dashboard/email_list.html', {'email_list': page_obj, 'email_list_draft': page_obj_draft, 'email_list_sent': page_obj_sent})
+
+@login_required
+def edit_email(request, email_id):
+    if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+        print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
+        # return HttpResponseForbidden("You are not authorized for this tenant.")
+        return render(request, 'error.html', {'message': 'You are not authorized for this tenant.'})
+    
+    email = get_object_or_404(Email, id=email_id, tenant=request.tenant, sender=request.user)
+    if email.sender != request.user:
+        # return HttpResponseForbidden('You can only edit your own emails')
+        # raise PermissionDenied('You can only edit your own emails')
+        return render(request, 'error.html', {'message': 'You can only edit your own emails.'})
+    if email.sent:
+        # return HttpResponseForbidden('You cannot edit sent emails')
+        # raise PermissionDenied('You cannot edit sent emails')
+        return render(request, 'error.html', {'message': 'You cannot edit sent emails.'})
+    
+    if request.method == 'POST':
+        form = EmailForm(request.POST, user=request.user, instance=email)
+        formset = AttachmentFormSet(request.POST, request.FILES, queryset=Attachment.objects.filter(email=email))
+        
+        if form.is_valid() and formset.is_valid():
+            email = form.save(commit=False)
+            email.tenant = request.tenant
+            email.sender = request.user
+            email.sent = False
+            email.save()
+            form.save_m2m()  # Save ManyToMany relationships
+            
+            # Handle attachments
+            for f in formset:
+                if f.cleaned_data.get('file') and not f.cleaned_data.get('DELETE', False):
+                    attachment = Attachment(email=email, file=f.cleaned_data['file'])
+                    attachment.save()
+                elif f.cleaned_data.get('DELETE', False) and f.instance.pk:
+                    f.instance.delete()
+            
+            # If user wants to send the email
+            if 'send' in request.POST:
+                sender_email = request.user.smtp_email
+                sender_password = request.user.smtp_password
+                connection = get_connection(
+                    backend="django.core.mail.backends.smtp.EmailBackend",
+                    host="smtp.zoho.com",
+                    port=587,
+                    username=sender_email,
+                    password=sender_password,
+                    use_tls=True,
+                )
+                subject = form.cleaned_data['subject']
+                message = form.cleaned_data['body']
+                to_emails = [to.email for to in form.cleaned_data['to']]
+                cc_emails = [cc.email for cc in form.cleaned_data['cc']]
+                bcc_emails = [bcc.email for bcc in form.cleaned_data['bcc']]
+                email_msg = EmailMessage(
+                    subject, message, sender_email, to_emails,
+                    cc=cc_emails, bcc=bcc_emails, connection=connection
+                )
+                # Attach all files
+                for attachment in email.attachments.all():
+                    email_msg.attach_file(attachment.file.path)
+                email_msg.send()
+                email.sent = True
+                email.sent_at = timezone.now()
+                email.save()
+                return redirect('email_list')
+            
+            return redirect('email_list')
+    else:
+        form = EmailForm(user=request.user, instance=email)
+        formset = AttachmentFormSet(queryset=Attachment.objects.filter(email=email))
+    
+    return render(request, 'dashboard/edit_email.html', {'form': form, 'formset': formset, 'email': email})
+@login_required
+def save_draft(request):
+    if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+        print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
+        return HttpResponseForbidden("You are not authorized for this tenant.")
+    
+    if request.method == 'POST':
+        form = EmailForm(request.POST, user=request.user)
+        formset = AttachmentFormSet(request.POST, request.FILES)
+        
+        if form.is_valid() and formset.is_valid():
+            email = form.save(commit=False)
+            email.tenant = request.tenant
+            email.sender = request.user
+            email.sent = False
+            email.save()
+            form.save_m2m()  # Save ManyToMany relationships
+            
+            # Save attachments
+            for f in formset:
+                if f.cleaned_data.get('file') and not f.cleaned_data.get('DELETE', False):
+                    attachment = Attachment(email=email, file=f.cleaned_data['file'])
+                    attachment.save()
+            
+            return redirect('email_list')
+    else:
+        form = EmailForm(user=request.user)
+        formset = AttachmentFormSet(queryset=Attachment.objects.none())
+    
+    return render(request, 'dashboard/send_email.html', {'form': form, 'formset': formset})
+
+# Update send_email view to handle multiple attachments
+@login_required
+def send_email(request):
+    if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+        print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
+        return HttpResponseForbidden("You are not authorized for this tenant.")
+    
+    sender_email = request.user.smtp_email
+    sender_password = request.user.smtp_password
+    connection = get_connection(
+        backend="django.core.mail.backends.smtp.EmailBackend",
+        host="smtp.zoho.com",
+        port=587,
+        username=sender_email,
+        password=sender_password,
+        use_tls=True,
+    )
+    
+    if request.method == 'POST':
+        form = EmailForm(request.POST, user=request.user)
+        formset = AttachmentFormSet(request.POST, request.FILES)
+        
+        if form.is_valid() and formset.is_valid():
+            email = form.save(commit=False)
+            email.tenant = request.tenant
+            email.sender = request.user
+            email.sent = False
+            email.save()
+            form.save_m2m()
+            
+            # Save attachments
+            for f in formset:
+                if f.cleaned_data.get('file') and not f.cleaned_data.get('DELETE', False):
+                    attachment = Attachment(email=email, file=f.cleaned_data['file'])
+                    attachment.save()
+            
+            # Send email
+            subject = form.cleaned_data['subject']
+            message = form.cleaned_data['body']
+            to_emails = [to.email for to in form.cleaned_data['to']]
+            cc_emails = [cc.email for cc in form.cleaned_data['cc']]
+            bcc_emails = [bcc.email for bcc in form.cleaned_data['bcc']]
+            email_msg = EmailMessage(
+                subject, message, sender_email, to_emails,
+                cc=cc_emails, bcc=bcc_emails, connection=connection
+            )
+            for attachment in email.attachments.all():
+                email_msg.attach_file(attachment.file.path)
+            email_msg.send()
+            email.sent = True
+            email.sent_at = timezone.now()
+            email.save()
+            return redirect('email_list')
+    else:
+        form = EmailForm(user=request.user)
+        formset = AttachmentFormSet(queryset=Attachment.objects.none())
+    
+    return render(request, 'dashboard/send_email.html', {'form': form, 'formset': formset})
+@login_required
+def email_detail(request, email_id):
+    if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+        print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
+        return HttpResponseForbidden("You are not authorized for this tenant.")
+    email = get_object_or_404(Email, id=email_id, tenant=request.tenant, sender=request.user)
+    return render(request, 'dashboard/email_detail.html', {'email': email})
+
+def delete_email(request, email_id):
+    if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+        print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
+        return HttpResponseForbidden("You are not authorized for this tenant.")
+    email = get_object_or_404(Email, id=email_id, tenant=request.tenant, sender=request.user)
+    if email.sender != request.user:
+        raise HttpResponseForbidden('You can only delete your own emails')
+    email.delete()
+    return redirect('email_list')

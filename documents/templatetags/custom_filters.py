@@ -103,3 +103,21 @@ def format_teams(value, separator=', '):
         return separator.join(str(team) for team in value.all())
     except AttributeError:
         return "N/A"
+    
+@register.filter
+def union(list1, list2):
+    """Returns the union of two lists without duplicates based on IDs."""
+    if not list1:
+        return list2
+    if not list2:
+        return list1
+
+    seen_ids = set()
+    result = []
+
+    for obj in list1 + list2:
+        obj_id = getattr(obj, 'id', None)
+        if obj_id not in seen_ids:
+            seen_ids.add(obj_id)
+            result.append(obj)
+    return result

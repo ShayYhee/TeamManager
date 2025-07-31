@@ -20,7 +20,8 @@ from documents.views import staff_profile_list, create_staff_profile, delete_sta
 from documents.views import event_participant_list, create_event_participant, edit_event_participant, delete_event_participant
 from documents.views import admin_notification_list, create_notification, edit_notification, delete_notification, edit_company_profile, view_company_profile
 from documents.views import user_notification_list, create_user_notification, edit_user_notification, delete_user_notification
-from documents.views import custom_404, custom_403, custom_500, custom_400
+from documents.views import custom_404, custom_403, custom_500, custom_400, post_login_redirect, contact_list, create_contact, edit_contact, delete_contact, view_contact_detail
+from documents.views import email_list, send_email, edit_email, delete_email, email_detail, save_draft
 from documents.views import EventViewSet
 from django.http import HttpResponse
 
@@ -37,6 +38,7 @@ handler500 = custom_500
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('post-login/', post_login_redirect, name='post_login_redirect'),
     path("", home, name="home"),
     path("documents/", include("documents.urls")),  # Added namespace
     path("tenants/", include("tenants.urls")),
@@ -49,21 +51,32 @@ urlpatterns = [
     path("send-email/<int:document_id>/", send_approved_email, name="send_approved_email"),
     path("delete/<int:document_id>/", delete_document, name="delete_document"),
     path("staff/", staff_directory, name="staff_directory"),
-    path("users/my-profile/", view_my_profile, name="view_my_profile"),
-    path("users/edit-profile/", edit_my_profile, name="edit_my_profile"),
     path("staff/<int:user_id>/", view_staff_profile, name="view_staff_profile"),
-    path("staff/list", staff_list, name="staff_list"),
+    path("staff/list/", staff_list, name="staff_list"),
     path("staff/documents/add", add_staff_document, name="add_staff_document"),
     path("staff/documents/delete/<int:document_id>", delete_staff_document, name="delete_staff_document"),
     path('staff/export-csv/', export_staff_csv, name='export_staff_csv'),
     path('notifications/', notifications_view, name='notifications'),
     path('notifications/dismiss/', dismiss_notification, name='dismiss_notification'),
     path('notifications/dismiss-all/', dismiss_all_notifications, name='dismiss_all_notifications'),
-    path('users/email-config/', email_config, name='email_config'),
+    path('dashboard/email-config/', email_config, name='email_config'),
     path('api/', include(router.urls)),
     path('calendar/', calendar_view, name='calendar'),
+    path("dashboard/my-profile/", view_my_profile, name="view_my_profile"),
+    path("dashboard/my-profile/edit/", edit_my_profile, name="edit_my_profile"),
     path('dashboard/performance-dashboard/', performance_dashboard, name='performance_dashboard'),
     path('dashboard/hod-performance-dashboard/', hod_performance_dashboard, name='hod_performance_dashboard'),
+    path('dashboard/contacts/', contact_list, name='contact_list'),
+    path('dashboard/contacts/create/', create_contact, name='create_contact'),
+    path('dashboard/contacts/<int:contact_id>/', view_contact_detail, name='view_contact_detail'),
+    path('dashboard/contacts/edit/<int:contact_id>/', edit_contact, name='edit_contact'),
+    path('dashboard/contacts/delete/<int:contact_id>/', delete_contact, name='delete_contact'),
+    path('dashboard/emails/', email_list, name='email_list'),
+    path('dashboard/emails/<int:email_id>', email_detail, name='email_detail'),
+    path('dashboard/emails/save-draft/', save_draft, name='save_draft'),
+    path('dashboard/emails/send/', send_email, name='send_email'),
+    path('dashboard/emails/edit/<int:email_id>', edit_email, name='edit_email'),
+    path('dashboard/emails/delete/<int:email_id>', delete_email, name='delete_email'),
     path('folders/', folder_list, name='folder_list'),
     path('folders/<int:parent_id>/', folder_list, name='folder_list'),
     path('folders/create/', create_folder, name='create_folder'),
@@ -74,16 +87,16 @@ urlpatterns = [
     path('folders/files/<int:file_id>/rename/', rename_file, name='rename_file'),
     path('folders/<int:folder_id>/move/', move_folder, name='move_folder'),
     path('folders/files/<int:file_id>/move/', move_file, name='move_file'),
-    path('public_folders/', public_folder_list, name='public_folder_list'),
-    path('public_folders/<int:public_folder_id>/', public_folder_list, name='public_folder_list'),
-    path('public_folders/create/', create_public_folder, name='create_public_folder'),
-    path('public_folders/<int:folder_id>/rename/', rename_public_folder, name='rename_public_folder'),
-    path('public_folders/<int:folder_id>/move/', move_public_folder, name='move_public_folder'),
-    path('public_folders/<int:folder_id>/delete/', delete_public_folder, name='delete_public_folder'),
-    path('public_folders/files/upload/', upload_public_file, name='upload_public_file'),
-    path('public_folders/files/<int:file_id>/rename/', rename_public_file, name='rename_public_file'),
-    path('public_folders/files/<int:file_id>/move/', move_public_file, name='move_public_file'),
-    path('public_folders/files/<int:file_id>/delete/', delete_public_file, name='delete_public_file'),
+    path('public-folders/', public_folder_list, name='public_folder_list'),
+    path('public-folders/<int:public_folder_id>/', public_folder_list, name='public_folder_list'),
+    path('public-folders/create/', create_public_folder, name='create_public_folder'),
+    path('public-folders/<int:folder_id>/rename/', rename_public_folder, name='rename_public_folder'),
+    path('public-folders/<int:folder_id>/move/', move_public_folder, name='move_public_folder'),
+    path('public-folders/<int:folder_id>/delete/', delete_public_folder, name='delete_public_folder'),
+    path('public-folders/files/upload/', upload_public_file, name='upload_public_file'),
+    path('public-folders/files/<int:file_id>/rename/', rename_public_file, name='rename_public_file'),
+    path('public-folders/files/<int:file_id>/move/', move_public_file, name='move_public_file'),
+    path('public-folders/files/<int:file_id>/delete/', delete_public_file, name='delete_public_file'),
     path('tasks/', task_list, name='task_list'),
     path('tasks/create/', create_task, name='create_task'),
     path('tasks/<int:task_id>/update-status/', update_task_status, name='update_task_status'),

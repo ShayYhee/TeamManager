@@ -1,6 +1,6 @@
 from django import forms
 from django.forms import modelformset_factory
-from .models import Document, User, CustomUser, Folder, File, Task, StaffProfile, StaffDocument, Department, Team, PublicFolder, PublicFile, Role, Event, EventParticipant, Notification, UserNotification, CompanyProfile
+from .models import Document, User, CustomUser, Folder, File, Task, StaffProfile, StaffDocument, Department, Team, PublicFolder, PublicFile, Role, Event, EventParticipant, Notification, UserNotification, CompanyProfile, Contact, Email, Attachment
 from tenants.models import Tenant
 from ckeditor.widgets import CKEditorWidget
 from ckeditor_uploader.widgets import CKEditorUploadingWidget
@@ -439,3 +439,52 @@ class CompanyProfileForm(forms.ModelForm):
             'date_founded': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
             'contact_details': forms.TextInput(attrs={'rows': 4, 'class': 'form-control'})
         }
+
+class ContactForm(forms.ModelForm):
+    class Meta:
+        model = Contact
+        fields = ['name', 'email', 'phone', 'organization', 'designation', 'priority', 'is_public']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'email': forms.EmailInput(attrs={'class': 'form-control'}),
+            'phone': forms.TextInput(attrs={'class': 'form-control'}),
+            'organization': forms.TextInput(attrs={'class': 'form-control'}),
+            'designation': forms.TextInput(attrs={'class': 'form-control'}),
+            'priority': forms.Select(attrs={'class': 'form-control'}),
+            'is_public': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
+
+class EmailForm(forms.ModelForm):
+    class Meta:
+        model = Email
+        fields = ['subject', 'body', 'to', 'cc', 'bcc']
+        widgets = {
+            'subject': forms.TextInput(attrs={'class': 'form-control'}),
+            'body': forms.Textarea(attrs={'class': 'form-control', 'rows': 5}),
+            'to': forms.SelectMultiple(attrs={'class': 'form-control select2', 'multiple': 'multiple'}),
+            'cc': forms.SelectMultiple(attrs={'class': 'form-control select2', 'multiple': 'multiple'}),
+            'bcc': forms.SelectMultiple(attrs={'class': 'form-control select2', 'multiple': 'multiple'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
+        if user:
+            tenant = getattr(user, 'tenant', None)
+            if tenant:
+                self.fields['to'].queryset = Contact.objects.filter(tenant=tenant, department=user.department)
+                self.fields['cc'].queryset = Contact.objects.filter(tenant=tenant, department=user.department)
+                self.fields['bcc'].queryset = Contact.objects.filter(tenant=tenant, department=user.department)
+            else:
+                self.fields['to'].queryset = Contact.objects.none()
+                self.fields['cc'].queryset = Contact.objects.none()
+                self.fields['bcc'].queryset = Contact.objects.none()
+
+# Formset for attachments
+AttachmentFormSet = modelformset_factory(
+    Attachment,
+    fields=('file',),
+    extra=3,  # Allow up to 3 additional attachments
+    can_delete=True,
+    widgets={'file': forms.FileInput(attrs={'class': 'form-control'})}
+)

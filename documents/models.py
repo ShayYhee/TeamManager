@@ -410,3 +410,56 @@ class CompanyProfile(models.Model):
 
     def __str__(self):
         return self.tenant.name
+    
+
+class Contact(models.Model):
+    PRIORITY_CHOICES = [
+        ('high', 'High'),
+        ('medium', 'Medium'),
+        ('low', 'Low'),
+    ]
+
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
+    name = models.CharField(max_length=255)
+    email = models.EmailField()
+    phone = models.CharField(max_length=20, blank=True, null=True)
+    organization = models.CharField(max_length=255, null=True, blank=True)
+    designation = models.CharField(max_length=255, blank=True, null=True)
+    priority = models.CharField(max_length=10, choices=PRIORITY_CHOICES, default='medium')
+    department = models.ForeignKey('Department', null=True, blank=True, on_delete=models.SET_NULL, related_name='contact_lists')
+    team = models.ForeignKey('Team', null=True, blank=True, on_delete=models.SET_NULL, related_name='contact_lists')
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='created_contact_lists')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='updated_contact_lists', null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    is_public = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"{self.name} ({self.email})"
+    # class Meta:
+    #     constraints = [
+    #         models.CheckConstraint(
+    #             check=Q(department__isnull=False) | Q(team__isnull=False),
+    #             name='contact_list_department_or_team_required'
+    #         )
+    #     ]
+
+class Email(models.Model):
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
+    subject = models.CharField(max_length=255)
+    body = models.TextField()
+    to = models.ManyToManyField(Contact, blank=False, related_name='recipients')
+    cc = models.ManyToManyField(Contact, blank=True, related_name='copy_recipients')
+    bcc = models.ManyToManyField(Contact, blank=True, related_name='blind_recipients')
+    sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='sender_email')
+    created_at = models.DateTimeField(auto_now_add=True)
+    sent = models.BooleanField(default=False)
+    sent_at = models.DateTimeField(null=True, blank=True)
+
+class Attachment(models.Model):
+    email = models.ForeignKey(Email, on_delete=models.CASCADE, related_name='attachments')
+    file = models.FileField(upload_to='email_attachments/')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.file.name

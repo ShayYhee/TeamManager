@@ -6,54 +6,191 @@
 <div class="container">
     <div class="row justify-content-center">
         <div class="col-lg-8 col-md-10">
-            <!-- Staff Profile Form -->
-            <div class="card shadow-sm border-0 mb-4">
-                <div class="card-header bg-transparent d-flex align-items-center justify-content-between" onclick="toggleVisibility(this)" role="button" aria-expanded="true" aria-controls="profileFormCollapse">
-                    <h3 class="mb-0"><i class="fas fa-user me-2"></i> Profile Information</h3>
-                    <span class="caret"><i class="fas fa-chevron-right"></i></span>
-                </div>
-                <div class="card-body collapse show" id="profileFormCollapse">
-                    <form method="post" enctype="multipart/form-data" novalidate>
-                        {% csrf_token %}
-                        {% if profile_form.non_field_errors %}
-                            <div class="alert alert-danger" role="alert">
-                                {% for error in profile_form.non_field_errors %}
-                                    {{ error }}
-                                {% endfor %}
-                            </div>
-                        {% endif %}
-                        {% for field in profile_form %}
-                            <div class="mb-3">
-                                <label for="{{ field.id_for_label }}" class="form-label fw-medium">
-                                    {{ field.label }}
-                                    {% if field.field.required %}
-                                        <span class="text-danger">*</span>
-                                    {% endif %}
-                                </label>
-                                {{ field }}
-                                {% if field.errors %}
-                                    <div class="text-danger small mt-1">
-                                        {% for error in field.errors %}
-                                            {{ error }}
-                                        {% endfor %}
-                                    </div>
-                                {% endif %}
-                                {% if field.help_text %}
-                                    <div class="form-text small">{{ field.help_text }}</div>
-                                {% endif %}
-                            </div>
+            <form method="post" enctype="multipart/form-data" novalidate>
+                {% csrf_token %}
+                {% if profile_form.non_field_errors %}
+                    <div class="alert alert-danger" role="alert">
+                        {% for error in profile_form.non_field_errors %}
+                            {{ error }}
                         {% endfor %}
-                        <div class="d-flex gap-2">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-save me-1"></i> Save Profile
-                            </button>
-                            <a href="{% url 'view_my_profile' %}" class="btn btn-outline-secondary">
-                                <i class="fas fa-times me-1"></i> Cancel
-                            </a>
-                        </div>
-                    </form>
+                    </div>
+                {% endif %}
+
+                <!-- Personal Information -->
+                <div class="card shadow-sm border-0 mb-4">
+                    <div class="card-header bg-transparent d-flex align-items-center justify-content-between" onclick="toggleVisibility(this)" role="button" aria-expanded="true" aria-controls="personalInfoCollapse">
+                        <h3 class="mb-0"><i class="fas fa-user me-2"></i> Personal Information</h3>
+                        <span class="caret"><i class="fas fa-chevron-right"></i></span>
+                    </div>
+                    <div class="card-body collapse show" id="personalInfoCollapse">
+                        {% for field in profile_form %}
+                            {% if field.name in 'photo,first_name,last_name,middle_name,date_of_birth,sex,religion,marital_status,state_of_origin,lga' %}
+                                <div class="mb-3">
+                                    <label for="{{ field.id_for_label }}" class="form-label fw-medium">
+                                        {{ field.label }}
+                                        {% if field.field.required %}
+                                            <span class="text-danger">*</span>
+                                        {% endif %}
+                                    </label>
+                                    {{ field }}
+                                    {% if field.errors %}
+                                        <div class="text-danger small mt-1">
+                                            {% for error in field.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                    {% if field.help_text %}
+                                        <div class="form-text small">{{ field.help_text }}</div>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
                 </div>
-            </div>
+
+                <!-- Contact Information -->
+                <div class="card shadow-sm border-0 mb-4">
+                    <div class="card-header bg-transparent d-flex align-items-center justify-content-between" onclick="toggleVisibility(this)" role="button" aria-expanded="false" aria-controls="contactInfoCollapse">
+                        <h3 class="mb-0"><i class="fas fa-address-book me-2"></i> Contact Information</h3>
+                        <span class="caret"><i class="fas fa-chevron-right"></i></span>
+                    </div>
+                    <div class="card-body collapse" id="contactInfoCollapse">
+                        {% for field in profile_form %}
+                            {% if field.name in 'phone_number,email,home_address' %}
+                                <div class="mb-3">
+                                    <label for="{{ field.id_for_label }}" class="form-label fw-medium">
+                                        {{ field.label }}
+                                        {% if field.field.required %}
+                                            <span class="text-danger">*</span>
+                                        {% endif %}
+                                    </label>
+                                    {{ field }}
+                                    {% if field.errors %}
+                                        <div class="text-danger small mt-1">
+                                            {% for error in field.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                    {% if field.help_text %}
+                                        <div class="form-text small">{{ field.help_text }}</div>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Education -->
+                <div class="card shadow-sm border-0 mb-4">
+                    <div class="card-header bg-transparent d-flex align-items-center justify-content-between" onclick="toggleVisibility(this)" role="button" aria-expanded="false" aria-controls="educationCollapse">
+                        <h3 class="mb-0"><i class="fas fa-graduation-cap me-2"></i> Education</h3>
+                        <span class="caret"><i class="fas fa-chevron-right"></i></span>
+                    </div>
+                    <div class="card-body collapse" id="educationCollapse">
+                        {% for field in profile_form %}
+                            {% if field.name in 'institution,course,degree,graduation_year' %}
+                                <div class="mb-3">
+                                    <label for="{{ field.id_for_label }}" class="form-label fw-medium">
+                                        {{ field.label }}
+                                        {% if field.field.required %}
+                                            <span class="text-danger">*</span>
+                                        {% endif %}
+                                    </label>
+                                    {{ field }}
+                                    {% if field.errors %}
+                                        <div class="text-danger small mt-1">
+                                            {% for error in field.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                    {% if field.help_text %}
+                                        <div class="form-text small">{{ field.help_text }}</div>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Employment Details -->
+                <div class="card shadow-sm border-0 mb-4">
+                    <div class="card-header bg-transparent d-flex align-items-center justify-content-between" onclick="toggleVisibility(this)" role="button" aria-expanded="false" aria-controls="employmentCollapse">
+                        <h3 class="mb-0"><i class="fas fa-briefcase me-2"></i> Employment Details</h3>
+                        <span class="caret"><i class="fas fa-chevron-right"></i></span>
+                    </div>
+                    <div class="card-body collapse" id="employmentCollapse">
+                        {% for field in profile_form %}
+                            {% if field.name in 'account_number,bank_name,account_name,designation,location,employment_date,official_email,department,team' %}
+                                <div class="mb-3">
+                                    <label for="{{ field.id_for_label }}" class="form-label fw-medium">
+                                        {{ field.label }}
+                                        {% if field.field.required %}
+                                            <span class="text-danger">*</span>
+                                        {% endif %}
+                                    </label>
+                                    {{ field }}
+                                    {% if field.errors %}
+                                        <div class="text-danger small mt-1">
+                                            {% for error in field.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                    {% if field.help_text %}
+                                        <div class="form-text small">{{ field.help_text }}</div>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Emergency Contact -->
+                <div class="card shadow-sm border-0 mb-4">
+                    <div class="card-header bg-transparent d-flex align-items-center justify-content-between" onclick="toggleVisibility(this)" role="button" aria-expanded="false" aria-controls="emergencyCollapse">
+                        <h3 class="mb-0"><i class="fas fa-phone-alt me-2"></i> Emergency Contact</h3>
+                        <span class="caret"><i class="fas fa-chevron-right"></i></span>
+                    </div>
+                    <div class="card-body collapse" id="emergencyCollapse">
+                        {% for field in profile_form %}
+                            {% if field.name in 'emergency_name,emergency_relationship,emergency_phone,emergency_address,emergency_email' %}
+                                <div class="mb-3">
+                                    <label for="{{ field.id_for_label }}" class="form-label fw-medium">
+                                        {{ field.label }}
+                                        {% if field.field.required %}
+                                            <span class="text-danger">*</span>
+                                        {% endif %}
+                                    </label>
+                                    {{ field }}
+                                    {% if field.errors %}
+                                        <div class="text-danger small mt-1">
+                                            {% for error in field.errors %}
+                                                {{ error }}
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                    {% if field.help_text %}
+                                        <div class="form-text small">{{ field.help_text }}</div>
+                                    {% endif %}
+                                </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Save/Cancel Buttons -->
+                <div class="d-flex gap-2 mb-4">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-1"></i> Save Profile
+                    </button>
+                    <a href="{% url 'view_my_profile' %}" class="btn btn-outline-secondary">
+                        <i class="fas fa-times me-1"></i> Cancel
+                    </a>
+                </div>
+            </form>
 
             <!-- Documents Section -->
             <div class="card shadow-sm border-0 mb-4">
