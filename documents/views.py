@@ -2972,7 +2972,8 @@ def contact_list(request):
 def create_contact(request):
     if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
         print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
-        return HttpResponseForbidden("You are not authorized for this tenant.")
+        # return HttpResponseForbidden("You are not authorized for this tenant.")
+        return render(request, 'error.html', {'message': 'You are not authorized for this tenant.'})
     if request.method == "POST":
         form = ContactForm(request.POST)
         if form.is_valid():
@@ -3012,7 +3013,8 @@ def view_contact_detail(request, contact_id):
 def edit_contact(request, contact_id):
     if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
         print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
-        return HttpResponseForbidden("You are not authorized for this tenant.")
+        # return HttpResponseForbidden("You are not authorized for this tenant.")
+        return render(request, 'error.html', {'message': 'You are not authorized for this tenant.'})
     contact = get_object_or_404(Contact, id=contact_id, tenant=request.tenant)
     print(f"Contact to edit: {contact}")
     if request.method == "POST":
@@ -3031,7 +3033,8 @@ def edit_contact(request, contact_id):
 def delete_contact(request, contact_id):
     if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
         print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
-        return HttpResponseForbidden("You are not authorized for this tenant.")
+        # return HttpResponseForbidden("You are not authorized for this tenant.")
+        return render(request, 'error.html', {'message': 'You are not authorized for this tenant.'})
     contact = get_object_or_404(Contact, id=contact_id, tenant=request.tenant)
     if contact.created_by != request.user:
         return JsonResponse({'success': False, 'errors': {'folder': ['You can only delete your own contacts']}}, status=403)
@@ -3042,7 +3045,9 @@ def delete_contact(request, contact_id):
 def email_list(request):
     if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
         print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
-        return HttpResponseForbidden("You are not authorized for this tenant.")
+        # return HttpResponseForbidden("You are not authorized for this tenant.")
+        return render(request, 'error.html', {'message': 'You are not authorized for this tenant.'})
+        
     email_list = Email.objects.filter(tenant=request.tenant, sender=request.user)
     email_list_draft = Email.objects.filter(tenant=request.tenant, sender=request.user, sent=False)
     email_list_sent = Email.objects.filter(tenant=request.tenant, sender=request.user, sent=True)
@@ -3059,15 +3064,18 @@ def email_list(request):
 def edit_email(request, email_id):
     if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
         print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
-        return HttpResponseForbidden("You are not authorized for this tenant.")
+        # return HttpResponseForbidden("You are not authorized for this tenant.")
+        return render(request, 'error.html', {'message': 'You are not authorized for this tenant.'})
     
     email = get_object_or_404(Email, id=email_id, tenant=request.tenant, sender=request.user)
     if email.sender != request.user:
-        return HttpResponseForbidden('You can only edit your own emails')
+        # return HttpResponseForbidden('You can only edit your own emails')
         # raise PermissionDenied('You can only edit your own emails')
+        return render(request, 'error.html', {'message': 'You can only edit your own emails.'})
     if email.sent:
-        return HttpResponseForbidden('You cannot edit sent emails')
+        # return HttpResponseForbidden('You cannot edit sent emails')
         # raise PermissionDenied('You cannot edit sent emails')
+        return render(request, 'error.html', {'message': 'You cannot edit sent emails.'})
     
     if request.method == 'POST':
         form = EmailForm(request.POST, user=request.user, instance=email)
