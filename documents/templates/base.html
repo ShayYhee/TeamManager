@@ -111,10 +111,16 @@
             max-width: 100%;
             z-index: 1020;
             position: relative;
+            background: #fefcbf;
+            padding: 10px;
+            font-size: 0.9rem;
+            border-bottom: 1px solid #e2e8f0;
+            text-align: center;
         }
         body.dark-mode .notification-bar {
-            background: #3b4a6b !important;
+            background-color: #3b4a6b !important;
             border-bottom: 1px solid #4a5568;
+            color: #f2f3f5ff !important;
         }
         body.dark-mode .text-muted {
             color: #b8bfceff !important;
@@ -485,50 +491,72 @@
     </nav>
     {% endif %}
     {% if notification_bar_items %}
-        <div id="notification-bar" style="background: #fefcbf; padding: 10px; font-size: 0.9rem; border-bottom: 1px solid #e2e8f0; text-align: center; position: relative;">
-            {% for note in notification_bar_items %}
-                <span class="notification-message" style="display: none; transition: opacity 0.3s ease;" data-notification-id="{{ note.id }}">
-                    <strong>{{ note.title }}:</strong> {{ note.message }}
-                    {% if user.is_authenticated %}
-                        <i class="fas fa-times dismiss-btn ms-2" title="Dismiss" role="button" aria-label="Dismiss Notification" style="cursor: pointer; color: #e53e3e;"></i>
-                    {% endif %}
-                </span>
-            {% endfor %}
+        <div id="notification-bar" class="notification-bar">
+            <span id="current-notification" class="notification-message" style="opacity: 0;">
+                <!-- Notification content will be injected here by JavaScript -->
+            </span>
         </div>
         <script>
-            $(document).ready(function() {
-                const messages = $('.notification-message');
-                let index = 0;
-                function showNextNotification() {
-                    messages.fadeOut(300, function() {
-                        if (messages.length > 0) {
-                            $(messages[index]).fadeIn(300);
-                            index = (index + 1) % messages.length;
-                        }
+        $(document).ready(function() {
+            const notifications = [
+                {% for note in notification_bar_items %}
+                {
+                    id: "{{ note.id }}",
+                    html: '<strong>{{ note.title | escapejs }}:</strong> {{ note.message | escapejs }}' +
+                        {% if user.is_authenticated %}
+                        '<i class="fas fa-times dismiss-btn ms-2" title="Dismiss" role="button" aria-label="Dismiss Notification"></i>'
+                        {% endif %}
+                }{% if not forloop.last %},{% endif %}
+                {% endfor %}
+            ];
+            
+            let index = 0;
+            const $currentNotification = $('#current-notification');
+
+            function showNotification() {
+                if (notifications.length === 0) return;
+                
+                const nextNotification = notifications[index];
+                $currentNotification.css('opacity', 0);
+                
+                setTimeout(() => {
+                    $currentNotification.html(nextNotification.html)
+                        .attr('data-notification-id', nextNotification.id)
+                        .css('opacity', 1);
+                    
+                    // Rebind dismiss button handler for the new notification
+                    $('.dismiss-btn').off('click').on('click', function() {
+                        const notificationId = $(this).parent().attr('data-notification-id');
+                        $.ajax({
+                            url: '{% url "dismiss_notification" %}',
+                            method: 'POST',
+                            data: {
+                                notification_id: notificationId,
+                                csrfmiddlewaretoken: '{{ csrf_token }}'
+                            },
+                            success: function() {
+                                notifications.splice(notifications.findIndex(n => n.id === notificationId), 1);
+                                if (notifications.length === 0) {
+                                    $('#notification-bar').fadeOut(300, function() {
+                                        $(this).remove();
+                                    });
+                                    return;
+                                }
+                                index = index >= notifications.length ? 0 : index;
+                                showNotification();
+                            }
+                        });
                     });
-                }
-                showNextNotification();
-                setInterval(showNextNotification, 5000);
-                $('.dismiss-btn').on('click', function() {
-                    const notificationId = $(this).parent().data('notification-id');
-                    $.ajax({
-                        url: '{% url "dismiss_notification" %}',
-                        method: 'POST',
-                        data: {
-                            notification_id: notificationId,
-                            csrfmiddlewaretoken: '{{ csrf_token }}'
-                        },
-                        success: function() {
-                            $(`[data-notification-id="${notificationId}"]`).fadeOut(300, function() {
-                                $(this).remove();
-                                messages = $('.notification-message');
-                                index = Math.min(index, messages.length - 1);
-                                showNextNotification();
-                            });
-                        }
-                    });
-                });
-            });
+                    
+                    index = (index + 1) % notifications.length;
+                }, 300);
+            }
+
+            if (notifications.length > 0) {
+                showNotification();
+                setInterval(showNotification, 5000);
+            }
+        });
         </script>
     {% endif %}
     <div class="main-content" id="main-content">

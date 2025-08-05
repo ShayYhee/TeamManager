@@ -52,7 +52,17 @@ def notification_bar(request):
             dismissed=True
         ).values_list('notification_id', flat=True)
         notifications = notifications.exclude(id__in=dismissed_ids)
-        context['notification_bar_items'] = [n for n in notifications if n.is_visible()]
+        # context['notification_bar_items'] = [n for n in notifications if n.is_visible()]
+
+        # Check for Event Notification Participants
+        participants = UserNotification.objects.filter(
+            notification__tenant=request.user.tenant,
+            user=request.user,
+            notification__type=Notification.NotificationType.EVENT
+        ).values_list('notification_id', flat=True)
+        # non_participants = notifications.exclude(id__in=participants)
+        # notifications = notifications.exclude(id__in=non_participants)
+        context['notification_bar_items'] = [n for n in notifications if n.id in participants and n.is_visible()]
 
         try:
             user_profile = StaffProfile.objects.get(user=request.user, tenant=request.user.tenant)
