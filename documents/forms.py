@@ -118,13 +118,16 @@ class SignUpForm(forms.ModelForm):
         return cleaned_data
     
 class UserForm(forms.ModelForm):
+    password = forms.CharField(widget=forms.PasswordInput(attrs={"class": "form-control"}))
+    password_confirm = forms.CharField(widget=forms.PasswordInput(attrs={"class": "form-control"}))
     class Meta:
         model = CustomUser
-        fields = ['username', 'first_name', 'last_name', 'email', 
+        fields = ['username', 'password', 'first_name', 'last_name', 'email', 
                   'is_active', 'roles', 'phone_number', 
                   'department', 'teams', 'smtp_email', 'smtp_password']
         widgets = {
             'username': forms.TextInput(attrs={'class': 'form-control'}),
+            'password': forms.PasswordInput(attrs={'class': 'form-control'}),
             'first_name': forms.TextInput(attrs={'class': 'form-control'}),
             'last_name': forms.TextInput(attrs={'class': 'form-control'}),
             'email': forms.EmailInput(attrs={'class': 'form-control'}),
@@ -150,6 +153,14 @@ class UserForm(forms.ModelForm):
                 self.fields['roles'].queryset = Role.objects.none()
                 self.fields['department'].queryset = Department.objects.none()
                 self.fields['teams'].queryset = Team.objects.none()
+
+    def clean(self):
+        cleaned_data = super().clean()
+        password = cleaned_data.get("password")
+        password_confirm = cleaned_data.get("password_confirm")
+        if password and password_confirm and password != password_confirm:
+            raise forms.ValidationError("Passwords do not match")
+        return cleaned_data
 
 
 class FolderForm(forms.ModelForm):

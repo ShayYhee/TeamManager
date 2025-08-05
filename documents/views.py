@@ -2225,6 +2225,7 @@ def create_user(request):
         form = UserForm(request.POST)
         if form.is_valid():
             user = form.save(commit=False)
+            user.set_password(form.cleaned_data["password"])
             user.tenant = request.tenant
             user.save()
             LogEntry.objects.log_action(
