@@ -2904,12 +2904,11 @@ def view_company_profile(request):
         logger.error(f"Unauthorized access by user {request.user.username}: tenant mismatch")
         return HttpResponseForbidden("You are not authorized for this tenant.")
     print(f"User tenant: {request.user.tenant}. Request tenant: {request.tenant.name}")
-    tenant_profile, created = CompanyProfile.objects.get_or_create(
-        tenant=request.tenant,
-        defaults={'company_name': request.tenant}  # Set default company_name to tenant name
-    )
-    
-    try:
+    try: 
+        tenant_profile, created = CompanyProfile.objects.get_or_create(
+            tenant=request.tenant
+        )
+
         num_staff = CustomUser.objects.filter(tenant=request.tenant).count()
         num_departments = Department.objects.filter(tenant=request.tenant).count()
         num_teams = Team.objects.filter(tenant=request.tenant).count()
