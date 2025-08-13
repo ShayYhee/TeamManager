@@ -71,33 +71,33 @@ class Role(models.Model):
     
 
 class CustomUser(AbstractUser):
-    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, blank=True, null=True)
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, blank=True, null=True, related_name="customuser")
     roles = models.ManyToManyField(Role, blank=True)
     department = models.ForeignKey('Department', on_delete=models.SET_NULL, null=True, blank=True, related_name='members')
     teams = models.ManyToManyField('Team', blank=True, related_name='members')
     phone_number = models.CharField(max_length=15, blank=True, null=True)
-    smtp_email = models.EmailField(blank=True, null=True)
-    smtp_password = models.CharField(max_length=255, blank=True, null=True)  # Encrypted SMTP password
+    zoho_email = models.EmailField(blank=True, null=True)
+    zoho_password = models.CharField(max_length=255, blank=True, null=True)  # Encrypted SMTP password
 
     def set_smtp_password(self, password):
         """Encrypt and store SMTP password."""
         if password:
-            self.smtp_password = cipher.encrypt(password.encode()).decode()
+            self.zoho_password = cipher.encrypt(password.encode()).decode()
         else:
-            self.smtp_password = None
+            self.zoho_password = None
 
     def get_smtp_password(self):
         """Decrypt and return SMTP password."""
-        if self.smtp_password:
-            return cipher.decrypt(self.smtp_password.encode()).decode()
+        if self.zoho_password:
+            return cipher.decrypt(self.zoho_password.encode()).decode()
         return None
 
     def clean(self):
         """Validate SMTP credentials."""
-        if self.smtp_email and not self.smtp_password:
-            raise ValidationError("SMTP password is required if SMTP email is provided.")
-        if self.smtp_password and not self.smtp_email:
-            raise ValidationError("SMTP email is required if SMTP password is provided.")
+        if self.zoho_email and not self.zoho_password:
+            raise ValidationError("Zoho password is required if Zoho email is provided. Necessary for email sending.")
+        if self.zoho_password and not self.zoho_email:
+            raise ValidationError("Zoho email is required if Zoho password is provided. Necessary for email sending.")
 
     def is_hod(self):
         return self.roles.filter(name='HOD').exists()
@@ -171,7 +171,7 @@ class Task(models.Model):
 #         return self.name
     
 class Department(models.Model):
-    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="department")
     name = models.CharField(max_length=255, unique=True)
     hod = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='hod_department')
 
@@ -186,7 +186,7 @@ class Department(models.Model):
         return self.name
     
 class Team(models.Model):
-    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="team")
     name = models.CharField(max_length=255, unique=True)
     department = models.ForeignKey(Department, on_delete=models.CASCADE, blank=True, null=True)
     team_leader = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='team_leader')
@@ -221,7 +221,7 @@ class StaffProfile(models.Model):
         ('widowed', 'Widowed'),
     ]
 
-    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="staff_profile")
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="staff_profile")
     photo = models.ImageField(upload_to='staff_photos/', null=True, blank=True)
     first_name = models.CharField(max_length=255)
@@ -263,7 +263,7 @@ class StaffProfile(models.Model):
         return f"{self.first_name} {self.last_name}".strip()
 
 class Notification(models.Model):
-    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="notification")
     title = models.CharField(max_length=255)
     message = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -293,7 +293,7 @@ class Notification(models.Model):
     
 
 class UserNotification(models.Model):
-    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="user_notification")
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     notification = models.ForeignKey(Notification, on_delete=models.CASCADE)
     dismissed = models.BooleanField(default=False)
@@ -463,3 +463,93 @@ class Attachment(models.Model):
 
     def __str__(self):
         return self.file.name
+    
+class Payee(models.Model):
+    PAYEE_TYPE_CHOICES = [
+        ('employee', 'Employee'),  # Internal, linked to CustomUser
+        ('contractor', 'Contractor'),  # External, freelance or temporary
+        ('vendor', 'Vendor'),  # External, for suppliers or services
+        ('other', 'Other'),  # Catch-all for miscellaneous
+    ]
+
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='payees')
+    user = models.OneToOneField(CustomUser, on_delete=models.SET_NULL, null=True, blank=True, related_name='payee_profile')  # Link to internal user if applicable
+    payee_type = models.CharField(max_length=20, choices=PAYEE_TYPE_CHOICES, default='employee')
+    name = models.CharField(max_length=255)  # Full name or company name
+    email = models.EmailField(blank=True, null=True)
+    address = models.TextField(blank=True, null=True)  # For tax/compliance purposes
+    tax_id = models.CharField(max_length=50, blank=True, null=True)  # e.g., SSN, EIN for US; adaptable for other countries
+    account_number = models.CharField(max_length=100, blank=True, null=True)  # IBAN, account number, etc.
+    bank_name = models.CharField(max_length=100, blank=True, null=True)
+    account_name = models.CharField(max_length=100, blank=True, null=True)
+    routing_number = models.CharField(max_length=50, blank=True, null=True)  # For bank transfers
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.name} ({self.payee_type}) for {self.tenant}"
+
+    def save(self, *args, **kwargs):
+        if self.user:
+            # Auto-populate from CustomUser if linked
+            self.name = self.user.get_full_name() or self.user.username
+            self.email = self.user.email
+            self.payee_type = 'employee'
+            self.account_number = self.user.staff_profile.account_number
+            self.bank_name = self.user.staff_profile.bank_name
+            self.account_name = self.user.staff_profile.account_name
+        super().save(*args, **kwargs)
+
+class Payroll(models.Model):
+    STATUS_CHOICES = [
+        ('draft', 'Draft'),
+        ('approved', 'Approved'),
+        ('processed', 'Processed'),
+        ('paid', 'Paid'),
+        ('cancelled', 'Cancelled'),
+    ]
+
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='payrolls')
+    period_start = models.DateField()
+    period_end = models.DateField()
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
+    total_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)  # Sum of all linked payments
+    notes = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, blank=True, related_name='created_payrolls')
+
+    def __str__(self):
+        return f"Payroll for {self.tenant} ({self.period_start} to {self.period_end})"
+
+    # def save(self, *args, **kwargs):
+    #     super().save(*args, **kwargs)
+    #     # Optionally auto-calculate total_amount from linked payments
+    #     self.total_amount = sum(payment.amount for payment in self.payments.all()) or 0
+    #     super().save(*args, **kwargs)  # Save again to update total
+
+class Payment(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('success', 'Success'),
+        ('failed', 'Failed'),
+        ('cancelled', 'Cancelled'),
+    ]
+
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='payroll_payments')
+    payee = models.ForeignKey(Payee, on_delete=models.CASCADE, related_name='payments')  # Links to Payee (internal or external)
+    payroll = models.ForeignKey(Payroll, on_delete=models.SET_NULL, null=True, blank=True, related_name='payments')  # Optional link to Payroll for batching
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    net_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)  # After deductions
+    tax_deductions = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    payment_date = models.DateTimeField(auto_now_add=True)
+    payroll_period_start = models.DateField(null=True, blank=True)
+    payroll_period_end = models.DateField(null=True, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    transaction_id = models.CharField(max_length=100, blank=True, null=True)  # From payment gateway or bank
+    payment_method = models.CharField(max_length=50, blank=True, null=True)  # e.g., 'bank_transfer', 'direct_deposit'
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Payment of {self.amount} to {self.payee} by {self.tenant}"

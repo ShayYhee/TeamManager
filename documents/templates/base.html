@@ -20,7 +20,10 @@
             margin: 0;
             padding: 0;
             padding-top: 70px;
-            font-family: 'Inter', 'Helvetica', 'Arial', sans-serif;
+            {% comment %} font-family: 'Inter', 'Helvetica', 'Arial', sans-serif; {% endcomment %}
+            Font-family: 'Candara', 'Calibri', 'Segoe', 'Segoe UI', 'Optima', 'Arial', sans-serif;
+            {% comment %} Font-family: 'Garamond', 'Baskerville', 'Baskerville Old Face', 'Hoefler Text', 'Times New Roman', serif. {% endcomment %}
+            {% comment %} Font-family: 'Perpetua', 'Baskerville', 'Big Caslon', 'Palatino Linotype', 'Palatino', serif. {% endcomment %}
             background: linear-gradient(135deg, #f5f7fa 0%, #e2e7ec 100%);
             color: #2d3748;
             line-height: 1.6;
@@ -333,6 +336,8 @@
     <div class="sidebar" id="sidebar">
         <h4 class="text-white text-center mb-4"><i class="fas fa-briefcase mr-2"></i> {{ tenant.name|default:"Team Manager" }}</h4>
         {% if user.is_superuser %}
+            <a href="{% url 'superuser_dashboard' %}" {% if request.path == '/tenants/dashboard/' %}class="active"{% endif %}><i class="fas fa-user-shield"></i>Dashboard</a>
+            <a href="{% url 'all_users_list' %}" {% if request.path == '/tenants/users/list/' %}class="active"{% endif %}><i class="fas fa-user-shield"></i>All Users</a>
             <a href="{% url 'tenant_applications' %}" {% if request.path == '/tenants/tenant-applications/'%}class="active"{% endif %}><i class="fas fa-user-shield"></i>Tenant Applications</a>
             <a href="{% url 'tenant_list' %}" {% if request.path == '/tenants/list/' %}class="active"{% endif %}><i class="fas fa-user-shield"></i>Tenants</a>
             <a href="{% url 'admin:index' %}" {% if request.path|slice:":7" == '/admin/' %}class="active"{% endif %}><i class="fas fa-key"></i> Admin Panel</a>

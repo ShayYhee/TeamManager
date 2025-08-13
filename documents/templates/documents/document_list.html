@@ -12,9 +12,20 @@
                     <i class="fas fa-folder-open me-2 text-primary" aria-hidden="true"></i>
                     Generated Documents
                 </h4>
-                <a href="{% url 'create_document' %}" class="btn btn-primary btn-sm">
-                    <i class="fas fa-plus me-1"></i> Create New Document
-                </a>
+                <div>
+                    {% if user.tenant.slug == "raadaa" or user.tenant.slug == "transnet-cloud" %}
+                        <a href="{% url 'create_document' %}" class="btn btn-primary btn-sm">
+                            <i class="fas fa-plus me-1"></i> Generate Template/Upload Document
+                        </a>
+                        <a href="{% url 'create_from_editor' %}" class="btn btn-primary btn-sm">
+                            <i class="fas fa-plus me-1"></i> Create New Document
+                        </a>
+                    {% else %}
+                        <a href="{% url 'create_from_editor' %}" class="btn btn-primary btn-sm">
+                            <i class="fas fa-plus me-1"></i> Create New Document
+                        </a>
+                    {% endif %}
+                </div>
             </div>
             <div class="card-body">
                 {% if messages %}

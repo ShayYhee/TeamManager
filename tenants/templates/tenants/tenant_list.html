@@ -1,35 +1,59 @@
-{% extends "base.html" %}
-{% load static %}
-
-{% block title %}Tenant List - Team Manager{% endblock %}
-
+{% extends 'base.html' %}
+{% block title %}Tenants - Team Manager{% endblock %}
 {% block content %}
-<div class="container-fluid py-4">
-    <h2 class="mb-4" style="font-weight: 600; color: #2d3748;">
-        <i class="fas fa-user-shield me-2"></i>Tenant List
-    </h2>
-    <div class="card shadow-sm border-0" style="border-radius: 12px; background: #ffffff;">
-        <div class="card-body p-4">
-            {% if tenants %}
+<div class="users-page">
+    <div class="card shadow-sm">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h4 class="card-title mb-0">
+                <i class="fas fa-user-shield me-2 text-primary" aria-hidden="true"></i>
+                Tenants ({{ tenants|length }})
+            </h4>
+            {% comment %} <div class="mb-3">
+                <a href="{% url 'create_user' %}" class="btn btn-success">Add User</a>
+            </div> {% endcomment %}
+            <div class="input-group w-50 w-md-25">
+                <span class="input-group-text bg-transparent border-end-0">
+                    <i class="fas fa-search text-muted"></i>
+                </span>
+                <input type="text" class="form-control border-start-0" id="searchUsers" placeholder="Search tenants..." aria-label="Search users">
+            </div>
+            {% comment %} <a href="{% url 'admin_dashboard' %}" class="btn btn-outline-secondary btn-sm" title="Back to Admin Dashboard">
+                <i class="fas fa-arrow-left me-1"></i> Back
+            </a> {% endcomment %}
+        </div>
+
+        <div class="card-body">
             <div class="table-responsive">
-                <table class="table table-hover" aria-label="Tenant List Table">
-                    <thead>
-                        <tr style="background: #f8fafc; color: #2d3748;">
+                <form method="POST" id="bulkActionForm">
+                    {% csrf_token %}
+                    <select name="action" class="form-select d-inline w-auto me-2">
+                        <option value="activate">Activate</option>
+                        <option value="delete">Delete</option>
+                    </select>
+                    <button type="submit" class="btn btn-primary btn-sm">Apply</button>
+                </form>
+                <table class="table table-hover table-bordered align-middle">
+                    <thead class="table-light">
+                        <tr>
                             <th scope="col">Name</th>
                             <th scope="col">Slug</th>
                             <th scope="col">Admin</th>
+                            <th scope="col">No. Tenant Users</th>
                             <th scope="col">Verified</th>
+                            <th scope="col">Subscription Plan</th>
+                            <th scope="col"> Subscription Status</th>
                             <th scope="col">Created By</th>
                             <th scope="col">Created At</th>
                             <th scope="col">Actions</th>
                         </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="userTableBody">
                         {% for tenant in tenants %}
                         <tr style="transition: background-color 0.2s ease;">
                             <td>{{ tenant.name }}</td>
                             <td>{{ tenant.slug }}</td>
                             <td>{{ tenant.admin }}</td>
+                            <td>{{ tenant.num_users }}</td>
                             <td>
                                 {% if tenant.is_verified %}
                                     <i class="fas fa-check-circle text-success" aria-hidden="true" title="Active"></i>
@@ -43,6 +67,8 @@
                                     </form>
                                 {% endif %}
                             </td>
+                            <td>{{ tenant.subscription_plan }}</td>
+                            <td>{{ tenant.subscription_status }}</td>
                             <td>{{ tenant.created_by }}</td>
                             <td>{{ tenant.created_at|date:"M d, Y H:i" }}</td>
                             <td>
@@ -61,52 +87,193 @@
                         {% endfor %}
                     </tbody>
                 </table>
+                {% if tenants.has_other_pages %}
+                    <nav aria-label="Page navigation">
+                        <ul class="pagination justify-content-center mt-3">
+                            {% if tenants.has_previous %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ tenants.previous_page_number }}" aria-label="Previous">
+                                        <span aria-hidden="true">&laquo;</span>
+                                    </a>
+                                </li>
+                            {% endif %}
+                            {% for num in tenants.paginator.page_range %}
+                                <li class="page-item {% if tenants.number == num %}active{% endif %}">
+                                    <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+                                </li>
+                            {% endfor %}
+                            {% if tenants.has_next %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?page={{ tenants.next_page_number }}" aria-label="Next">
+                                        <span aria-hidden="true">&raquo;</span>
+                                    </a>
+                                </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                {% endif %}
             </div>
-            {% else %}
-            <div class="alert alert-info text-center" role="alert" style="border-radius: 8px; font-size: 0.9rem;">
-                No tenants found.
-            </div>
-            {% endif %}
         </div>
     </div>
 </div>
 
-<style>
-    body.dark-mode .card {
-        background: #2d3748 !important;
-        color: #e2e8f0;
+<style scoped>
+    .pagination .page-link {
+        color: #319795;
+        border-radius: 8px;
+        margin: 0 2px;
     }
-    body.dark-mode .table {
-        color: #e2e8f0;
+    .pagination .page-item.active .page-link {
+        background-color: #319795;
+        border-color: #319795;
+        color: #ffffff;
     }
-    body.dark-mode thead tr {
-        background: #3b4a6b !important;
-        color: #e2e8f0;
+    .pagination .page-link:hover {
+        background-color: #f1f5f9;
+        color: #2c7a7b;
     }
-    body.dark-mode .alert-info {
-        background: #3b4a6b;
-        color: #e2e8f0;
-        border-color: #4a5568;
+    .users-page {
+        padding: 20px;
     }
-    .table-hover tbody tr:hover {
-        background-color: #f8fafc;
+
+    .users-page .card {
+        border: none;
+        border-radius: 12px; /* Match base.html's rounded corners */
+        background: #ffffff;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); /* Match base.html's main-content */
     }
-    body.dark-mode .table-hover tbody tr:hover {
-        background-color: #3b4a6b;
+
+    .users-page .card-header {
+        background: #f8fafc;
+        border-bottom: 1px solid #e2e8f0; /* Match base.html's border color */
+        border-radius: 12px 12px 0 0;
+        padding: 15px 20px;
+    }
+
+    .users-page .card-title {
+        font-weight: 600;
+        color: #2d3748; /* Match base.html's text color */
+    }
+
+    .users-page .table {
+        margin-bottom: 0;
+        font-size: 0.95rem;
+    }
+
+    .users-page .table th {
+        font-weight: 500;
+        color: #2d3748;
+        background: #f8fafc;
+        border-bottom: 2px solid #e2e8f0;
+    }
+
+    .users-page .table td {
+        vertical-align: middle;
+        border-color: #e2e8f0;
+    }
+
+    .users-page .table-hover tbody tr:hover {
+        background-color: #f1f5f9; /* Subtle hover effect */
+    }
+
+    .users-page .btn-primary {
+        background-color: #319795;
+        border-color: #319795;
+        border-radius: 8px; /* Match base.html's button style */
+        padding: 6px 12px;
+        font-size: 0.9rem;
+        transition: background-color 0.2s ease;
+    }
+
+    .users-page .btn-primary:hover {
+        background-color: #2c7a7b;
+        border-color: #2c7a7b;
+    }
+
+    .users-page .btn-danger {
+        background-color: #dc3545;
+        border-color: #dc3545;
+        border-radius: 8px;
+        padding: 6px 12px;
+        font-size: 0.9rem;
+        transition: background-color 0.2s ease;
+    }
+
+    .users-page .btn-danger:hover {
+        background-color: #c82333;
+        border-color: #c82333;
+    }
+
+    .users-page .form-control {
+        border-radius: 8px;
+        border: 1px solid #e2e8f0;
+        font-size: 0.9rem;
+        padding: 8px;
+    }
+
+    .users-page .form-control:focus {
+        border-color: #319795;
+        box-shadow: 0 0 0 0.2rem rgba(49, 151, 149, 0.25);
+    }
+
+    .users-page .input-group-text {
+        border-radius: 8px 0 0 8px;
+        border: 1px solid #e2e8f0;
+    }
+
+    /* Focus styles for accessibility */
+    .users-page a:focus, .users-page button:focus, .users-page input:focus {
+        outline: 2px solid #319795;
+        outline-offset: 2px;
+        border-radius: 4px;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+        .users-page {
+            padding: 15px;
+        }
+
+        .users-page .card-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 10px;
+        }
+
+        .users-page .input-group {
+            width: 100% !important;
+        }
+
+        .users-page .table {
+            font-size: 0.85rem;
+        }
+
+        .users-page .btn-sm {
+            padding: 4px 8px;
+            font-size: 0.85rem;
+        }
     }
 </style>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const tableRows = document.querySelectorAll('tbody tr');
-        tableRows.forEach(row => {
-            row.addEventListener('focusin', function() {
-                this.style.outline = '2px solid #319795';
-                this.style.outlineOffset = '2px';
-            });
-            row.addEventListener('focusout', function() {
-                this.style.outline = 'none';
-            });
+    document.getElementById('searchUsers').addEventListener('input', function(e) {
+        const searchTerm = e.target.value.toLowerCase();
+        const rows = document.querySelectorAll('#userTableBody tr:not(.no-results)');
+        rows.forEach(row => {
+            const text = row.textContent.toLowerCase();
+            row.style.display = text.includes(searchTerm) ? '' : 'none';
+        });
+        const noResultsRow = document.querySelector('#userTableBody tr.no-results');
+        if (noResultsRow) {
+            noResultsRow.style.display = Array.from(rows).every(row => row.style.display === 'none') ? '' : 'none';
+        }
+    });
+    
+    document.querySelectorAll('form').forEach(form => {
+        form.addEventListener('submit', function() {
+            const btn = form.querySelector('button[type="submit"]');
+            btn.querySelector('.spinner-border').classList.remove('d-none');
+            btn.disabled = true;
         });
     });
 </script>

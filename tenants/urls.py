@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import home, apply_for_tenant, application_status, create_tenant, tenant_list, reject_tenant, tenant_applications, check_status, edit_tenant, delete_tenant, verify_tenant, delete_tenant_app
+from .views import home, apply_for_tenant, application_status, create_tenant, tenant_list, reject_tenant, tenant_applications, check_status, edit_tenant, delete_tenant, verify_tenant, delete_tenant_app, users_list, superuser_dashboard
 
 urlpatterns = [
     path('', home, name='tenant_home'),
@@ -10,8 +10,10 @@ urlpatterns = [
     path('tenant-applications/delte/<int:tenant_application_id>/', delete_tenant_app, name='delete_tenant_app'),
     path('create/<int:tenant_application_id>/', create_tenant, name='create_tenant'),
     path('reject/<int:tenant_application_id>/', reject_tenant, name='reject_tenant'),
-    path('list/', tenant_list, name='tenant_list'),
     path('edit/<int:tenant_id>/', edit_tenant, name='edit_tenant'),
     path('delete/<int:tenant_id>/', delete_tenant, name='delete_tenant'),
     path('verify/<int:tenant_id>/', verify_tenant, name='verify_tenant'),
+    path('list/', tenant_list, name='tenant_list'),
+    path('users/list/', users_list, name='all_users_list'),
+    path('dashboard/', superuser_dashboard, name='superuser_dashboard')
 ]

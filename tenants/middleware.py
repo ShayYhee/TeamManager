@@ -1,6 +1,10 @@
 import logging
 from django.http import HttpResponseNotFound, HttpResponseForbidden, HttpResponseServerError
 from django.conf import settings
+from django.urls import reverse
+from urllib.parse import urlparse, urlunparse
+from django.shortcuts import redirect, render
+from django.conf import settings
 from documents.models import CustomUser
 from tenants.models import Tenant
 
@@ -68,7 +72,18 @@ class TenantMiddleware:
         if hasattr(request, 'user') and request.user.is_authenticated:
             if not CustomUser.objects.filter(id=request.user.id, tenant=request.tenant).exists():
                 print(f"User {request.user.username} not associated with tenant {request.tenant.slug}")
-                return HttpResponseForbidden("You are not authorized to access this tenant.")
+                # return HttpResponseForbidden("You are not authorized to access this tenant.")
+                # Login redirect
+                expected_subdomain = (
+                    request.user.tenant.slug
+                    if hasattr(request.user, 'tenant') and request.user.tenant
+                    else None
+                )
+                base_domain = "localhost:8000" if settings.DEBUG else "teammanager.ng"
+                protocol = "http" if settings.DEBUG else "https"
+                login_url = f"{protocol}://{expected_subdomain}.{base_domain}/accounts/login"
+                return redirect(login_url)
+                # render(request, 'tenants/tenant_error.html', {'message': 'You are not authorized to access this tenant.', 'login_url':login_url})
 
         print(f"Set request.tenant to: {request.tenant.slug if request.tenant else 'None'}")
         return self.get_response(request)
