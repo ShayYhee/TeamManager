@@ -15,8 +15,6 @@ class Command(BaseCommand):
         try:
             user = User.objects.get(username=username)
             # Ensure user is staff (required for admin panel access)
-            user.is_staff = True
-            user.is_superuser = True  # Optional, set to False for non-superuser
             user.save()
 
             # Get or create the Admin role

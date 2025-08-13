@@ -37,6 +37,13 @@
                                         <div class="d-flex align-items-center">
                                             <i class="fas fa-circle fa-xs me-3 text-primary"></i>
                                             <div>
+                                                {% if contact.priority == 'high' %}
+                                                    <i class="fas fa-solid fa-flag" style="color: #1c9237ff;"></i>
+                                                {% elif contact.priority == 'medium' %}
+                                                    <i class="fas fa-solid fa-flag" style="color: #ebeb0cff;"></i>
+                                                {% else %}
+                                                    <i class="fas fa-solid fa-flag" style="color: #585854e6;"></i>
+                                                {% endif %}
                                                 <h5 class="card-title mb-1 contact-name" style="cursor: pointer;">{{ contact.name }}</h5>
                                                 <p class="card-text mb-1">{{ contact.email }} | {{ contact.phone|default:"No phone" }}</p>
                                                 <small class="text-muted">Created on {{ contact.created_at|date:"F d, Y H:i" }}</small>
@@ -93,6 +100,13 @@
                                         <div class="d-flex align-items-center">
                                             <i class="fas fa-circle fa-xs me-3 text-primary"></i>
                                             <div>
+                                                {% if contact.priority == 'high' %}
+                                                    <i class="fas fa-solid fa-flag" style="color: #1c9237ff;"></i>
+                                                {% elif contact.priority == 'medium' %}
+                                                    <i class="fas fa-solid fa-flag" style="color: #ebeb0cff;"></i>
+                                                {% else %}
+                                                    <i class="fas fa-solid fa-flag" style="color: #585854e6;"></i>
+                                                {% endif %}
                                                 <h5 class="card-title mb-1 contact-name" style="cursor: pointer;">{{ contact.name }}</h5>
                                                 <p class="card-text mb-1">{{ contact.email }} | {{ contact.phone|default:"No phone" }}</p>
                                                 <small class="text-muted">Created on {{ contact.created_at|date:"F d, Y H:i" }}</small>
@@ -149,6 +163,13 @@
                                         <div class="d-flex align-items-center">
                                             <i class="fas fa-circle fa-xs me-3 text-primary"></i>
                                             <div>
+                                                {% if contact.priority == 'high' %}
+                                                    <i class="fas fa-solid fa-flag" style="color: #1c9237ff;"></i>
+                                                {% elif contact.priority == 'medium' %}
+                                                    <i class="fas fa-solid fa-flag" style="color: #ebeb0cff;"></i>
+                                                {% else %}
+                                                    <i class="fas fa-solid fa-flag" style="color: #585854e6;"></i>
+                                                {% endif %}
                                                 <h5 class="card-title mb-1 contact-name" style="cursor: pointer;">{{ contact.name }}</h5>
                                                 <p class="card-text mb-1">{{ contact.email }} | {{ contact.phone|default:"No phone" }}</p>
                                                 <small class="text-muted">Created on {{ contact.created_at|date:"F d, Y H:i" }}</small>

@@ -107,14 +107,20 @@ class SignUpForm(forms.ModelForm):
     
     class Meta:
         model = User
-        fields = ["username", "email", "password"]
+        fields = ["first_name", "last_name", "username", "email", "password"]
 
     def clean(self):
         cleaned_data = super().clean()
         password = cleaned_data.get("password")
         password_confirm = cleaned_data.get("password_confirm")
+        first_name = cleaned_data.get("first_name")
+        last_name = cleaned_data.get("last_name")
         if password and password_confirm and password != password_confirm:
             raise forms.ValidationError("Passwords do not match")
+        if not first_name:
+            raise forms.ValidationError("Please Enter First Name")
+        if not last_name:
+            raise forms.ValidationError("Please Enter Last Name")
         return cleaned_data
     
 class UserForm(forms.ModelForm):
@@ -122,12 +128,13 @@ class UserForm(forms.ModelForm):
     password_confirm = forms.CharField(widget=forms.PasswordInput(attrs={"class": "form-control"}))
     class Meta:
         model = CustomUser
-        fields = ['username', 'password', 'first_name', 'last_name', 'email', 
+        fields = ['username', 'password', 'password_confirm', 'first_name', 'last_name', 'email', 
                   'is_active', 'roles', 'phone_number', 
-                  'department', 'teams', 'smtp_email', 'smtp_password']
+                  'department', 'teams', 'zoho_email', 'zoho_password']
         widgets = {
             'username': forms.TextInput(attrs={'class': 'form-control'}),
             'password': forms.PasswordInput(attrs={'class': 'form-control'}),
+            'password_confirm': forms.PasswordInput(attrs={'class': 'form-control'}),
             'first_name': forms.TextInput(attrs={'class': 'form-control'}),
             'last_name': forms.TextInput(attrs={'class': 'form-control'}),
             'email': forms.EmailInput(attrs={'class': 'form-control'}),
@@ -136,21 +143,21 @@ class UserForm(forms.ModelForm):
             'phone_number': forms.TextInput(attrs={'class': 'form-control'}),
             'department': forms.Select(attrs={'class': 'form-control'}),
             'teams': forms.SelectMultiple(attrs={'class': 'form-control'}),
-            'smtp_email': forms.EmailInput(attrs={'class': 'form-control'}),
-            'smtp_password': forms.PasswordInput(attrs={'class': 'form-control'}),
+            'zoho_email': forms.EmailInput(attrs={'class': 'form-control'}),
+            'zoho_password': forms.PasswordInput(attrs={'class': 'form-control'}),
         }
 
     def __init__(self, *args, **kwargs):
-        user = kwargs.pop('user', None)
+        tenant = kwargs.pop('tenant', None)
         super().__init__(*args, **kwargs)
-        if user:
-            tenant = getattr(user, 'tenant', None)
+        if tenant:
+            # tenant = getattr(user, 'tenant', None)
             if tenant:
-                self.fields['roles'].queryset = Role.objects.filter(tenant=tenant)
+                # self.fields['roles'].queryset = Role.objects.filter(tenant=tenant)
                 self.fields['department'].queryset = Department.objects.filter(tenant=tenant)
                 self.fields['teams'].queryset = Team.objects.filter(tenant=tenant)
             else:
-                self.fields['roles'].queryset = Role.objects.none()
+                # self.fields['roles'].queryset = Role.objects.none()
                 self.fields['department'].queryset = Department.objects.none()
                 self.fields['teams'].queryset = Team.objects.none()
 
@@ -162,6 +169,34 @@ class UserForm(forms.ModelForm):
             raise forms.ValidationError("Passwords do not match")
         return cleaned_data
 
+class EditUserForm(forms.ModelForm):
+    class Meta:
+        model = CustomUser
+        fields = ['username', 'first_name', 'last_name', 'email', 
+                  'is_active', 'roles', 'phone_number', 
+                  'department', 'teams']
+        widgets = {
+            'username': forms.TextInput(attrs={'class': 'form-control'}),
+            'first_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'last_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'email': forms.EmailInput(attrs={'class': 'form-control'}),
+            'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'roles': forms.SelectMultiple(attrs={'class': 'form-control'}),
+            'phone_number': forms.TextInput(attrs={'class': 'form-control'}),
+            'department': forms.Select(attrs={'class': 'form-control'}),
+            'teams': forms.SelectMultiple(attrs={'class': 'form-control'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        tenant = kwargs.pop('tenant', None)
+        super().__init__(*args, **kwargs)
+        if tenant:
+            if tenant:
+                self.fields['department'].queryset = Department.objects.filter(tenant=tenant)
+                self.fields['teams'].queryset = Team.objects.filter(tenant=tenant)
+            else:
+                self.fields['department'].queryset = Department.objects.none()
+                self.fields['teams'].queryset = Team.objects.none()
 
 class FolderForm(forms.ModelForm):
     class Meta:
@@ -279,10 +314,10 @@ class StaffDocumentForm(forms.ModelForm):
 class EmailConfigForm(forms.ModelForm):
     class Meta:
         model = CustomUser
-        fields = ['smtp_email', 'smtp_password' ]
+        fields = ['zoho_email', 'zoho_password' ]
         widgets = {
-            'smtp_email': forms.EmailInput(attrs={'class': 'form-control'}),
-            'smtp_password': forms.PasswordInput(attrs={'class': 'form-control'}),
+            'zoho_email': forms.EmailInput(attrs={'class': 'form-control'}),
+            'zoho_password': forms.PasswordInput(attrs={'class': 'form-control'}),
         }
 
 class PublicFolderForm(forms.ModelForm):
@@ -442,8 +477,7 @@ class CompanyProfileForm(forms.ModelForm):
     class Meta:
         model = CompanyProfile
         fields = ['photo', 'company_name',  'description', 'date_founded', 'reg_number', 
-                  'address', 'email', 'contact_details', 'website', 
-                  'num_staff', 'num_departments', 'num_teams']
+                  'address', 'email', 'contact_details', 'website']
         widgets = {
             'description' : forms.TextInput(attrs={'rows': 5, 'class': 'form-control'}),
             'date_founded': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),

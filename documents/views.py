@@ -21,7 +21,7 @@ from django.utils import timezone
 from django.utils.timezone import now
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
-from .forms import DocumentForm, SignUpForm, CreateDocumentForm, FileUploadForm, FolderForm, TaskForm, ReassignTaskForm, StaffProfileForm, StaffDocumentForm, EmailConfigForm, UserForm, PublicFolderForm, PublicFileForm, DepartmentForm, TeamForm, EventForm, EventParticipantForm, NotificationForm, UserNotificationForm, CompanyProfileForm, ContactForm, EmailForm, AttachmentFormSet
+from .forms import DocumentForm, SignUpForm, CreateDocumentForm, FileUploadForm, FolderForm, TaskForm, ReassignTaskForm, StaffProfileForm, StaffDocumentForm, EmailConfigForm, UserForm, PublicFolderForm, PublicFileForm, DepartmentForm, TeamForm, EventForm, EventParticipantForm, NotificationForm, UserNotificationForm, CompanyProfileForm, ContactForm, EmailForm, AttachmentFormSet, EditUserForm
 from .models import Document, CustomUser, Role, File, Folder, Task, StaffProfile, Notification, UserNotification, StaffDocument, Event, EventParticipant, Department, Team, PublicFile, PublicFolder, CompanyProfile, Contact, Email, Attachment
 from raadaa.settings import ALLOWED_HOSTS
 from .serializers import EventSerializer
@@ -96,8 +96,8 @@ def send_approval_request(document):
         'message': 'Unauthorized: Creator does not belong to the document\'s tenant.'
     }, status=403)
 
-    sender_email = document.created_by.smtp_email
-    sender_password = document.created_by.smtp_password
+    sender_email = document.created_by.zoho_email
+    sender_password = document.created_by.zoho_password
 
     if not sender_email or not sender_password:
         return HttpResponseForbidden("Your email credentials are missing. Contact admin.")
@@ -381,41 +381,54 @@ def register(request):
             if not request.tenant:
                 return HttpResponseForbidden("No tenant associated with this request.")
             user.save()
+            try:
+                created = StaffProfile.objects.create(tenant=user.tenant, user=user)
+                created.first_name = form.cleaned_data["first_name"]
+                created.last_name = form.cleaned_data["last_name"]
+                created.email = form.cleaned_data["email"]
+                created.save()
+            except ValidationError as e:
+                print(f"Staff Profile creation error: {e}")
+                return redirect('view_my_profile')
 
             # Send confirmation email
             admin_user = CustomUser.objects.filter(
                 tenant=request.tenant, roles__name="Admin"
             ).first()
-            if admin_user:
-                sender_email = admin_user.smtp_email
-                sender_password = admin_user.smtp_password
-                if sender_email and sender_password:
-                    connection = get_connection(
-                        backend="django.core.mail.backends.smtp.EmailBackend",
-                        host="smtp.zoho.com",
-                        port=587,
-                        username=sender_email,
-                        password=sender_password,
-                        use_tls=True,
-                    )
-                    base_domain = "127.0.0.1:8000" if settings.DEBUG else "teammanager.ng"
-                    protocol = "http" if settings.DEBUG else "https"
-                    login_url = f"{protocol}://{request.tenant.slug}.{base_domain}/accounts/login"
-                    subject = f"Account Pending Approval: {user.username}"
-                    message = f"""
-                    Dear {user.username},
+            if admin_user.zoho_email and admin_user.zoho_password:
+                sender_email = admin_user.zoho_email
+                sender_password = admin_user.zoho_password
+            else:
+                superuser = CustomUser.objects.get(is_superuser=True)
+                sender_email = superuser.zoho_email
+                sender_password = superuser.zoho_password
+            if sender_email and sender_password:
+                connection = get_connection(
+                    backend="django.core.mail.backends.smtp.EmailBackend",
+                    host="smtp.zoho.com",
+                    port=587,
+                    username=sender_email,
+                    password=sender_password,
+                    use_tls=True,
+                )
+                base_domain = "127.0.0.1:8000" if settings.DEBUG else "teammanager.ng"
+                protocol = "http" if settings.DEBUG else "https"
+                login_url = f"{protocol}://{request.tenant.slug}.{base_domain}/accounts/login"
+                subject = f"Account Pending Approval: {user.username}"
+                message = f"""
+                Dear {user.username},
 
-                    Your account has been created and is pending approval. You will be notified once approved. 
-                    Once activated, you can log in at: {login_url}
+                Your account has been created and is pending approval. You will be notified once approved. 
+                Once activated, you can log in at: {login_url}
 
-                    Best regards,  
-                    {admin_user.get_full_name() or admin_user.username}
-                    """
-                    try:
-                        send_mail(subject, message, sender_email, [user.email], connection=connection)
-                    except Exception as e:
-                        print(f"Failed to send email: {e}")
-                        # Log error or notify admin, but proceed with registration
+                Best regards,  
+                {admin_user.get_full_name() or admin_user.username}
+                """
+                try:
+                    send_mail(subject, message, sender_email, [user.email], connection=connection)
+                except Exception as e:
+                    print(f"Failed to send email: {e}")
+                    # Log error or notify admin, but proceed with registration
             return redirect("account_activation_sent")
     else:
         form = SignUpForm()
@@ -554,8 +567,8 @@ def approve_document(request, document_id):
     document.save()
 
     # Ensure the BDM has SMTP credentials (or use tenant-specific SMTP settings)
-    sender_email = request.user.smtp_email
-    sender_password = request.user.smtp_password
+    sender_email = request.user.zoho_email
+    sender_password = request.user.zoho_password
 
     if not sender_email or not sender_password:
         return HttpResponseForbidden("Your email credentials are missing. Contact admin.")
@@ -620,8 +633,8 @@ def send_approved_email(request, document_id):
         return HttpResponseForbidden("PDF file not found.")
 
     # Get sender credentials from the logged-in user
-    sender_email = request.user.smtp_email
-    sender_password = request.user.smtp_password
+    sender_email = request.user.zoho_email
+    sender_password = request.user.zoho_password
 
     if not sender_email or not sender_password:
         return HttpResponseForbidden("Your email credentials are missing. Contact admin.")
@@ -2154,8 +2167,8 @@ def bulk_action_users(request):
             )
             # Send activation emails
             admin_user = request.user
-            sender_email = admin_user.smtp_email
-            sender_password = admin_user.smtp_password
+            sender_email = admin_user.zoho_email
+            sender_password = admin_user.zoho_password
             if sender_email and sender_password:
                 connection = get_connection(
                     backend="django.core.mail.backends.smtp.EmailBackend",
@@ -2251,13 +2264,14 @@ def view_user_details(request, user_id):
     try:
         user_view = CustomUser.objects.get(id=user_id, tenant=request.tenant)
         details = ['username', 'first_name', 'last_name', 'email', 
-                  'is_staff', 'is_active', 'roles', 'phone_number', 
-                  'department', 'teams', 'smtp_email', 'smtp_password']
+                 'is_active', 'roles', 'phone_number', 
+                  'department', 'teams', 'zoho_email', 'zoho_password']
     except CustomUser.DoesNotExist:
         return HttpResponseForbidden("User not found or does not belong to your tenant.")
 
     return render(request, "admin/view_user_details.html", {"user_view": user_view, "details": details})
 @user_passes_test(is_admin)
+@user_passes_test(lambda u: u.is_superuser)
 def approve_user(request, user_id):
     # Validate that the admin belongs to the current tenant
     if request.user.tenant != request.tenant:
@@ -2275,8 +2289,13 @@ def approve_user(request, user_id):
 
     # Use the admin's email credentials (request.user is already the admin)
     admin_user = request.user
-    sender_email = admin_user.smtp_email
-    sender_password = admin_user.smtp_password
+    if admin_user.zoho_email and admin_user.zoho_password:
+        sender_email = admin_user.zoho_email
+        sender_password = admin_user.zoho_password
+    else:
+        superuser = CustomUser.objects.get(is_superuser=True)
+        sender_email = superuser.zoho_email
+        sender_password = superuser.zoho_password
 
     if not sender_email or not sender_password:
         return HttpResponseForbidden("Your email credentials are missing. Contact admin.")
@@ -2342,7 +2361,7 @@ def edit_user(request, user_id):
     user = get_object_or_404(CustomUser, id=user_id, tenant=request.tenant)
 
     if request.method == "POST":
-        form = UserForm(request.POST, instance=user)
+        form = EditUserForm(request.POST, instance=user, tenant=request.tenant)
         if form.is_valid():
             # Ensure the tenant field cannot be changed
             form.instance.tenant = request.tenant
@@ -2357,7 +2376,7 @@ def edit_user(request, user_id):
             )
             return redirect("users_list")
     else:
-        form = UserForm(instance=user)
+        form = EditUserForm(instance=user, tenant=request.tenant)
     return render(request, "admin/edit_user.html", {"form": form})
 
 @user_passes_test(is_admin)
@@ -3099,8 +3118,8 @@ def edit_email(request, email_id):
             
             # If user wants to send the email
             if 'send' in request.POST:
-                sender_email = request.user.smtp_email
-                sender_password = request.user.smtp_password
+                sender_email = request.user.zoho_email
+                sender_password = request.user.zoho_password
                 connection = get_connection(
                     backend="django.core.mail.backends.smtp.EmailBackend",
                     host="smtp.zoho.com",
@@ -3171,8 +3190,8 @@ def send_email(request):
         print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
         return HttpResponseForbidden("You are not authorized for this tenant.")
     
-    sender_email = request.user.smtp_email
-    sender_password = request.user.smtp_password
+    sender_email = request.user.zoho_email
+    sender_password = request.user.zoho_password
     connection = get_connection(
         backend="django.core.mail.backends.smtp.EmailBackend",
         host="smtp.zoho.com",
