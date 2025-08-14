@@ -6,7 +6,7 @@
         <div class="card-header d-flex justify-content-between align-items-center">
             <h4 class="card-title mb-0">
                 <i class="fas fa-user-shield me-2 text-primary" aria-hidden="true"></i>
-                Users ({{ users|length }})
+                Users ({{ count }})
             </h4>
             <div class="mb-3">
                 <a href="{% url 'create_user' %}" class="btn btn-success">Add User</a>
@@ -65,13 +65,14 @@
                                 {% if user.is_active %}
                                     <i class="fas fa-check-circle text-success" aria-hidden="true" title="Active"></i>
                                 {% else %}
-                                    <form action="{% url 'approve_user' user.id %}" method="POST" class="d-inline">
+                                    <i class="fas fa-times-circle text-danger" aria-hidden="true" title="Failed"></i>
+                                    {% comment %} <form action="{% url 'approve_user' user.id %}" method="POST" class="d-inline">
                                         {% csrf_token %}
                                         <button type="submit" class="btn btn-primary btn-sm" title="Activate User" id="activate-{{ user.id }}">
                                             <i class="fas fa-check me-1"></i> Activate
                                             <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
                                         </button>
-                                    </form>
+                                    </form> {% endcomment %}
                                 {% endif %}
                             </td>
                             <td>{{ user.date_joined|date:"d M Y" }}</td>

@@ -376,7 +376,8 @@ def register(request):
         if form.is_valid():
             user = form.save(commit=False)
             user.set_password(form.cleaned_data["password"])
-            user.is_active = False
+            # user.is_active = False
+            user.is_active = True
             user.tenant = request.tenant
             if not request.tenant:
                 return HttpResponseForbidden("No tenant associated with this request.")
@@ -2228,7 +2229,8 @@ def users_list(request):
     paginator = Paginator(users, 10)  # 10 users per page
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
-    return render(request, "admin/users_list.html", {"users": page_obj})
+    count = users.count()
+    return render(request, "admin/users_list.html", {"users": page_obj, 'count': count})
 
 @user_passes_test(is_admin)
 def create_user(request):
@@ -2271,7 +2273,7 @@ def view_user_details(request, user_id):
 
     return render(request, "admin/view_user_details.html", {"user_view": user_view, "details": details})
 @user_passes_test(is_admin)
-@user_passes_test(lambda u: u.is_superuser)
+# @user_passes_test(lambda u: u.is_superuser)
 def approve_user(request, user_id):
     # Validate that the admin belongs to the current tenant
     if request.user.tenant != request.tenant:
