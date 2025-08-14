@@ -203,13 +203,15 @@ def tenant_list(request):
         ).distinct()
     logger.debug(f"Listed {tenants.count()} tenants for user: {request.user.username}")
 
+    count = tenants.count()
+
     for tenant in tenants:
         tenant.num_users = CustomUser.objects.filter(tenant=tenant).count()
 
     paginator = Paginator(tenants, 10)  # 10 users per page
     page_number = request.GET.get('page')
     tenants = paginator.get_page(page_number)
-    return render(request, 'tenants/tenant_list.html', {'tenants': tenants})
+    return render(request, 'tenants/tenant_list.html', {'tenants': tenants, 'count':count})
 
 @login_required
 @user_passes_test(lambda u: u.is_superuser)
@@ -246,7 +248,8 @@ def users_list(request):
     paginator = Paginator(users, 10)  # 10 users per page
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
-    return render(request, "tenants/users_list.html", {"users": page_obj})
+    count = users.count()
+    return render(request, "tenants/users_list.html", {"users": page_obj, 'count': count})
 
 # @login_required
 # @user_passes_test(lambda u: u.is_superuser)
