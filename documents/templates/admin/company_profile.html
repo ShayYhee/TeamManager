@@ -10,9 +10,11 @@
         {% comment %} <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4"> {% endcomment %}
             <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
                 <h1 class="h2">Company Profile</h1>
-                {% if user.is_staff %}
-                    <a href="{% url 'edit_company_profile' %}" class="btn btn-primary">Edit Profile</a>
-                {% endif %}
+                {% for role in user.roles.all %}
+                    {% if role.name == "Admin" %}
+                        <a href="{% url 'edit_company_profile' %}" class="btn btn-primary">Edit Profile</a>
+                    {% endif %}
+                {% endfor%}
             </div>
 
             <div class="card mb-4">
