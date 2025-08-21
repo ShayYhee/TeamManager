@@ -29,22 +29,24 @@
             </div>
             <div class="col-12 col-md-6 mb-3">
                 <p class="fw-bold mb-1">Assigned To:</p>
-                <p>
-                    {% if task.assigned_to == user %}
-                        You
-                    {% else %}
-                        {{ task.assigned_to|default:"Unassigned" }}
-                    {% endif %}
-                </p>
+                {% for ass in task.assigned_to.all %}
+                    <p>
+                        {% if ass == user %}
+                            You
+                        {% else %}
+                            {{ ass|default:"Unassigned" }}
+                        {% endif %}
+                    </p>
+                {% endfor %}
             </div>
             <div class="col-12 col-md-6 mb-3">
                 <p class="fw-bold mb-1">Due Date:</p>
                 <p>{{ task.due_date|date:"M d, Y" }}</p>
             </div>
-            <div class="col-12 col-md-6 mb-3">
+            {% comment %} <div class="col-12 col-md-6 mb-3">
                 <p class="fw-bold mb-1">Folder:</p>
                 <p>{{ task.folder|default:"None" }}</p>
-            </div>
+            </div> {% endcomment %}
         </div>
 
         {% if task.documents.exists %}

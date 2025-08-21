@@ -27,6 +27,9 @@
                                     {% if field.field.required %}
                                         <span class="text-danger">*</span>
                                     {% endif %}
+                                    {% if field.help_text %}
+                                        <span class="tooltip-trigger" title="{{ field.help_text }}"><i class="fa fa-info-circle"></i></span>
+                                    {% endif %}
                                 </label>
                                 {{ field }}
                                 {% if field.errors %}
@@ -35,9 +38,6 @@
                                             {{ error }}
                                         {% endfor %}
                                     </div>
-                                {% endif %}
-                                {% if field.help_text %}
-                                    <div class="form-text small">{{ field.help_text }}</div>
                                 {% endif %}
                             </div>
                         {% endfor %}

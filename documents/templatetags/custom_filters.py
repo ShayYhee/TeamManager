@@ -26,6 +26,13 @@ def underscore_to_space_upper(value):
     return value
 
 @register.filter
+def underscore_to_space(value):
+    """Replaces underscores with spaces and converts to uppercase."""
+    if isinstance(value, str):
+        return value.replace('_', ' ')
+    return value
+
+@register.filter
 def dict_get(obj, key):
     """Access dictionary or object attributes dynamically."""
     try:

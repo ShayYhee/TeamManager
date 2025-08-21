@@ -83,13 +83,15 @@
                                 {% endfor %}
                             </select>
                         </div>
-                        <div class="col-md-2">
-                            <select name="send_email" class="form-select" aria-label="Filter by Email Status">
-                                <option value="">All Email Statuses</option>
-                                <option value="sent" {% if filter_params.send_email == "sent" %}selected{% endif %}>Sent</option>
-                                <option value="not_sent" {% if filter_params.send_email == "not_sent" %}selected{% endif %}>Not Sent</option>
-                            </select>
-                        </div>
+                        {% if user.tenant.slug == 'raadaa' or user.tenant.slug == "transnet-cloud" %}
+                            <div class="col-md-2">
+                                <select name="send_email" class="form-select" aria-label="Filter by Email Status">
+                                    <option value="">All Email Statuses</option>
+                                    <option value="sent" {% if filter_params.send_email == "sent" %}selected{% endif %}>Sent</option>
+                                    <option value="not_sent" {% if filter_params.send_email == "not_sent" %}selected{% endif %}>Not Sent</option>
+                                </select>
+                            </div>
+                        {% endif %}
                         <div class="col-md-2 d-flex gap-2">
                             <button type="submit" class="btn btn-primary flex-fill">Apply Filters</button>
                             <a href="{% url 'document_list' %}" class="btn btn-outline-secondary flex-fill">Reset</a>
@@ -108,7 +110,9 @@
                                 <th>Created By</th>
                                 <th>Files</th>
                                 <th>Approved By</th>
-                                <th>Email</th>
+                                {% if user.tenant.slug == 'raadaa' or user.tenant.slug == "transnet-cloud" %}
+                                    <th>Email</th>
+                                {% endif %}
                                 <th>Actions</th>
                             </tr>
                         </thead>
@@ -167,17 +171,19 @@
                                         {% endif %}
                                     {% endif %}
                                 </td>
-                                <td>
-                                    {% if document.status == "approved" %}
-                                        {% if document.email_sent %}
-                                            <span class="text-success"><i class="fas fa-check-circle me-1"></i> Sent</span>
+                                {% if user.tenant.slug == 'raadaa' or user.tenant.slug == "transnet-cloud" %}
+                                    <td>
+                                        {% if document.status == "approved" %}
+                                            {% if document.email_sent %}
+                                                <span class="text-success"><i class="fas fa-check-circle me-1"></i> Sent</span>
+                                            {% else %}
+                                                <a href="{% url 'send_approved_email' document.id %}" class="btn btn-primary btn-sm">Send Email</a>
+                                            {% endif %}
                                         {% else %}
-                                            <a href="{% url 'send_approved_email' document.id %}" class="btn btn-primary btn-sm">Send Email</a>
+                                            <span class="text-muted">Pending</span>
                                         {% endif %}
-                                    {% else %}
-                                        <span class="text-muted">Pending</span>
-                                    {% endif %}
-                                </td>
+                                    </td>
+                                {% endif %}
                                 <td>
                                     {% for role in user.roles.all %}
                                         {% if role.name == "Admin" %}

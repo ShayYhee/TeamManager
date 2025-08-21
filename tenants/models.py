@@ -12,11 +12,11 @@ class TenantApplication(models.Model):
         ('rejected', 'Rejected'),
     ]
 
-    username = models.CharField(max_length=150, unique=True)
-    email = models.EmailField(unique=True)
+    username = models.CharField(max_length=150, unique=True, help_text="Required. Letters, digits and @/./+/-/_ only.")
+    email = models.EmailField(unique=True, help_text="Enter a valid email address.")
     password = models.CharField(max_length=255)
     organization_name = models.CharField(max_length=100, unique=True)
-    slug = models.SlugField(max_length=100, unique=True)
+    slug = models.SlugField(max_length=100, unique=True, help_text="Short name used in the URL. Can only contain lowercase letters, numbers and hyphens.")
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

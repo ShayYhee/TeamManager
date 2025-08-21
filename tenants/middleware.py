@@ -5,6 +5,7 @@ from django.urls import reverse
 from urllib.parse import urlparse, urlunparse
 from django.shortcuts import redirect, render
 from django.conf import settings
+from django.contrib.auth import authenticate, login
 from documents.models import CustomUser
 from tenants.models import Tenant
 
@@ -18,12 +19,12 @@ class TenantMiddleware:
     def __call__(self, request):
         # Initialize tenant as None
         request.tenant = None
-
+        
         # Early return for superusers to bypass tenant logic
         if hasattr(request, 'user') and request.user.is_authenticated and request.user.is_superuser:
             print("Superuser detected, bypassing tenant assignment")
             return self.get_response(request)
-
+        
         # Extract host and remove port if present
         host = request.get_host().split(':')[0]
         print(f"Raw host: {request.get_host()}, Processed host: {host}, REMOTE_ADDR: {request.META.get('REMOTE_ADDR')}")
@@ -74,14 +75,22 @@ class TenantMiddleware:
                 print(f"User {request.user.username} not associated with tenant {request.tenant.slug}")
                 # return HttpResponseForbidden("You are not authorized to access this tenant.")
                 # Login redirect
+                
+                print(f"Request tenant {request.tenant}")
                 expected_subdomain = (
                     request.user.tenant.slug
                     if hasattr(request.user, 'tenant') and request.user.tenant
                     else None
                 )
+                print(f"Wrong user tenant slug: { expected_subdomain }")
                 base_domain = "localhost:8000" if settings.DEBUG else "teammanager.ng"
                 protocol = "http" if settings.DEBUG else "https"
                 login_url = f"{protocol}://{expected_subdomain}.{base_domain}/accounts/login"
+            
+                # user = authenticate(username=request.user.username, password=request.user.password)
+                # print("User authenticated")
+                # login(request, user)
+                # print("User logged in")
                 return redirect(login_url)
                 # render(request, 'tenants/tenant_error.html', {'message': 'You are not authorized to access this tenant.', 'login_url':login_url})
 
