@@ -40,7 +40,7 @@
                                                 <h5 class="card-title mb-1 email-subject" style="cursor: pointer;">{{ email.subject|truncatechars:50 }}</h5>
                                                 <p class="card-text mb-1">
                                                     To: 
-                                                    {% for contact in email.to.all %}
+                                                    {% for contact in email.to_emails.all %}
                                                         {{ contact.name }} ({{ contact.email }}){% if not forloop.last %}, {% endif %}
                                                     {% empty %}
                                                         None
@@ -104,7 +104,7 @@
                                                 <h5 class="card-title mb-1 email-subject" style="cursor: pointer;">{{ email.subject|truncatechars:50 }}</h5>
                                                 <p class="card-text mb-1">
                                                     To: 
-                                                    {% for contact in email.to.all %}
+                                                    {% for contact in email.to_emails.all %}
                                                         {{ contact.name }} ({{ contact.email }}){% if not forloop.last %}, {% endif %}
                                                     {% empty %}
                                                         None
@@ -166,7 +166,7 @@
                                                 <h5 class="card-title mb-1 email-subject" style="cursor: pointer;">{{ email.subject|truncatechars:50 }}</h5>
                                                 <p class="card-text mb-1">
                                                     To: 
-                                                    {% for contact in email.to.all %}
+                                                    {% for contact in email.to_emails.all %}
                                                         {{ contact.name }} ({{ contact.email }}){% if not forloop.last %}, {% endif %}
                                                     {% empty %}
                                                         None

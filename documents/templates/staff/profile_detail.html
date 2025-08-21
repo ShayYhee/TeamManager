@@ -25,7 +25,7 @@
                         {% for vis in visible_fields %}
                             {% if vis in 'first_name,last_name,middle_name,date_of_birth,sex,religion,marital_status,state_of_origin,lga' %}
                                 <li class="list-group-item d-flex justify-content-between align-items-center">
-                                    <strong>{{ vis|capfirst|title }}:</strong>
+                                    <strong>{{ vis|capfirst|title|underscore_to_space }}:</strong>
                                     <span>{{ profile|dict_get:vis|default:"N/A" }}</span>
                                 </li>
                             {% endif %}
@@ -45,7 +45,7 @@
                         {% for vis in visible_fields %}
                             {% if vis in 'phone_number,email,home_address' %}
                                 <li class="list-group-item d-flex justify-content-between align-items-center">
-                                    <strong>{{ vis|capfirst|title }}:</strong>
+                                    <strong>{{ vis|capfirst|title|underscore_to_space }}:</strong>
                                     <span>{{ profile|dict_get:vis|default:"N/A" }}</span>
                                 </li>
                             {% endif %}
@@ -65,7 +65,7 @@
                         {% for vis in visible_fields %}
                             {% if vis in 'institution,course,degree,graduation_year' %}
                                 <li class="list-group-item d-flex justify-content-between align-items-center">
-                                    <strong>{{ vis|capfirst|title }}:</strong>
+                                    <strong>{{ vis|capfirst|title|underscore_to_space }}:</strong>
                                     <span>{{ profile|dict_get:vis|default:"N/A" }}</span>
                                 </li>
                             {% endif %}
@@ -85,7 +85,7 @@
                         {% for vis in visible_fields %}
                             {% if vis in 'account_number,bank_name,account_name,designation,location,employment_date,official_email,department,team' %}
                                 <li class="list-group-item d-flex justify-content-between align-items-center">
-                                    <strong>{{ vis|capfirst|title }}:</strong>
+                                    <strong>{{ vis|capfirst|title|underscore_to_space }}:</strong>
                                     <span>
                                         {% if vis == 'team' %}
                                             {{ profile.team|format_teams:", " }}
@@ -111,7 +111,7 @@
                         {% for vis in visible_fields %}
                             {% if vis in 'emergency_name,emergency_relationship,emergency_phone,emergency_address,emergency_email' %}
                                 <li class="list-group-item d-flex justify-content-between align-items-center">
-                                    <strong>{{ vis|capfirst|title }}:</strong>
+                                    <strong>{{ vis|capfirst|title|underscore_to_space }}:</strong>
                                     <span>{{ profile|dict_get:vis|default:"N/A" }}</span>
                                 </li>
                             {% endif %}

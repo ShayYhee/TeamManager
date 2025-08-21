@@ -850,7 +850,7 @@ def create_from_editor(request):
         return HttpResponseForbidden("Unauthorized: User does not belong to the current tenant.")
 
     if request.method == "POST":
-        form = CreateDocumentForm(request.POST, user=request.user)
+        form = CreateDocumentForm(request.POST)
         if form.is_valid():
             title = form.cleaned_data["title"]
             content = form.cleaned_data["content"]
@@ -1055,7 +1055,7 @@ def folder_list(request, parent_id=None):
 @login_required
 def create_folder(request):
     if request.method == 'POST':
-        form = FolderForm(request.POST, user=request.user)
+        form = FolderForm(request.POST)
         if form.is_valid():
             folder = form.save(commit=False)
             folder.created_by = request.user
@@ -1265,7 +1265,8 @@ def task_list(request):
 @login_required
 def task_detail(request, task_id):
     task = get_object_or_404(Task, id=task_id, tenant=request.tenant)
-    if not (task.assigned_to == request.user or task.created_by == request.user or request.user.is_hod()):
+    user = request.user
+    if not (user in task.assigned_to.all() or task.created_by == request.user or request.user.is_hod()):
         return render(request, 'tasks/error.html', {'message': 'Access denied.'})
     return render(request, 'tasks/task_detail.html', {'task': task})
 
@@ -1941,26 +1942,52 @@ def public_folder_list(request, public_folder_id=None):
 @login_required
 @require_POST
 def create_public_folder(request):
-    form = PublicFolderForm(request.POST, user=request.user)
-    if form.is_valid():
-        folder = form.save(commit=False)
-        folder.created_by = request.user
-        user = request.user
-
-        if folder.department and folder.department != user.department:
-            # return JsonResponse({'success': False, 'errors': {'department': ['Invalid department']}}, status=403)
-            return render(request, 'folder/error.html', {'message': 'Invalid Department.'})
-        if folder.team and folder.team not in user.teams.all():
-            return JsonResponse({'success': False, 'errors': {'team': ['Invalid team']}}, status=403)
-        if folder.parent and not (folder.parent.department == user.department or folder.parent.team in user.teams.all()):
-            return JsonResponse({'success': False, 'errors': {'parent': ['No access to parent folder']}}, status=403)
-
-        try:
+    if request.method == 'POST':
+        form = PublicFolderForm(request.POST)
+        if form.is_valid():
+            folder = form.save(commit=False)
+            folder.created_by = request.user
+            folder.tenant = request.tenant
+            folder.department = request.user.department
+            # Validate that the user belongs to the same tenant
+            if folder.created_by.tenant != request.tenant:
+                return HttpResponse("Unauthorized: User does not belong to the current tenant.", status=403)
+            parent_id = request.POST.get('parent')
+            if parent_id:
+                folder.parent = PublicFolder.objects.get(id=parent_id, tenant=request.tenant)
             folder.save()
-            return JsonResponse({'success': True, 'folder_id': folder.id})
-        except ValidationError as e:
-            return JsonResponse({'success': False, 'errors': {'name': [str(e)]}}, status=400)
+            print(f"Folder {folder.id} has been successfully created")
+            return JsonResponse({'success': True})
     return JsonResponse({'success': False, 'errors': form.errors}, status=400)
+
+# @login_required
+# @require_POST
+# def create_public_folder(request):
+#     form = PublicFolderForm(request.POST, user=request.user, tenant=request.tenant)
+#     if form.is_valid():
+#         folder = form.save(commit=False)
+#         folder.department = request.user.department
+#         folder.created_by = request.user
+#         user = request.user
+
+#         if folder.department and folder.department != user.department:
+#             print("Wrong Department")
+#             return JsonResponse({'success': False, 'errors': {'department': ['Invalid department']}}, status=403)
+#             # return render(request, 'folder/error.html', {'message': 'Invalid Department.'})
+#         if folder.team and folder.team not in user.teams.all():
+#             print("Wrong Team")
+#             return JsonResponse({'success': False, 'errors': {'team': ['Invalid team']}}, status=403)
+#         if folder.parent and not (folder.parent.department == user.department or folder.parent.team in user.teams.all()):
+#             print("Wrong Parent Folder")
+#             return JsonResponse({'success': False, 'errors': {'parent': ['No access to parent folder']}}, status=403)
+
+#         try:
+#             folder.save()
+#             print(f"Folder {folder.id} successfully created")
+#             return JsonResponse({'success': True, 'folder_id': folder.id})
+#         except ValidationError as e:
+#             return JsonResponse({'success': False, 'errors': {'name': [str(e)]}}, status=400)
+#     return JsonResponse({'success': False, 'errors': form.errors}, status=400)
 
 @login_required
 @require_POST
@@ -1985,15 +2012,25 @@ def move_public_folder(request, folder_id):
     user = request.user
     if new_parent_id:
         new_parent = get_object_or_404(PublicFolder, id=new_parent_id, tenant=request.tenant)
-        if not (new_parent.department == user.department or new_parent.team in user.teams.all()):
-            return JsonResponse({'success': False, 'errors': {'new_parent_id': ['No access to destination']}}, status=403)
-        if new_parent == folder or new_parent in folder.subfolders.all():
-            return JsonResponse({'success': False, 'errors': {'new_parent_id': ['Invalid destination']}}, status=400)
         folder.parent = new_parent
     else:
         folder.parent = None
     folder.save()
     return JsonResponse({'success': True})
+
+# @require_POST
+# @login_required
+# def move_public_folder(request, folder_id):
+#     if not hasattr (request, 'tenant') or request.user.tenant != request.tenant:
+#         return HttpResponseForbidden("You are not authorized for this tenant.")
+#     folder = get_object_or_404(PublicFolder, id=folder_id, created_by=request.user, tenant=request.tenant)
+#     if request.method == 'POST':
+#         new_parent_id = request.POST.get('new_parent_id')
+#         if new_parent_id:
+#             folder.parent = PublicFolder.objects.get(id=new_parent_id, tenant=request.tenant)
+#             folder.save()
+#         return JsonResponse({'success': True})
+#     return JsonResponse({'success': False}, status=400)
 
 @login_required
 @require_POST
@@ -3096,7 +3133,8 @@ def edit_email(request, email_id):
     if email.sent:
         # return HttpResponseForbidden('You cannot edit sent emails')
         # raise PermissionDenied('You cannot edit sent emails')
-        return render(request, 'error.html', {'message': 'You cannot edit sent emails.'})
+        # return render(request, 'error.html', {'message': 'You cannot edit sent emails.'})
+        return redirect('email_detail', email_id=email_id)
     
     if request.method == 'POST':
         form = EmailForm(request.POST, user=request.user, instance=email)
@@ -3132,9 +3170,9 @@ def edit_email(request, email_id):
                 )
                 subject = form.cleaned_data['subject']
                 message = form.cleaned_data['body']
-                to_emails = [to.email for to in form.cleaned_data['to']]
-                cc_emails = [cc.email for cc in form.cleaned_data['cc']]
-                bcc_emails = [bcc.email for bcc in form.cleaned_data['bcc']]
+                to_emails = [to_emails.email for to in form.cleaned_data['to']]
+                cc_emails = [cc_emails.email for cc in form.cleaned_data['cc']]
+                bcc_emails = [bcc_emails.email for bcc in form.cleaned_data['bcc']]
                 email_msg = EmailMessage(
                     subject, message, sender_email, to_emails,
                     cc=cc_emails, bcc=bcc_emails, connection=connection
@@ -3161,7 +3199,7 @@ def save_draft(request):
         return HttpResponseForbidden("You are not authorized for this tenant.")
     
     if request.method == 'POST':
-        form = EmailForm(request.POST, user=request.user)
+        form = EmailForm(request.POST)
         formset = AttachmentFormSet(request.POST, request.FILES)
         
         if form.is_valid() and formset.is_valid():
@@ -3180,7 +3218,7 @@ def save_draft(request):
             
             return redirect('email_list')
     else:
-        form = EmailForm(user=request.user)
+        form = EmailForm()
         formset = AttachmentFormSet(queryset=Attachment.objects.none())
     
     return render(request, 'dashboard/send_email.html', {'form': form, 'formset': formset})
@@ -3204,11 +3242,13 @@ def send_email(request):
     )
     
     if request.method == 'POST':
-        form = EmailForm(request.POST, user=request.user)
+        # form = EmailForm(request.POST, user=request.user)
+        form = EmailForm(request.POST)
         formset = AttachmentFormSet(request.POST, request.FILES)
         
         if form.is_valid() and formset.is_valid():
             email = form.save(commit=False)
+            print(f"To Emails: {email.get_to_emails()}")
             email.tenant = request.tenant
             email.sender = request.user
             email.sent = False
@@ -3224,12 +3264,12 @@ def send_email(request):
             # Send email
             subject = form.cleaned_data['subject']
             message = form.cleaned_data['body']
-            to_emails = [to.email for to in form.cleaned_data['to']]
-            cc_emails = [cc.email for cc in form.cleaned_data['cc']]
-            bcc_emails = [bcc.email for bcc in form.cleaned_data['bcc']]
+            # to_emails = [to.email for to in form.cleaned_data['to']]
+            # cc_emails = [cc.email for cc in form.cleaned_data['cc']]
+            # bcc_emails = [bcc.email for bcc in form.cleaned_data['bcc']]
             email_msg = EmailMessage(
-                subject, message, sender_email, to_emails,
-                cc=cc_emails, bcc=bcc_emails, connection=connection
+                subject, message, sender_email, email.get_to_emails(),
+                cc=email.get_cc_emails(), bcc=email.get_bcc_emails(), connection=connection
             )
             for attachment in email.attachments.all():
                 email_msg.attach_file(attachment.file.path)
@@ -3239,7 +3279,8 @@ def send_email(request):
             email.save()
             return redirect('email_list')
     else:
-        form = EmailForm(user=request.user)
+        # form = EmailForm(user=request.user)
+        form = EmailForm()
         formset = AttachmentFormSet(queryset=Attachment.objects.none())
     
     return render(request, 'dashboard/send_email.html', {'form': form, 'formset': formset})
@@ -3260,3 +3301,13 @@ def delete_email(request, email_id):
         raise HttpResponseForbidden('You can only delete your own emails')
     email.delete()
     return redirect('email_list')
+
+@login_required
+def contact_search(request):
+    query = request.GET.get('q', '')
+    contacts = Contact.objects.filter(
+        tenant=request.user.tenant,  # Assuming tenant-based filtering
+        email__icontains=query
+    )[:10]  # Limit to 10 results
+    results = [{'email': contact.email, 'name': contact.name} for contact in contacts]
+    return JsonResponse(results, safe=False)

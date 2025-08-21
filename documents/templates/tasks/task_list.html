@@ -98,7 +98,14 @@
                                             {% if task.created_by == user %}You{% else %}{{ task.created_by|default:"N/A" }}{% endif %}
                                         </small>
                                         <small class="d-block text-muted mb-2">Assigned To: 
-                                            {% if task.assigned_to == user %}You{% else %}{{ task.assigned_to|default:"Unassigned" }}{% endif %}
+                                            {% for ass in task.assigned_to.all %}
+                                                    {% if ass == user %}
+                                                        You
+                                                    {% else %}
+                                                        {{ ass|default:"Unassigned" }}
+                                                    {% endif %}
+                                                    ,
+                                            {% endfor %}
                                         </small>
                                         {% if task.documents.exists %}
                                             <small class="d-block text-muted mb-2">Documents: 

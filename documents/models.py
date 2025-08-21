@@ -4,7 +4,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth.models import Permission
 from raadaa import settings
 from django.utils import timezone
-import os
+import os, json
 from django.core.exceptions import ValidationError
 from cryptography.fernet import Fernet
 from tenants.models import Tenant
@@ -149,14 +149,13 @@ class Task(models.Model):
     ]
 
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
-    title = models.CharField(max_length=255)
-    description = models.TextField()
-    documents = models.ManyToManyField('File', blank=True)
-    folder = models.ForeignKey('Folder', on_delete=models.SET_NULL, null=True, blank=True)
-    assigned_to = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+    title = models.CharField(max_length=255, help_text="Required. Title of the task")
+    description = models.TextField(help_text="Any notes or details about the task")
+    documents = models.ManyToManyField('PublicFile', blank=True, help_text="Attach documents for this task from Public Files")
+    assigned_to = models.ManyToManyField(settings.AUTH_USER_MODEL, null=True, blank=True, help_text="Select staff to assign this task to")
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='created_tasks')
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
-    due_date = models.DateField(null=True, blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending', help_text="Current status of the task")
+    due_date = models.DateField(null=True, blank=True, help_text="Set a due date for the task")
     created_at = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(null=True, blank=True)
 
@@ -448,13 +447,48 @@ class Email(models.Model):
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
     subject = models.CharField(max_length=255)
     body = models.TextField()
-    to = models.ManyToManyField(Contact, blank=False, related_name='recipients')
-    cc = models.ManyToManyField(Contact, blank=True, related_name='copy_recipients')
-    bcc = models.ManyToManyField(Contact, blank=True, related_name='blind_recipients')
+    to_emails = models.TextField()  # Store email addresses as JSON
+    cc_emails = models.TextField(blank=True)  # Optional
+    bcc_emails = models.TextField(blank=True)  # Optional
     sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='sender_email')
     created_at = models.DateTimeField(auto_now_add=True)
     sent = models.BooleanField(default=False)
     sent_at = models.DateTimeField(null=True, blank=True)
+
+    def set_to_emails(self, emails):
+        """Helper to store list of emails as JSON."""
+        self.to_emails = json.dumps(emails)
+
+    def get_to_emails(self):
+        """Helper to retrieve list of emails."""
+        return json.loads(self.to_emails) if self.to_emails else []
+
+    def set_cc_emails(self, emails):
+        self.cc_emails = json.dumps(emails)
+
+    def get_cc_emails(self):
+        return json.loads(self.cc_emails) if self.cc_emails else []
+
+    def set_bcc_emails(self, emails):
+        self.bcc_emails = json.dumps(emails)
+
+    def get_bcc_emails(self):
+        return json.loads(self.bcc_emails) if self.bcc_emails else []
+
+    def __str__(self):
+        return self.subject
+
+# class Email(models.Model):
+#     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
+#     subject = models.CharField(max_length=255)
+#     body = models.TextField()
+#     to = models.ManyToManyField(Contact, blank=False, related_name='recipients')
+#     cc = models.ManyToManyField(Contact, blank=True, related_name='copy_recipients')
+#     bcc = models.ManyToManyField(Contact, blank=True, related_name='blind_recipients')
+#     sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='sender_email')
+#     created_at = models.DateTimeField(auto_now_add=True)
+#     sent = models.BooleanField(default=False)
+#     sent_at = models.DateTimeField(null=True, blank=True)
 
 class Attachment(models.Model):
     email = models.ForeignKey(Email, on_delete=models.CASCADE, related_name='attachments')

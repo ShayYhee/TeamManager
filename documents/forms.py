@@ -5,6 +5,7 @@ from tenants.models import Tenant
 from ckeditor.widgets import CKEditorWidget
 from ckeditor_uploader.widgets import CKEditorUploadingWidget
 from django.contrib.auth import get_user_model
+import json
 
 User = get_user_model()
 
@@ -146,6 +147,12 @@ class UserForm(forms.ModelForm):
             'zoho_email': forms.EmailInput(attrs={'class': 'form-control'}),
             'zoho_password': forms.PasswordInput(attrs={'class': 'form-control'}),
         }
+        help_texts = {
+            'password': 'Choose a strong password',
+            'password_confirm': 'Confirm your password',
+            'zoho_email': 'Enter your Zoho email address',
+            'zoho_password': 'Enter your Zoho password',
+        }
 
     def __init__(self, *args, **kwargs):
         tenant = kwargs.pop('tenant', None)
@@ -220,13 +227,12 @@ class FileUploadForm(forms.ModelForm):
 class TaskForm(forms.ModelForm):
     class Meta:
         model = Task
-        fields = ['title', 'description', 'documents', 'folder', 'assigned_to', 'due_date', 'status']
+        fields = ['title', 'description', 'documents', 'assigned_to', 'due_date', 'status']
         widgets = {
             'title': forms.TextInput(attrs={'class': 'form-control'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 5}),
             'documents': forms.SelectMultiple(attrs={'class': 'form-control'}),
-            'folder': forms.Select(attrs={'class': 'form-control'}),
-            'assigned_to': forms.Select(attrs={'class': 'form-control'}),
+            'assigned_to': forms.SelectMultiple(attrs={'class': 'form-control'}),
             'due_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
             'status': forms.Select(attrs={'class': 'form-control'}),
         }
@@ -239,12 +245,10 @@ class TaskForm(forms.ModelForm):
             tenant = getattr(user, 'tenant', None)
             if tenant:
                 self.fields['assigned_to'].queryset = CustomUser.objects.filter(tenant=tenant)
-                self.fields['documents'].queryset = File.objects.filter(tenant=tenant, uploaded_by=user)
-                self.fields['folder'].queryset = Folder.objects.filter(tenant=tenant, created_by=user)
+                self.fields['documents'].queryset = PublicFile.objects.filter(tenant=tenant, created_by=user)
             else:
                 self.fields['assigned_to'].queryset = CustomUser.objects.none()
-                self.fields['documents'].queryset = File.objects.none()
-                self.fields['folder'].queryset = Folder.objects.none()
+                self.fields['documents'].queryset = PublicFile.objects.none()
 
 class ReassignTaskForm(forms.ModelForm):
     class Meta:
@@ -323,41 +327,11 @@ class EmailConfigForm(forms.ModelForm):
 class PublicFolderForm(forms.ModelForm):
     class Meta:
         model = PublicFolder
-        fields = ['name', 'parent', 'department', 'team']
+        fields = ['name', 'parent']
         widgets = {
-            'department': forms.Select(attrs={'class': 'form-control'}),
-            'team': forms.Select(attrs={'class': 'form-control'}),
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'parent': forms.HiddenInput(),
         }
-
-    def __init__(self, *args, **kwargs):
-        user = kwargs.pop('user', None)
-        super().__init__(*args, **kwargs)
-
-        if user:
-            tenant = getattr(user, 'tenant', None)
-            if tenant:
-                self.fields['department'].queryset = Department.objects.filter(tenant=tenant)
-                self.fields['team'].queryset = Team.objects.filter(tenant=tenant)
-            else:
-                self.fields['department'].queryset = Department.objects.none()
-                self.fields['team'].queryset = Team.objects.none
-
-    def clean(self):
-        cleaned_data = super().clean()
-        department = cleaned_data.get('department')
-        team = cleaned_data.get('team')
-        parent = cleaned_data.get('parent')
-
-        if not (department or team):
-            raise forms.ValidationError('A public folder must be associated with a department or team.')
-        if team and not department:
-            raise forms.ValidationError('A team must be associated with a department.')
-        if parent and team and parent.team != team:
-            raise forms.ValidationError('Subfolder team must match parent team.')
-        if parent and department and parent.department != department:
-            raise forms.ValidationError('Subfolder department must match parent department.')
-
-        return cleaned_data
 
 class PublicFileForm(forms.ModelForm):
     class Meta:
@@ -498,32 +472,146 @@ class ContactForm(forms.ModelForm):
             'is_public': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
 
+# class EmailForm(forms.ModelForm):
+#     class Meta:
+#         model = Email
+#         fields = ['subject', 'body', 'to', 'cc', 'bcc']
+#         widgets = {
+#             'subject': forms.TextInput(attrs={'class': 'form-control'}),
+#             'body': forms.Textarea(attrs={'class': 'form-control', 'rows': 5}),
+#             'to': forms.SelectMultiple(attrs={'class': 'form-control select2', 'multiple': 'multiple'}),
+#             'cc': forms.SelectMultiple(attrs={'class': 'form-control select2', 'multiple': 'multiple'}),
+#             'bcc': forms.SelectMultiple(attrs={'class': 'form-control select2', 'multiple': 'multiple'}),
+#         }
+
+#     def __init__(self, *args, **kwargs):
+#         user = kwargs.pop('user', None)
+#         super().__init__(*args, **kwargs)
+#         if user:
+#             tenant = getattr(user, 'tenant', None)
+#             if tenant:
+#                 self.fields['to'].queryset = Contact.objects.filter(tenant=tenant, department=user.department)
+#                 self.fields['cc'].queryset = Contact.objects.filter(tenant=tenant, department=user.department)
+#                 self.fields['bcc'].queryset = Contact.objects.filter(tenant=tenant, department=user.department)
+#             else:
+#                 self.fields['to'].queryset = Contact.objects.none()
+#                 self.fields['cc'].queryset = Contact.objects.none()
+#                 self.fields['bcc'].queryset = Contact.objects.none()
+
 class EmailForm(forms.ModelForm):
+    to_emails = forms.CharField(
+        widget=forms.SelectMultiple(attrs={
+            'class': 'form-control select2',
+            'data-placeholder': 'Enter emails or select contacts',
+            'data-tags': 'true',
+            'data-token-separators': '[",", " "]'
+        }),
+        help_text="Enter email addresses or select contacts, separated by commas or spaces.",
+        required=True
+    )
+    cc_emails = forms.CharField(
+        widget=forms.SelectMultiple(attrs={
+            'class': 'form-control select2',
+            'data-placeholder': 'Enter CC emails or select contacts',
+            'data-tags': 'true',
+            'data-token-separators': '[",", " "]'
+        }),
+        help_text="Enter CC email addresses or select contacts, separated by commas or spaces.",
+        required=False
+    )
+    bcc_emails = forms.CharField(
+        widget=forms.SelectMultiple(attrs={
+            'class': 'form-control select2',
+            'data-placeholder': 'Enter BCC emails or select contacts',
+            'data-tags': 'true',
+            'data-token-separators': '[",", " "]'
+        }),
+        help_text="Enter BCC email addresses or select contacts, separated by commas or spaces.",
+        required=False
+    )
+
     class Meta:
         model = Email
-        fields = ['subject', 'body', 'to', 'cc', 'bcc']
-        widgets = {
-            'subject': forms.TextInput(attrs={'class': 'form-control'}),
-            'body': forms.Textarea(attrs={'class': 'form-control', 'rows': 5}),
-            'to': forms.SelectMultiple(attrs={'class': 'form-control select2', 'multiple': 'multiple'}),
-            'cc': forms.SelectMultiple(attrs={'class': 'form-control select2', 'multiple': 'multiple'}),
-            'bcc': forms.SelectMultiple(attrs={'class': 'form-control select2', 'multiple': 'multiple'}),
-        }
+        fields = ['subject', 'body', 'to_emails', 'cc_emails', 'bcc_emails']
 
-    def __init__(self, *args, **kwargs):
-        user = kwargs.pop('user', None)
-        super().__init__(*args, **kwargs)
-        if user:
-            tenant = getattr(user, 'tenant', None)
-            if tenant:
-                self.fields['to'].queryset = Contact.objects.filter(tenant=tenant, department=user.department)
-                self.fields['cc'].queryset = Contact.objects.filter(tenant=tenant, department=user.department)
-                self.fields['bcc'].queryset = Contact.objects.filter(tenant=tenant, department=user.department)
-            else:
-                self.fields['to'].queryset = Contact.objects.none()
-                self.fields['cc'].queryset = Contact.objects.none()
-                self.fields['bcc'].queryset = Contact.objects.none()
+    def clean_to_emails(self):
+        """Validate and process to_emails field."""
+        emails = self.cleaned_data['to_emails']
+        print(f"To Emails: {emails}")
+        email_list = []
+        if isinstance(emails, str):
+            try:
+                # Handle stringified list (e.g., "['email1','email2']")
+                parsed_emails = json.loads(emails.replace("'", '"'))
+                email_list = [email.strip() for email in parsed_emails if email.strip()]
+                print(f"To Emails string instance: {email_list}")
+            except (json.JSONDecodeError, TypeError):
+                # Handle comma-separated string
+                email_list = [email.strip() for email in emails.split(',') if email.strip()]
+        else:
+            # Handle list input from SelectMultiple
+            email_list = [email.strip() for email in emails if email.strip()]
+            print(f"To Emails list instance: {email_list}")
+        if not email_list:
+            raise forms.ValidationError("At least one recipient email is required.")
+        for email in email_list:
+            if not self._is_valid_email(email):
+                raise forms.ValidationError(f"Invalid email address: {email}")
+        return email_list
 
+    def clean_cc_emails(self):
+        """Validate and process cc_emails field."""
+        emails = self.cleaned_data['cc_emails']
+        email_list = []
+        if isinstance(emails, str):
+            try:
+                parsed_emails = json.loads(emails.replace("'", '"'))
+                email_list = [email.strip() for email in parsed_emails if email.strip()]
+            except (json.JSONDecodeError, TypeError):
+                email_list = [email.strip() for email in emails.split(',') if email.strip()]
+        else:
+            email_list = [email.strip() for email in emails if email.strip()]
+        for email in email_list:
+            if not self._is_valid_email(email):
+                raise forms.ValidationError(f"Invalid email address: {email}")
+        return email_list
+
+    def clean_bcc_emails(self):
+        """Validate and process bcc_emails field."""
+        emails = self.cleaned_data['bcc_emails']
+        email_list = []
+        if isinstance(emails, str):
+            try:
+                parsed_emails = json.loads(emails.replace("'", '"'))
+                email_list = [email.strip() for email in parsed_emails if email.strip()]
+            except (json.JSONDecodeError, TypeError):
+                email_list = [email.strip() for email in emails.split(',') if email.strip()]
+        else:
+            email_list = [email.strip() for email in emails if email.strip()]
+        for email in email_list:
+            if not self._is_valid_email(email):
+                raise forms.ValidationError(f"Invalid email address: {email}")
+        return email_list
+
+    def _is_valid_email(self, email):
+        """Validate email format."""
+        from django.core.validators import validate_email
+        try:
+            validate_email(email)
+            return True
+        except forms.ValidationError:
+            return False
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        instance.set_to_emails(self.cleaned_data['to_emails'])
+        instance.set_cc_emails(self.cleaned_data['cc_emails'])
+        instance.set_bcc_emails(self.cleaned_data['bcc_emails'])
+        if commit:
+            instance.save()
+        return instance
+
+    
 # Formset for attachments
 AttachmentFormSet = modelformset_factory(
     Attachment,

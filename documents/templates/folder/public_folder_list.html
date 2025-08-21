@@ -257,14 +257,14 @@
                         {{ folder_form.name }}
                         <div id="createPublicFolderError" class="text-danger small mt-1"></div>
                     </div>
-                    <div class="mb-3">
+                    {% comment %} <div class="mb-3">
                         <label for="{{ folder_form.department.id_for_label }}" class="form-label fw-medium">Department <span class="text-danger">*</span></label>
                         {{ folder_form.department }}
                     </div>
                     <div class="mb-3">
                         <label for="{{ folder_form.team.id_for_label }}" class="form-label fw-medium">Team (optional)</label>
                         {{ folder_form.team }}
-                    </div>
+                    </div> {% endcomment %}
                 </form>
             </div>
             <div class="modal-footer">
@@ -441,7 +441,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const form = document.getElementById(`movePublicForm${folderId}`);
         const select = form.querySelector('select[name="new_parent_id"]');
         const errorDiv = document.getElementById(`movePublicFolderError${folderId}`);
-        fetch(`/public_folders/${folderId}/move/`, {
+        fetch(`/public-folders/${folderId}/move/`, {
             method: 'POST',
             headers: {
                 'X-CSRFToken': form.querySelector('input[name="csrfmiddlewaretoken"]').value,
@@ -449,14 +449,11 @@ document.addEventListener('DOMContentLoaded', () => {
             },
             body: `new_parent_id=${encodeURIComponent(select.value)}`
         })
-        .then(res => {
-            if (!res.ok) throw new Error(`HTTP error! Status: ${res.status}`);
-            return res.json();
-        })
+        .then(res => res.json())
         .then(data => {
             if (data.success) {
                 $(`#movePublicFolderModal${folderId}`).modal('hide');
-                document.querySelector(`[data-public-folder-id="${folderId}"]`).remove();
+                location.reload();
             } else {
                 errorDiv.textContent = data.errors.new_parent_id ? data.errors.new_parent_id.join(' ') : 'An error occurred.';
             }
@@ -466,6 +463,8 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error('Error moving public folder:', err);
         });
     };
+
+    
 
     window.deletePublicFolder = function(folderId) {
         if (confirm('Are you sure you want to delete this public folder?')) {
