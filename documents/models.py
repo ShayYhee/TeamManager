@@ -171,7 +171,7 @@ class Task(models.Model):
     
 class Department(models.Model):
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="department")
-    name = models.CharField(max_length=255, unique=True)
+    name = models.CharField(max_length=255)
     hod = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='hod_department')
 
     def save(self, *args, **kwargs):
@@ -181,14 +181,20 @@ class Department(models.Model):
             self.hod.save()
         super().save(*args, **kwargs)
 
+    class Meta:
+        unique_together = ('tenant', 'name')
+
     def __str__(self):
         return self.name
     
 class Team(models.Model):
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="team")
-    name = models.CharField(max_length=255, unique=True)
+    name = models.CharField(max_length=255)
     department = models.ForeignKey(Department, on_delete=models.CASCADE, blank=True, null=True)
     team_leader = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='team_leader')
+
+    class Meta:
+        unique_together = ('tenant', 'name')
 
     def __str__(self):
         return self.name
@@ -364,13 +370,13 @@ class PublicFolder(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    class Meta:
-        constraints = [
-            models.CheckConstraint(
-                check=Q(department__isnull=False) | Q(team__isnull=False),
-                name='public_folder_department_or_team_required'
-            )
-        ]
+    # class Meta:
+    #     constraints = [
+    #         models.CheckConstraint(
+    #             check=Q(department__isnull=False) | Q(team__isnull=False),
+    #             name='public_folder_department_or_team_required'
+    #         )
+    #     ]
 
     def __str__(self):
         return self.name
