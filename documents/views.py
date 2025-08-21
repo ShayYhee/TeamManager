@@ -1920,14 +1920,14 @@ def public_folder_list(request, public_folder_id=None):
     parent_public_folder = get_object_or_404(PublicFolder, id=public_folder_id, tenant=user.tenant) if public_folder_id else None
 
     public_folders = PublicFolder.objects.filter(
-        Q(department=user.department) | Q(team__in=user.teams.all()),
+        Q(department=user.department) | Q(team__in=user.teams.all()) if user.department else Q(),
         parent=parent_public_folder,
         tenant=user.tenant
     ).distinct()
 
     public_files = PublicFile.objects.filter(
         Q(folder=parent_public_folder) &
-        (Q(folder__department=user.department) | Q(folder__team__in=user.teams.all())), tenant=user.tenant
+        (Q(folder__department=user.department) | Q(folder__team__in=user.teams.all()) if user.department else Q()), tenant=user.tenant
     ).distinct()
 
     context = {
