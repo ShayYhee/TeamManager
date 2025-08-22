@@ -16,10 +16,14 @@
                     </h1>
                 </div>
                 <div class="card-body text-center">
-                    <p class="text-gray-700">
-                        You are not authorized to access this page. 
-                    </p>
-                    {% if not request.user.is_authenticated or request.user.is_superuser %}
+                    <h4 class="text-gray-700">
+                        You are not authorized to access this page.
+                    </h4>
+                    <p class="text-gray-700">{{message}}</p>
+                    <button type= "button" onclick="history.back()" class="btn btn-primary btn-sm mt-3" data-bs-toggle="tooltip" title="Return to previous page">
+                        <i class="fas fa-arrow-left me-1"></i> Back
+                    </button>
+                    {% comment %} {% if not request.user.is_authenticated or request.user.is_superuser %}
                         <a href="{% url 'tenant_home' %}" class="btn btn-primary btn-sm mt-3" data-bs-toggle="tooltip" title="Return to Home">
                             <i class="fas fa-arrow-left me-1"></i> Back to Home
                         </a>
@@ -27,7 +31,7 @@
                         <a href="{% url 'home' %}" class="btn btn-primary btn-sm mt-3" data-bs-toggle="tooltip" title="Return to Home">
                             <i class="fas fa-arrow-left me-1"></i> Back to Home
                         </a>
-                    {% endif %}
+                    {% endif %} {% endcomment %}
                 </div>
             </div>
         </div>

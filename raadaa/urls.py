@@ -21,7 +21,8 @@ from documents.views import event_participant_list, create_event_participant, ed
 from documents.views import admin_notification_list, create_notification, edit_notification, delete_notification, edit_company_profile, view_company_profile
 from documents.views import user_notification_list, create_user_notification, edit_user_notification, delete_user_notification
 from documents.views import custom_404, custom_403, custom_500, custom_400, post_login_redirect, contact_list, create_contact, edit_contact, delete_contact, view_contact_detail
-from documents.views import email_list, send_email, edit_email, delete_email, email_detail, save_draft, contact_search
+from documents.views import email_list, send_email, edit_email, delete_email, email_detail, save_draft, contact_search, CustomLoginView
+from documents.views import add_company_document, delete_company_document
 from documents.views import EventViewSet
 from django.http import HttpResponse
 
@@ -38,6 +39,7 @@ handler500 = custom_500
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('accounts/login/', CustomLoginView.as_view(), name='login'),
     path('post-login/', post_login_redirect, name='post_login_redirect'),
     path("", home, name="home"),
     path("documents/", include("documents.urls")),  # Added namespace
@@ -53,7 +55,7 @@ urlpatterns = [
     path("staff/", staff_directory, name="staff_directory"),
     path("staff/<int:user_id>/", view_staff_profile, name="view_staff_profile"),
     path("staff/list/", staff_list, name="staff_list"),
-    path("staff/documents/add", add_staff_document, name="add_staff_document"),
+    path("staff/documents/add/", add_staff_document, name="add_staff_document"),
     path("staff/documents/delete/<int:document_id>", delete_staff_document, name="delete_staff_document"),
     path('staff/export-csv/', export_staff_csv, name='export_staff_csv'),
     path('notifications/', notifications_view, name='notifications'),
@@ -154,6 +156,8 @@ urlpatterns = [
     path('admins/user-notifications/delete/<int:user_notification_id>/', delete_user_notification, name='delete_user_notification'),
     # Company Profile URLs
     path('admins/company-profile/', edit_company_profile, name='edit_company_profile'),
+    path('admins/company/documents/add/', add_company_document, name="add_company_document"),
+    path('admins/company/documents/delete/<int:document_id>/', delete_company_document, name="delete_company_document"),
     path('company-profile/', view_company_profile, name='view_company_profile'),
 
     path('.well-known/<path:path>', handle_well_known),  # Handle .well-known requests

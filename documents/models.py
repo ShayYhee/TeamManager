@@ -318,18 +318,10 @@ class StaffDocument(models.Model):
         ('other', 'Other'),
     ]
 
-    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
-    staff_profile = models.ForeignKey(
-        'StaffProfile', 
-        on_delete=models.CASCADE, 
-        related_name='documents'
-    )
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="staff_document")
+    staff_profile = models.ForeignKey('StaffProfile', on_delete=models.CASCADE, related_name='documents')
     file = models.FileField(upload_to='staff_documents/')
-    document_type = models.CharField(
-        max_length=50, 
-        choices=DOCUMENT_TYPES, 
-        default='other'
-    )
+    document_type = models.CharField(max_length=50, choices=DOCUMENT_TYPES, default='other')
     description = models.CharField(max_length=255, blank=True, null=True)
     uploaded_at = models.DateTimeField(auto_now_add=True)
 
@@ -593,3 +585,23 @@ class Payment(models.Model):
 
     def __str__(self):
         return f"Payment of {self.amount} to {self.payee} by {self.tenant}"
+    
+
+class CompanyDocument(models.Model):
+    DOCUMENT_TYPES = [
+        ('certificate', 'Certificate'),
+        ('contract', 'Contract'),
+        ('license', 'License'),
+        ('memorandum', 'Memorandum'),
+        ('other', 'Other'),
+    ]
+
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="company_document")
+    company_profile = models.ForeignKey('CompanyProfile', on_delete=models.CASCADE, related_name='documents')
+    file = models.FileField(upload_to='company_documents/')
+    document_type = models.CharField(max_length=50, choices=DOCUMENT_TYPES, default='other')
+    description = models.CharField(max_length=255, blank=True, null=True)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.document_type} - {self.company_profile.full_name} ({self.uploaded_at})"
