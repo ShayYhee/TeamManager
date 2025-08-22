@@ -7,9 +7,10 @@ logger = logging.getLogger(__name__)
 
 def notification_count(request):
     # Validate tenant access
-    # if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
-    #     logger.error(f"Unauthorized access by user {request.user.username}: tenant mismatch")
-    #     return {'unseen_notification_count': 0}
+    if request.user.is_authenticated:
+        if not hasattr(request, 'tenant') or (not request.user.is_superuser and request.user.tenant != request.tenant):
+            logger.error(f"Unauthorized access by user {request.user.username}: tenant mismatch")
+            return {'unseen_notification_count': 0}
     print("Meer>>>>>", request)
         # Assuming this is in a view or similar context
     if request.user.is_authenticated:
@@ -34,9 +35,10 @@ def notification_bar(request):
         'birthday_others': [],
     }
 
-    # if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
-    #     logger.error(f"Unauthorized access by user {request.user.username}: tenant mismatch")
-    #     return context
+    if request.user.is_authenticated:
+        if not hasattr(request, 'tenant') or (not request.user.is_superuser and request.user.tenant != request.tenant):
+            logger.error(f"Unauthorized access by user {request.user.username}: tenant mismatch")
+            return context
 
     notifications = Notification.objects.filter(
         tenant=request.user.tenant if request.user.is_authenticated else None,

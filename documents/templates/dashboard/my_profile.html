@@ -3,9 +3,11 @@
 {% block title %}My Profile - Team Manager{% endblock %}
 
 {% block content %}
-<h2>My Profile</h2>
+<div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+    <h1 class="h2">My Profile</h1>
+    <a href="{% url 'edit_my_profile' %}" class="btn btn-primary ">Edit Profile</a>
+</div>
+{% comment %} <hr> {% endcomment %}
 {% include 'staff/profile_detail.html' with profile=profile %}
-<hr>
-<a href="{% url 'edit_my_profile' %}" class="btn btn-warning">Edit Profile</a>
 
 {% endblock%}

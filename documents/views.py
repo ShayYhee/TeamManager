@@ -4,11 +4,12 @@ from django.contrib.auth.models import User
 from django.contrib.admin.models import LogEntry, CHANGE, ADDITION, DELETION
 from django.contrib.auth import login, get_user_model
 from django.contrib.auth.signals import user_logged_in
+from django.contrib.auth.views import LoginView
 from django.contrib.contenttypes.models import ContentType
 from django.contrib import messages
 from django.core.mail import send_mail, EmailMessage, get_connection
 from django.core.paginator import Paginator
-from django.core.exceptions import ValidationError, PermissionDenied
+from django.core.exceptions import ValidationError, PermissionDenied, BadRequest
 from django.conf import settings
 from django.db import transaction
 from django.db.models import Q, F
@@ -21,8 +22,8 @@ from django.utils import timezone
 from django.utils.timezone import now
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
-from .forms import DocumentForm, SignUpForm, CreateDocumentForm, FileUploadForm, FolderForm, TaskForm, ReassignTaskForm, StaffProfileForm, StaffDocumentForm, EmailConfigForm, UserForm, PublicFolderForm, PublicFileForm, DepartmentForm, TeamForm, EventForm, EventParticipantForm, NotificationForm, UserNotificationForm, CompanyProfileForm, ContactForm, EmailForm, AttachmentFormSet, EditUserForm
-from .models import Document, CustomUser, Role, File, Folder, Task, StaffProfile, Notification, UserNotification, StaffDocument, Event, EventParticipant, Department, Team, PublicFile, PublicFolder, CompanyProfile, Contact, Email, Attachment
+from .forms import DocumentForm, SignUpForm, CreateDocumentForm, FileUploadForm, FolderForm, TaskForm, ReassignTaskForm, StaffProfileForm, StaffDocumentForm, EmailConfigForm, UserForm, PublicFolderForm, PublicFileForm, DepartmentForm, TeamForm, EventForm, EventParticipantForm, NotificationForm, UserNotificationForm, CompanyProfileForm, ContactForm, EmailForm, AttachmentFormSet, EditUserForm, CompanyDocumentForm
+from .models import Document, CustomUser, Role, File, Folder, Task, StaffProfile, Notification, UserNotification, StaffDocument, Event, EventParticipant, Department, Team, PublicFile, PublicFolder, CompanyProfile, Contact, Email, Attachment, CompanyDocument
 from raadaa.settings import ALLOWED_HOSTS
 from .serializers import EventSerializer
 from .placeholders import replace_placeholders
@@ -66,16 +67,59 @@ def is_admin(user):
     # return user.is_staff
 
 def custom_404(request, exception):
-    return render(request, '404.html', {'subdomain': request.get_host().split('.')[0]}, status=404)
+    return render(request, '404.html', {'subdomain': request.get_host().split('.')[0], 'message': str(exception)}, status=404)
 
 def custom_403(request, exception):
     return render(request, '403.html', {'message': str(exception)}, status=403)
 
 def custom_400(request, exception):
-    return render(request, '400.html', status=400)
+    return render(request, '400.html', {'message': str(exception)}, status=400)
 
 def custom_500(request):
     return render(request, '500.html', status=500)
+
+class CustomLoginView(LoginView):
+    def form_valid(self, form):
+        # Authenticate and log in the user
+        response = super().form_valid(form)  # Logs in the user
+        user = self.request.user
+
+        # If superuser, allow staying on base domain
+        if user.is_superuser:
+            return response
+
+        # For non-superusers, redirect to their tenant's login URL
+        expected_subdomain = (
+            user.tenant.slug
+            if hasattr(user, 'tenant') and user.tenant
+            else None
+        )
+        if expected_subdomain is None:
+            return HttpResponseForbidden("You have no associated tenant. Contact support faith.osebi@transnetcloud.com.")
+        
+        base_domain = "localhost:8000" if settings.DEBUG else "teammanager.ng"
+        protocol = "http" if settings.DEBUG else "https"
+        tenant_login_url = f"{protocol}://{expected_subdomain}.{base_domain}/accounts/login"
+
+        # Redirect to tenant-specific login URL
+        return redirect(tenant_login_url)
+
+    def get(self, request, *args, **kwargs):
+        # If already authenticated, redirect to home or tenant URL
+        if request.user.is_authenticated:
+            if request.user.is_superuser:
+                return redirect(settings.LOGIN_REDIRECT_URL or '/')
+            expected_subdomain = (
+                request.user.tenant.slug
+                if hasattr(request.user, 'tenant') and request.user.tenant
+                else None
+            )
+            if expected_subdomain is None:
+                return HttpResponseForbidden("You have no associated tenant. Contact support.")
+            base_domain = "localhost:8000" if settings.DEBUG else "teammanager.ng"
+            protocol = "http" if settings.DEBUG else "https"
+            return redirect(f"{protocol}://{expected_subdomain}.{base_domain}/")
+        return super().get(request, *args, **kwargs)
 
 def send_approval_request(document):
     # Get all BDM emails for the document's tenant
@@ -187,6 +231,7 @@ def create_document(request):
                     except ValidationError as e:
                         print(f"PublicFolder creation error: {e}")
                         return HttpResponse(f"Error creating Template Document folder: {e}", status=400)
+                        # raise BadRequest(f"Error creating Template Document folder: {e}")
 
                     # Validate folder access (similar to create_public_folder)
                     if template_folder.department and template_folder.department != user.department:
@@ -1069,6 +1114,7 @@ def create_folder(request):
             folder.save()
             return JsonResponse({'success': True})
     return JsonResponse({'success': False, 'errors': form.errors}, status=400)
+    # raise BadRequest("Invalid request")
 
 @login_required
 def delete_folder(request, folder_id):
@@ -1093,6 +1139,7 @@ def upload_file(request):
             uploaded_file.save()
         return JsonResponse({'success': True})
     return JsonResponse({'success': False, 'errors': form.errors}, status=400)
+    # raise BadRequest("Invalid Request")
 
 @login_required
 def delete_file(request, file_id):
@@ -1555,9 +1602,10 @@ def add_staff_document(request):
         logger.error(f"Unauthorized access by user {request.user.username}: tenant mismatch")
         return HttpResponseForbidden("You are not authorized for this tenant.")
     if request.method == 'POST':
-        form = StaffDocumentForm(request.POST, request.FILES, user=request.user)
+        form = StaffDocumentForm(request.POST, request.FILES)
         if form.is_valid():
             document = form.save(commit=False)
+            document.tenant = request.user.tenant
             document.staff_profile = get_object_or_404(StaffProfile, user=request.user, tenant=request.tenant)
             document.save()
             return JsonResponse({
@@ -1582,11 +1630,12 @@ def delete_staff_document(request, document_id):
     if hasattr(request, 'tenant') and request.user.tenant != request.tenant:
         logger.error(f"Unauthorized access by user {request.user.username}: tenant mismatch")
         return HttpResponseForbidden("You are not authorized for this tenant.")
-    
     try:
         # Get the user's StaffProfile (assuming one profile per user)
         staff_profile = StaffProfile.objects.get(user=request.user, tenant=request.tenant)
         document = get_object_or_404(StaffDocument, id=document_id, staff_profile=staff_profile)
+        if request.user != document.staff_profile.user:
+            return JsonResponse({'success': False, 'error': 'You are not authorized to delete this document.'}, status=403)
         if request.method == 'POST':
             document.delete()
             return JsonResponse({'success': True})
@@ -2274,7 +2323,7 @@ def create_user(request):
     if request.user.tenant != request.tenant:
         return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
     if request.method == "POST":
-        form = UserForm(request.POST)
+        form = UserForm(request.POST, tenant=request.tenant)
         if form.is_valid():
             user = form.save(commit=False)
             user.set_password(form.cleaned_data["password"])
@@ -2290,7 +2339,7 @@ def create_user(request):
             )
             return redirect("users_list")
     else:
-        form = UserForm()
+        form = UserForm(tenant=request.tenant)
     return render(request, "admin/create_user.html", {"form": form})
 
 @user_passes_test(is_admin)
@@ -2306,7 +2355,8 @@ def view_user_details(request, user_id):
                  'is_active', 'roles', 'phone_number', 
                   'department', 'teams', 'zoho_email', 'zoho_password']
     except CustomUser.DoesNotExist:
-        return HttpResponseForbidden("User not found or does not belong to your tenant.")
+        # return HttpResponseForbidden("User not found or does not belong to your tenant.")
+        raise PermissionDenied("User not found or does not belong to your tenant.")
 
     return render(request, "admin/view_user_details.html", {"user_view": user_view, "details": details})
 @user_passes_test(is_admin)
@@ -3004,7 +3054,62 @@ def edit_company_profile(request):
             return redirect("view_company_profile")
     else:
         form = CompanyProfileForm(instance=company_profile)
-    return render(request, "admin/edit_company_profile.html", {"form": form})
+        document_form = CompanyDocumentForm()
+    return render(request, "admin/edit_company_profile.html", {"form": form, 'profile': company_profile, 'document_form': document_form})
+
+@login_required
+@user_passes_test(is_admin)
+def add_company_document(request):
+    if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+        logger.error(f"Unauthorized access by user {request.user.username}: tenant mismatch")
+        return HttpResponseForbidden("You are not authorized for this tenant.")
+    if request.method == 'POST':
+        form = CompanyDocumentForm(request.POST, request.FILES)
+        if form.is_valid():
+            document = form.save(commit=False)
+            document.tenant = request.user.tenant
+            document.company_profile = get_object_or_404(CompanyProfile, tenant=request.tenant)
+            document.save()
+            return JsonResponse({
+                'success': True,
+                'document': {
+                    'id': document.id,
+                    'description': document.description or document.document_type,
+                    'file_url': document.file.url,
+                    'document_type': document.get_document_type_display(),
+                    'uploaded_at': document.uploaded_at.strftime('%B %d, %Y')
+                }
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'errors': form.errors
+            }, status=400)
+    return JsonResponse({'success': False, 'error': 'Invalid request'}, status=400)
+
+@login_required
+@user_passes_test(is_admin)
+def delete_company_document(request, document_id):
+    if hasattr(request, 'tenant') and request.user.tenant != request.tenant:
+        logger.error(f"Unauthorized access by user {request.user.username}: tenant mismatch")
+        return HttpResponseForbidden("You are not authorized for this tenant.")
+    
+    try:
+        # Get the user's StaffProfile (assuming one profile per user)
+        company_profile = CompanyProfile.objects.get(tenant=request.tenant)
+        document = get_object_or_404(CompanyDocument, id=document_id, company_profile=company_profile)
+        if request.method == 'POST':
+            document.delete()
+            return JsonResponse({'success': True})
+        return JsonResponse({'success': False, 'error': 'Invalid request method'}, status=400)
+        # raise BadRequest('Invalid request method')
+    except StaffProfile.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Staff profile not found'}, status=404)
+    except StaffDocument.DoesNotExist:
+        return JsonResponse({'success': False, 'error': 'Document not found or not owned by user'}, status=404)
+    except Exception as e:
+        return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
 
 
 # Contact List, Billing and Mass Mailing Section

@@ -1,6 +1,6 @@
 from django import forms
 from django.forms import modelformset_factory
-from .models import Document, User, CustomUser, Folder, File, Task, StaffProfile, StaffDocument, Department, Team, PublicFolder, PublicFile, Role, Event, EventParticipant, Notification, UserNotification, CompanyProfile, Contact, Email, Attachment
+from .models import Document, User, CustomUser, Folder, File, Task, StaffProfile, StaffDocument, Department, Team, PublicFolder, PublicFile, Role, Event, EventParticipant, Notification, UserNotification, CompanyProfile, Contact, Email, Attachment, CompanyDocument
 from tenants.models import Tenant
 from ckeditor.widgets import CKEditorWidget
 from ckeditor_uploader.widgets import CKEditorUploadingWidget
@@ -158,15 +158,11 @@ class UserForm(forms.ModelForm):
         tenant = kwargs.pop('tenant', None)
         super().__init__(*args, **kwargs)
         if tenant:
-            # tenant = getattr(user, 'tenant', None)
-            if tenant:
-                # self.fields['roles'].queryset = Role.objects.filter(tenant=tenant)
-                self.fields['department'].queryset = Department.objects.filter(tenant=tenant)
-                self.fields['teams'].queryset = Team.objects.filter(tenant=tenant)
-            else:
-                # self.fields['roles'].queryset = Role.objects.none()
-                self.fields['department'].queryset = Department.objects.none()
-                self.fields['teams'].queryset = Team.objects.none()
+            self.fields['department'].queryset = Department.objects.filter(tenant=tenant)
+            self.fields['teams'].queryset = Team.objects.filter(tenant=tenant)
+        else:
+            self.fields['department'].queryset = Department.objects.none()
+            self.fields['teams'].queryset = Team.objects.none()
 
     def clean(self):
         cleaned_data = super().clean()
@@ -198,12 +194,11 @@ class EditUserForm(forms.ModelForm):
         tenant = kwargs.pop('tenant', None)
         super().__init__(*args, **kwargs)
         if tenant:
-            if tenant:
-                self.fields['department'].queryset = Department.objects.filter(tenant=tenant)
-                self.fields['teams'].queryset = Team.objects.filter(tenant=tenant)
-            else:
-                self.fields['department'].queryset = Department.objects.none()
-                self.fields['teams'].queryset = Team.objects.none()
+            self.fields['department'].queryset = Department.objects.filter(tenant=tenant)
+            self.fields['teams'].queryset = Team.objects.filter(tenant=tenant)
+        else:
+            self.fields['department'].queryset = Department.objects.none()
+            self.fields['teams'].queryset = Team.objects.none()
 
 class FolderForm(forms.ModelForm):
     class Meta:
@@ -457,6 +452,22 @@ class CompanyProfileForm(forms.ModelForm):
             'date_founded': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
             'contact_details': forms.TextInput(attrs={'rows': 4, 'class': 'form-control'})
         }
+
+class CompanyDocumentForm(forms.ModelForm):
+    class Meta:
+        model = CompanyDocument
+        fields = ['file', 'document_type', 'description']
+        widgets = {
+            'file': forms.FileInput(attrs={'class': 'form-control'}),
+            'document_type': forms.Select(attrs={'class': 'form-control'}),
+            'description': forms.TextInput(attrs={'class': 'form-control'}),
+        }
+
+    def clean_file(self):
+        file = self.cleaned_data.get('file')
+        if file and file.size > 10 * 1024 * 1024:  # 10MB limit
+            raise forms.ValidationError("File size must be under 10MB.")
+        return file
 
 class ContactForm(forms.ModelForm):
     class Meta:
