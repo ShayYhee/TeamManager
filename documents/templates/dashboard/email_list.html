@@ -38,12 +38,14 @@
                                             <i class="fas fa-circle fa-xs me-3 text-primary"></i>
                                             <div>
                                                 <h5 class="card-title mb-1 email-subject" style="cursor: pointer;">{{ email.subject|truncatechars:50 }}</h5>
+                                                <small class="text-muted d-block mt-1">
+                                                    From:  
+                                                    {{ email.sender }}
+                                                </small>
                                                 <p class="card-text mb-1">
-                                                    To: 
-                                                    {% for contact in email.to_emails.all %}
-                                                        {{ contact.name }} ({{ contact.email }}){% if not forloop.last %}, {% endif %}
-                                                    {% empty %}
-                                                        None
+                                                    To:  
+                                                    {% for ema in email.get_to_emails %}
+                                                        {{ ema|truncatechars:7 }}{% if not forloop.last %}, {% endif %}
                                                     {% endfor %}
                                                     | Sent: {{ email.sent_at|date:"F d, Y H:i"|default:"Draft" }}
                                                 </p>
@@ -102,12 +104,14 @@
                                             <i class="fas fa-circle fa-xs me-3 text-primary"></i>
                                             <div>
                                                 <h5 class="card-title mb-1 email-subject" style="cursor: pointer;">{{ email.subject|truncatechars:50 }}</h5>
+                                                <small class="text-muted d-block mt-1">
+                                                    From:  
+                                                    {{ email.sender }}
+                                                </small>
                                                 <p class="card-text mb-1">
                                                     To: 
-                                                    {% for contact in email.to_emails.all %}
-                                                        {{ contact.name }} ({{ contact.email }}){% if not forloop.last %}, {% endif %}
-                                                    {% empty %}
-                                                        None
+                                                    {% for ema in email.get_to_emails %}
+                                                        {{ ema|truncatechars:7 }}{% if not forloop.last %}, {% endif %}
                                                     {% endfor %}
                                                     | Draft
                                                 </p>
@@ -164,12 +168,14 @@
                                             <i class="fas fa-circle fa-xs me-3 text-primary"></i>
                                             <div>
                                                 <h5 class="card-title mb-1 email-subject" style="cursor: pointer;">{{ email.subject|truncatechars:50 }}</h5>
+                                                <small class="text-muted d-block mt-1">
+                                                    From:  
+                                                    {{ email.sender }}
+                                                </small>
                                                 <p class="card-text mb-1">
                                                     To: 
-                                                    {% for contact in email.to_emails.all %}
-                                                        {{ contact.name }} ({{ contact.email }}){% if not forloop.last %}, {% endif %}
-                                                    {% empty %}
-                                                        None
+                                                    {% for ema in email.get_to_emails %}
+                                                        {{ ema|truncatechars:7 }}{% if not forloop.last %}, {% endif %}
                                                     {% endfor %}
                                                     | Sent: {{ email.sent_at|date:"F d, Y H:i" }}
                                                 </p>
