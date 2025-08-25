@@ -405,7 +405,7 @@
                     <a href="{% url 'admin_dashboard' %}" {% if request.path == '/admins/dashboard/' %}class="active"{% endif %}><i class="fas fa-key"></i> Admin Dashboard</a>
                 {% endif %}
             {% endfor %}
-            <a href="{% url 'contact_support' %}" {% if request.path == '/contact-support/' %}class="active"{% endif %}><i class="fa fa-question-circle" aria-hidden="true"></a>Contact Support</a>
+            <a href="{% url 'contact_support' %}" {% if request.path == '/contact-support/' %}class="active"{% endif %}><i class="fa fa-question-circle" aria-hidden="true"></i>Contact Support</a>
         {%endif%}
     </div>
     {% endif %}
