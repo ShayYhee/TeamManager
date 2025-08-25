@@ -22,7 +22,7 @@ from documents.views import admin_notification_list, create_notification, edit_n
 from documents.views import user_notification_list, create_user_notification, edit_user_notification, delete_user_notification
 from documents.views import custom_404, custom_403, custom_500, custom_400, post_login_redirect, contact_list, create_contact, edit_contact, delete_contact, view_contact_detail
 from documents.views import email_list, send_email, edit_email, delete_email, email_detail, save_draft, contact_search, CustomLoginView
-from documents.views import add_company_document, delete_company_document
+from documents.views import add_company_document, delete_company_document, toggle_file_sharing, shared_file_view, contact_support
 from documents.views import EventViewSet
 from django.http import HttpResponse
 
@@ -100,6 +100,8 @@ urlpatterns = [
     path('public-folders/files/<int:file_id>/rename/', rename_public_file, name='rename_public_file'),
     path('public-folders/files/<int:file_id>/move/', move_public_file, name='move_public_file'),
     path('public-folders/files/<int:file_id>/delete/', delete_public_file, name='delete_public_file'),
+    path('share/<uuid:token>/', shared_file_view, name='shared_file_view'),
+    path('file/<int:file_id>/toggle-sharing/', toggle_file_sharing, name='toggle_file_sharing'),
     path('tasks/', task_list, name='task_list'),
     path('tasks/create/', create_task, name='create_task'),
     path('tasks/<int:task_id>/update-status/', update_task_status, name='update_task_status'),
@@ -159,6 +161,7 @@ urlpatterns = [
     path('admins/company/documents/add/', add_company_document, name="add_company_document"),
     path('admins/company/documents/delete/<int:document_id>/', delete_company_document, name="delete_company_document"),
     path('company-profile/', view_company_profile, name='view_company_profile'),
+    path('contact-support/', contact_support, name='contact_support'),
 
     path('.well-known/<path:path>', handle_well_known),  # Handle .well-known requests
 ]

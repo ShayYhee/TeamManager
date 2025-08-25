@@ -4,7 +4,7 @@ from django.contrib.auth.models import User
 from django.contrib.auth.models import Permission
 from raadaa import settings
 from django.utils import timezone
-import os, json
+import os, json, uuid
 from django.core.exceptions import ValidationError
 from cryptography.fernet import Fernet
 from tenants.models import Tenant
@@ -385,6 +385,13 @@ class PublicFile(models.Model):
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='created_public_files')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    share_token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    is_shared = models.BooleanField(default=False, help_text="Enable external sharing for this file")
+    shared_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='shared_public_files')
+
+    def get_shareable_link(self):
+        from django.urls import reverse
+        return reverse('shared_file_view', kwargs={'token': str(self.share_token)})
 
     def __str__(self):
         return self.original_name

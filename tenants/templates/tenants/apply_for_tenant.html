@@ -21,15 +21,27 @@
                         {% csrf_token %}
                         {% for field in form %}
                             <div class="mb-3 text-start">
-                                <label for="{{ field.id_for_label }}" class="form-label" style="color: #15171bff; font-weight: 500;">
-                                    {{ field.label }}
-                                    {% if field.field.required %}
-                                        <span class="text-danger" aria-hidden="true">*</span>
-                                    {% endif %}
-                                    {% if field.help_text %}
-                                        <span class="tooltip-trigger" title="{{ field.help_text }}"><i class="fa fa-info-circle"></i></span>
-                                    {% endif %}
-                                </label>
+                                {% if field.label == 'Slug' %}
+                                    <label for="{{ field.id_for_label }}" class="form-label" style="color: #15171bff; font-weight: 500;">
+                                        {{ field.label }} (Subdomain)
+                                        {% if field.field.required %}
+                                            <span class="text-danger" aria-hidden="true">*</span>
+                                        {% endif %}
+                                        {% if field.help_text %}
+                                            <span class="tooltip-trigger" title="{{ field.help_text }}"><i class="fa fa-info-circle"></i></span>
+                                        {% endif %}
+                                    </label>
+                                {% else %}
+                                    <label for="{{ field.id_for_label }}" class="form-label" style="color: #15171bff; font-weight: 500;">
+                                        {{ field.label }}
+                                        {% if field.field.required %}
+                                            <span class="text-danger" aria-hidden="true">*</span>
+                                        {% endif %}
+                                        {% if field.help_text %}
+                                            <span class="tooltip-trigger" title="{{ field.help_text }}"><i class="fa fa-info-circle"></i></span>
+                                        {% endif %}
+                                    </label>
+                                {% endif %}
                                 {% if field.field.widget.input_type == 'select' %}
                                     <select name="{{ field.name }}" id="{{ field.id_for_label }}" class="form-select" {% if field.field.required %}required{% endif %} {% if field.errors %}aria-invalid="true"{% endif %}>
                                         {% for value, label in field.field.choices %}

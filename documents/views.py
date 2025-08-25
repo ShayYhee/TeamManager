@@ -22,7 +22,7 @@ from django.utils import timezone
 from django.utils.timezone import now
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
-from .forms import DocumentForm, SignUpForm, CreateDocumentForm, FileUploadForm, FolderForm, TaskForm, ReassignTaskForm, StaffProfileForm, StaffDocumentForm, EmailConfigForm, UserForm, PublicFolderForm, PublicFileForm, DepartmentForm, TeamForm, EventForm, EventParticipantForm, NotificationForm, UserNotificationForm, CompanyProfileForm, ContactForm, EmailForm, AttachmentFormSet, EditUserForm, CompanyDocumentForm
+from .forms import DocumentForm, SignUpForm, CreateDocumentForm, FileUploadForm, FolderForm, TaskForm, ReassignTaskForm, StaffProfileForm, StaffDocumentForm, EmailConfigForm, UserForm, PublicFolderForm, PublicFileForm, DepartmentForm, TeamForm, EventForm, EventParticipantForm, NotificationForm, UserNotificationForm, CompanyProfileForm, ContactForm, EmailForm, EditUserForm, CompanyDocumentForm, SupportForm
 from .models import Document, CustomUser, Role, File, Folder, Task, StaffProfile, Notification, UserNotification, StaffDocument, Event, EventParticipant, Department, Team, PublicFile, PublicFolder, CompanyProfile, Contact, Email, Attachment, CompanyDocument
 from raadaa.settings import ALLOWED_HOSTS
 from .serializers import EventSerializer
@@ -77,6 +77,16 @@ def custom_400(request, exception):
 
 def custom_500(request):
     return render(request, '500.html', status=500)
+
+def mail_connection(sender_email, sender_password):
+    return get_connection(
+        backend="django.core.mail.backends.smtp.EmailBackend",
+        host="smtp.zoho.com",
+        port=587,
+        username=sender_email,
+        password=sender_password,
+        use_tls=True,
+    )
 
 class CustomLoginView(LoginView):
     def form_valid(self, form):
@@ -1979,6 +1989,10 @@ def public_folder_list(request, public_folder_id=None):
         (Q(folder__department=user.department) | Q(folder__team__in=user.teams.all()) if user.department else Q()), tenant=user.tenant
     ).distinct()
 
+    # Generate shareable links for files where sharing is enabled
+    for file in public_files:
+        file.shareable_link = request.build_absolute_uri(file.get_shareable_link()) if file.is_shared else None
+
     context = {
         'parent': parent_public_folder,
         'public_folders': public_folders,
@@ -1987,6 +2001,39 @@ def public_folder_list(request, public_folder_id=None):
         'file_form': PublicFileForm(),
     }
     return render(request, 'folder/public_folder_list.html', context)
+
+@login_required
+def toggle_file_sharing(request, file_id):
+    # View to toggle the sharing status of a file
+    public_file = get_object_or_404(PublicFile, id=file_id, tenant=request.user.tenant)
+    
+    # Optional: Add permission checks (e.g., only allow certain users to toggle sharing)
+    # if public_file.created_by != request.user:
+    #     # return HttpResponseForbidden("You do not have permission to modify this file.")
+    #     raise PermissionDenied("You do not have permission to modify this file.")
+
+    if request.method == 'POST':
+        public_file.is_shared = not public_file.is_shared
+        public_file.shared_by = request.user
+        public_file.save()
+        return redirect('public_folder_list', public_folder_id=public_file.folder.id if public_file.folder else None)
+    
+    return redirect('public_folder_list', public_folder_id=public_file.folder.id if public_file.folder else None)
+
+
+def shared_file_view(request, token):
+    # Retrieve the file by share token
+    public_file = get_object_or_404(PublicFile, share_token=token, is_shared=True)
+    
+    # Optional: Add additional checks (e.g., tenant status, file availability)
+    if not public_file.file:
+        return HttpResponseForbidden("File not available.")
+    
+    context = {
+        'public_file': public_file,
+        'file_url': public_file.file.url,  # URL to access the file
+    }
+    return render(request, 'folder/shared_file_view.html', context)
 
 @login_required
 @require_POST
@@ -3227,60 +3274,45 @@ def email_list(request):
 def edit_email(request, email_id):
     if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
         print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
-        # return HttpResponseForbidden("You are not authorized for this tenant.")
         return render(request, 'error.html', {'message': 'You are not authorized for this tenant.'})
-    
+
     email = get_object_or_404(Email, id=email_id, tenant=request.tenant, sender=request.user)
     if email.sender != request.user:
-        # return HttpResponseForbidden('You can only edit your own emails')
-        # raise PermissionDenied('You can only edit your own emails')
         return render(request, 'error.html', {'message': 'You can only edit your own emails.'})
     if email.sent:
-        # return HttpResponseForbidden('You cannot edit sent emails')
-        # raise PermissionDenied('You cannot edit sent emails')
-        # return render(request, 'error.html', {'message': 'You cannot edit sent emails.'})
         return redirect('email_detail', email_id=email_id)
-    
+
     if request.method == 'POST':
-        form = EmailForm(request.POST, user=request.user, instance=email)
-        formset = AttachmentFormSet(request.POST, request.FILES, queryset=Attachment.objects.filter(email=email))
+        form = EmailForm(request.POST, request.FILES, instance=email)
         
-        if form.is_valid() and formset.is_valid():
+        if form.is_valid():
             email = form.save(commit=False)
             email.tenant = request.tenant
             email.sender = request.user
             email.sent = False
             email.save()
-            form.save_m2m()  # Save ManyToMany relationships
-            
-            # Handle attachments
-            for f in formset:
-                if f.cleaned_data.get('file') and not f.cleaned_data.get('DELETE', False):
-                    attachment = Attachment(email=email, file=f.cleaned_data['file'])
-                    attachment.save()
-                elif f.cleaned_data.get('DELETE', False) and f.instance.pk:
-                    f.instance.delete()
-            
+
+            # Handle attachment deletions if specified
+            if 'delete_attachments' in request.POST:
+                attachment_ids = request.POST.getlist('delete_attachments')
+                Attachment.objects.filter(id__in=attachment_ids, email=email).delete()
+
+            # Save new attachments (handled by form.save())
+            form.save()
+
             # If user wants to send the email
             if 'send' in request.POST:
                 sender_email = request.user.zoho_email
                 sender_password = request.user.zoho_password
-                connection = get_connection(
-                    backend="django.core.mail.backends.smtp.EmailBackend",
-                    host="smtp.zoho.com",
-                    port=587,
-                    username=sender_email,
-                    password=sender_password,
-                    use_tls=True,
-                )
-                subject = form.cleaned_data['subject']
-                message = form.cleaned_data['body']
-                to_emails = [to_emails.email for to in form.cleaned_data['to']]
-                cc_emails = [cc_emails.email for cc in form.cleaned_data['cc']]
-                bcc_emails = [bcc_emails.email for bcc in form.cleaned_data['bcc']]
+                connection = mail_connection(sender_email, sender_password)
                 email_msg = EmailMessage(
-                    subject, message, sender_email, to_emails,
-                    cc=cc_emails, bcc=bcc_emails, connection=connection
+                    subject=email.subject,
+                    body=email.body,
+                    from_email=sender_email,
+                    to=email.get_to_emails(),
+                    cc=email.get_cc_emails(),
+                    bcc=email.get_bcc_emails(),
+                    connection=connection
                 )
                 # Attach all files
                 for attachment in email.attachments.all():
@@ -3290,91 +3322,66 @@ def edit_email(request, email_id):
                 email.sent_at = timezone.now()
                 email.save()
                 return redirect('email_list')
-            
+
             return redirect('email_list')
     else:
-        form = EmailForm(user=request.user, instance=email)
-        formset = AttachmentFormSet(queryset=Attachment.objects.filter(email=email))
-    
-    return render(request, 'dashboard/edit_email.html', {'form': form, 'formset': formset, 'email': email})
+        form = EmailForm(instance=email)
+
+    return render(request, 'dashboard/edit_email.html', {'form': form, 'email': email})
+
 @login_required
 def save_draft(request):
     if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
         print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
-        return HttpResponseForbidden("You are not authorized for this tenant.")
-    
+        return render(request, 'error.html', {'message': 'You are not authorized for this tenant.'})
+
     if request.method == 'POST':
-        form = EmailForm(request.POST)
-        formset = AttachmentFormSet(request.POST, request.FILES)
+        form = EmailForm(request.POST, request.FILES)
         
-        if form.is_valid() and formset.is_valid():
+        if form.is_valid():
             email = form.save(commit=False)
             email.tenant = request.tenant
             email.sender = request.user
             email.sent = False
             email.save()
-            form.save_m2m()  # Save ManyToMany relationships
-            
-            # Save attachments
-            for f in formset:
-                if f.cleaned_data.get('file') and not f.cleaned_data.get('DELETE', False):
-                    attachment = Attachment(email=email, file=f.cleaned_data['file'])
-                    attachment.save()
-            
+            form.save()  # Save attachments
             return redirect('email_list')
     else:
         form = EmailForm()
-        formset = AttachmentFormSet(queryset=Attachment.objects.none())
-    
-    return render(request, 'dashboard/send_email.html', {'form': form, 'formset': formset})
+
+    return render(request, 'dashboard/send_email.html', {'form': form})
 
 # Update send_email view to handle multiple attachments
 @login_required
 def send_email(request):
     if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
         print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
-        return HttpResponseForbidden("You are not authorized for this tenant.")
-    
+        return render(request, 'error.html', {'message': 'You are not authorized for this tenant.'})
+
     sender_email = request.user.zoho_email
     sender_password = request.user.zoho_password
-    connection = get_connection(
-        backend="django.core.mail.backends.smtp.EmailBackend",
-        host="smtp.zoho.com",
-        port=587,
-        username=sender_email,
-        password=sender_password,
-        use_tls=True,
-    )
-    
+    connection = mail_connection(sender_email, sender_password)
+
     if request.method == 'POST':
-        # form = EmailForm(request.POST, user=request.user)
-        form = EmailForm(request.POST)
-        formset = AttachmentFormSet(request.POST, request.FILES)
+        form = EmailForm(request.POST, request.FILES)
         
-        if form.is_valid() and formset.is_valid():
+        if form.is_valid():
             email = form.save(commit=False)
-            print(f"To Emails: {email.get_to_emails()}")
             email.tenant = request.tenant
             email.sender = request.user
             email.sent = False
             email.save()
-            form.save_m2m()
-            
-            # Save attachments
-            for f in formset:
-                if f.cleaned_data.get('file') and not f.cleaned_data.get('DELETE', False):
-                    attachment = Attachment(email=email, file=f.cleaned_data['file'])
-                    attachment.save()
-            
+            form.save()  # Save attachments
+
             # Send email
-            subject = form.cleaned_data['subject']
-            message = form.cleaned_data['body']
-            # to_emails = [to.email for to in form.cleaned_data['to']]
-            # cc_emails = [cc.email for cc in form.cleaned_data['cc']]
-            # bcc_emails = [bcc.email for bcc in form.cleaned_data['bcc']]
             email_msg = EmailMessage(
-                subject, message, sender_email, email.get_to_emails(),
-                cc=email.get_cc_emails(), bcc=email.get_bcc_emails(), connection=connection
+                subject=email.subject,
+                body=email.body,
+                from_email=sender_email,
+                to=email.get_to_emails(),
+                cc=email.get_cc_emails(),
+                bcc=email.get_bcc_emails(),
+                connection=connection
             )
             for attachment in email.attachments.all():
                 email_msg.attach_file(attachment.file.path)
@@ -3384,11 +3391,9 @@ def send_email(request):
             email.save()
             return redirect('email_list')
     else:
-        # form = EmailForm(user=request.user)
         form = EmailForm()
-        formset = AttachmentFormSet(queryset=Attachment.objects.none())
-    
-    return render(request, 'dashboard/send_email.html', {'form': form, 'formset': formset})
+
+    return render(request, 'dashboard/send_email.html', {'form': form})
 @login_required
 def email_detail(request, email_id):
     if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
@@ -3416,3 +3421,43 @@ def contact_search(request):
     )[:10]  # Limit to 10 results
     results = [{'email': contact.email, 'name': contact.name} for contact in contacts]
     return JsonResponse(results, safe=False)
+
+def contact_support(request):
+    if request.method == 'POST':
+        print("POST data: %s", dict(request.POST))
+        files = request.FILES.getlist('attachments')
+        print("FILES data: %s", request.FILES)
+        print(("FILES data: %s", [(f.name, f.size, f.content_type) for f in files] if files else "No files received"))
+        form = SupportForm(request.POST, request.FILES)
+        if form.is_valid():
+            try:
+                # Create email
+                email = EmailMessage(
+                    subject=form.cleaned_data['subject'],
+                    body=form.cleaned_data['message'],
+                    from_email=request.user.zoho_email if request.user.is_authenticated else 'no-reply@teammanager.ng',
+                    to=['faith.osebi@transnetcloud.com'],
+                    connection=mail_connection(request.user.zoho_email, request.user.zoho_password)
+                )
+                
+                # Handle attachments
+                for f in request.FILES.getlist('attachments'):
+                    print(("Attaching file: %s (size: %s, type: %s)", f.name, f.size, f.content_type))
+                    email.attach(f.name, f.read(), f.content_type)
+
+                # for f in form.cleaned_data.get('attachments', []):
+                #     print(("Attaching file: %s (size: %s, type: %s)", f.name, f.size, f.content_type))
+                #     email.attach(f.name, f.read(), f.content_type)
+                
+                # Send email
+                email.send()
+                return JsonResponse({'success': True})
+            except Exception as e:
+                print(("Email sending error: %s", str(e)))
+                return JsonResponse({'success': False, 'error': str(e)})
+        else:
+            print(("Form errors: %s", form.errors))
+            return JsonResponse({'success': False, 'error': 'Invalid form data'})
+    else:
+        form = SupportForm()
+    return render(request, 'dashboard/contact_support.html', {'form': form})

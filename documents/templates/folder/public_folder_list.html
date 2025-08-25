@@ -136,11 +136,49 @@
                                             <i class="fas fa-file-image fa-3x mb-2" style="color: rgba(8, 66, 142, 0.89);"></i>
                                             <h6 class="card-title">{{ public_file.original_name }}</h6>
                                         </a>
+                                        {% if public_file.is_shared %}
+                                            <p>
+                                                Shareable Link: 
+                                                <span id="shareLink-{{ public_file.id }}">{{ public_file.shareable_link|truncatechars:20 }}</span>
+                                                <input type="hidden" id="fullShareLink-{{ public_file.id }}" value="{{ public_file.shareable_link }}">
+                                                <button type="button" class="btn btn-outline-primary btn-sm ms-2" onclick="copyShareLink('{{ public_file.id }}')">
+                                                    <i class="fas fa-copy"></i> Copy Link
+                                                </button>
+                                            </p>
+                                            <form method="post" action="{% url 'toggle_file_sharing' public_file.id %}">
+                                                {% csrf_token %}
+                                                <button class="btn btn-danger" type="submit">Disable Sharing</button>
+                                            </form>
+                                        {% else %}
+                                            <form method="post" action="{% url 'toggle_file_sharing' public_file.id %}">
+                                                {% csrf_token %}
+                                                <button class="btn btn-primary" type="submit">Enable Sharing</button>
+                                            </form>
+                                        {% endif %}
                                     {% elif public_file.original_name|get_file_extension|lower == "pdf" %}
                                         <a href="#" class="text-decoration-none" data-media-url="{{ public_file.file.url }}" data-media-type="pdf" data-media-name="{{ public_file.original_name }}">
                                             <i class="fas fa-file-pdf fa-3x mb-2" style="color: rgba(161, 7, 7, 0.89);"></i>
                                             <h6 class="card-title">{{ public_file.original_name }}</h6>
                                         </a>
+                                        {% if public_file.is_shared %}
+                                            <p>
+                                                Shareable Link: 
+                                                <span id="shareLink-{{ public_file.id }}">{{ public_file.shareable_link|truncatechars:20 }}</span>
+                                                <input type="hidden" id="fullShareLink-{{ public_file.id }}" value="{{ public_file.shareable_link }}">
+                                                <button type="button" class="btn btn-outline-primary btn-sm ms-2" onclick="copyShareLink('{{ public_file.id }}')">
+                                                    <i class="fas fa-copy"></i> Copy Link
+                                                </button>
+                                            </p>
+                                            <form method="post" action="{% url 'toggle_file_sharing' public_file.id %}">
+                                                {% csrf_token %}
+                                                <button class="btn btn-danger" type="submit">Disable Sharing</button>
+                                            </form>
+                                        {% else %}
+                                            <form method="post" action="{% url 'toggle_file_sharing' public_file.id %}">
+                                                {% csrf_token %}
+                                                <button class="btn btn-primary" type="submit">Enable Sharing</button>
+                                            </form>
+                                        {% endif %}
                                     {% else %}
                                         <a href="{{ public_file.file.url }}" target="_blank" class="text-decoration-none">
                                             {% if public_file.original_name|get_file_extension|lower == "docx" %}
@@ -154,6 +192,25 @@
                                             {% endif %}
                                             <h6 class="card-title">{{ public_file.original_name }}</h6>
                                         </a>
+                                        {% if public_file.is_shared %}
+                                            <p>
+                                                Shareable Link: 
+                                                <span id="shareLink-{{ public_file.id }}">{{ public_file.shareable_link|truncatechars:20 }}</span>
+                                                <input type="hidden" id="fullShareLink-{{ public_file.id }}" value="{{ public_file.shareable_link }}">
+                                                <button type="button" class="btn btn-outline-primary btn-sm ms-2" onclick="copyShareLink('{{ public_file.id }}')">
+                                                    <i class="fas fa-copy"></i> Copy Link
+                                                </button>
+                                            </p>
+                                            <form method="post" action="{% url 'toggle_file_sharing' public_file.id %}">
+                                                {% csrf_token %}
+                                                <button class="btn btn-danger" type="submit">Disable Sharing</button>
+                                            </form>
+                                        {% else %}
+                                            <form method="post" action="{% url 'toggle_file_sharing' public_file.id %}">
+                                                {% csrf_token %}
+                                                <button class="btn btn-primary" type="submit">Enable Sharing</button>
+                                            </form>
+                                        {% endif %}
                                     {% endif %}
                                     {% if public_file.created_by == request.user %}
                                         <div class="dropdown position-absolute top-0 end-0 p-2">
@@ -677,5 +734,14 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 });
+// Copy share link to clipboard
+function copyShareLink(fileId) {
+    const fullLink = document.getElementById(`fullShareLink-${fileId}`).value;
+    navigator.clipboard.writeText(fullLink).then(() => {
+        alert('Share link copied to clipboard!');
+    }).catch(err => {
+        alert('Failed to copy link: ' + err);
+    });
+}
 </script>
 {% endblock %}

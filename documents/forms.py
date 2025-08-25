@@ -540,6 +540,12 @@ class EmailForm(forms.ModelForm):
         help_text="Enter BCC email addresses or select contacts, separated by commas or spaces.",
         required=False
     )
+    attachments = forms.FileField(
+        widget=forms.FileInput(attrs={
+            'class': 'form-control'
+        }),
+        required=False
+    )
 
     class Meta:
         model = Email
@@ -603,6 +609,16 @@ class EmailForm(forms.ModelForm):
             if not self._is_valid_email(email):
                 raise forms.ValidationError(f"Invalid email address: {email}")
         return email_list
+    
+    def clean_attachments(self):
+        """Validate multiple file attachments."""
+        files = self.files.getlist('attachments')
+        if not files:
+            return None
+        for f in files:
+            if f.size > 10 * 1024 * 1024:  # 10MB limit
+                raise forms.ValidationError(f"File {f.name} is too large (max 10MB).")
+        return files
 
     def _is_valid_email(self, email):
         """Validate email format."""
@@ -620,14 +636,40 @@ class EmailForm(forms.ModelForm):
         instance.set_bcc_emails(self.cleaned_data['bcc_emails'])
         if commit:
             instance.save()
+            # Save attachments
+            files = self.cleaned_data.get('attachments')
+            if files:
+                for f in files:
+                    Attachment.objects.create(email=instance, file=f)
         return instance
 
     
 # Formset for attachments
-AttachmentFormSet = modelformset_factory(
-    Attachment,
-    fields=('file',),
-    extra=3,  # Allow up to 3 additional attachments
-    can_delete=True,
-    widgets={'file': forms.FileInput(attrs={'class': 'form-control'})}
-)
+# AttachmentFormSet = modelformset_factory(
+#     Attachment,
+#     fields=('file',),
+#     extra=3,  # Allow up to 3 additional attachments
+#     can_delete=True,
+#     widgets={'file': forms.FileInput(attrs={'class': 'form-control'})}
+# )
+
+class SupportForm(forms.Form):
+    subject = forms.CharField(max_length=255, required=True)
+    message = forms.CharField(widget=forms.Textarea, required=True)
+    attachments = forms.FileField(
+        widget=forms.FileInput(attrs={'class':'form-control'}),
+        required=False
+    )
+
+    def clean_attachments(self):
+        files = self.files.getlist('attachments')
+        print("Cleaning attachments: %s", [(f.name, f.size, f.content_type) for f in files])
+        if not files:
+            print("No attachments provided")
+            return None
+        for f in files:
+            if f.size > 10 * 1024 * 1024:  # 10MB limit
+                raise forms.ValidationError(f"File {f.name} is too large (max 10MB).")
+            if f.content_type not in ['image/jpeg', 'image/png']:
+                raise forms.ValidationError(f"File {f.name} is not a valid JPG/PNG file.")
+        return files
