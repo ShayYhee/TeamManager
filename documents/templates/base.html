@@ -196,13 +196,38 @@
         }
         @media (max-width: 768px) {
             .sidebar {
-                width: 0;
+                {% comment %} width: 0;
                 padding: 0;
-                overflow: hidden;
+                overflow: hidden; {% endcomment %}
+                position: fixed;
+                margin-top: 50px;
+                left: 0;
+                height: 100%;
+                width: 250px;
+                z-index: 1000; /* Ensure sidebar is above main content */
+                transform: translateX(-100%); /* Hide sidebar by default */
+            }
+            .sidebar.active {
+                transform: translateX(0); /* Show sidebar when active */
             }
             .main-content {
+                margin-left: 0; /* No margin needed since sidebar overlaps */
+            }
+            {% comment %} .main-content {
                 margin-left: 20px;
                 padding: 15px;
+            } {% endcomment %}
+             .toggle-sidebar {
+                display: block;
+                position: fixed;
+                top: 10px;
+                left: 10px;
+                z-index: 1100;
+                background-color: #007bff;
+                color: white;
+                padding: 10px;
+                border: none;
+                cursor: pointer;
             }
             .main-content.expanded {
                 margin-left: 20px;
@@ -405,7 +430,7 @@
                     <a href="{% url 'admin_dashboard' %}" {% if request.path == '/admins/dashboard/' %}class="active"{% endif %}><i class="fas fa-key"></i> Admin Dashboard</a>
                 {% endif %}
             {% endfor %}
-            <a href="{% url 'contact_support' %}" {% if request.path == '/contact-support/' %}class="active"{% endif %}><i class="fa fa-question-circle" aria-hidden="true"></a>Contact Support</a>
+            <a href="{% url 'contact_support' %}" {% if request.path == '/contact-support/' %}class="active"{% endif %}><i class="fa fa-question-circle" aria-hidden="true"></i>Contact Support</a>
         {%endif%}
     </div>
     {% endif %}
@@ -451,7 +476,7 @@
     <nav class="navbar navbar-light bg-light fixed-top" id="navbar">
         <div class="container-fluid">
             {% if user.is_authenticated %}
-                <button class="btn btn-outline-primary" onclick="toggleSidebar()" aria-label="Toggle Sidebar"><i class="fas fa-bars"></i></button>
+                <button class="btn btn-outline-primary toggle-sidebar" onclick="toggleSidebar()" aria-label="Toggle Sidebar"><i class="fas fa-bars"></i></button>
             {% else %}
                 <span class="d-none d-md-inline"> </span>
             {% endif %}
@@ -575,21 +600,16 @@
             var sidebar = document.getElementById("sidebar");
             var mainContent = document.getElementById("main-content");
             var navbar = document.getElementById("navbar");
-            if (sidebar) {
+            if (window.innerWidth > 768){
                 sidebar.classList.toggle("closed");
                 mainContent.classList.toggle("expanded");
                 navbar.style.marginLeft = sidebar.classList.contains("closed") ? "30px" : "250px";
+            } else{
+                if (navbar) navbar.style.marginLeft = "0px";
+                sidebar.classList.toggle('active');
             }
         }
-        window.addEventListener('load', function() {
-            var sidebar = document.getElementById("sidebar");
-            var mainContent = document.getElementById("main-content");
-            var navbar = document.getElementById("navbar");
-            if (!sidebar || window.innerWidth <= 768) {
-                if (mainContent) mainContent.classList.add("expanded");
-                if (navbar) navbar.style.marginLeft = "0px";
-            }
-        });
+        
         document.addEventListener('DOMContentLoaded', function() {
             const themeToggleBtn = document.getElementById('themeToggleBtn');
             const body = document.body;
