@@ -22,8 +22,8 @@ from django.utils import timezone
 from django.utils.timezone import now
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
-from .forms import DocumentForm, SignUpForm, CreateDocumentForm, FileUploadForm, FolderForm, TaskForm, ReassignTaskForm, StaffProfileForm, StaffDocumentForm, EmailConfigForm, UserForm, PublicFolderForm, PublicFileForm, DepartmentForm, TeamForm, EventForm, EventParticipantForm, NotificationForm, UserNotificationForm, CompanyProfileForm, ContactForm, EmailForm, EditUserForm, CompanyDocumentForm, SupportForm
-from .models import Document, CustomUser, Role, File, Folder, Task, StaffProfile, Notification, UserNotification, StaffDocument, Event, EventParticipant, Department, Team, PublicFile, PublicFolder, CompanyProfile, Contact, Email, Attachment, CompanyDocument
+from .forms import DocumentForm, SignUpForm, CreateDocumentForm, FileUploadForm, FolderForm, TaskForm, ReassignTaskForm, StaffProfileForm, StaffDocumentForm, EmailConfigForm, UserForm, DepartmentForm, TeamForm, EventForm, EventParticipantForm, NotificationForm, UserNotificationForm, CompanyProfileForm, ContactForm, EmailForm, EditUserForm, CompanyDocumentForm, SupportForm
+from .models import Document, CustomUser, Role, File, Folder, Task, StaffProfile, Notification, UserNotification, StaffDocument, Event, EventParticipant, Department, Team, CompanyProfile, Contact, Email, Attachment, CompanyDocument
 from raadaa.settings import ALLOWED_HOSTS
 from .serializers import EventSerializer
 from .placeholders import replace_placeholders
@@ -130,6 +130,17 @@ class CustomLoginView(LoginView):
             protocol = "http" if settings.DEBUG else "https"
             return redirect(f"{protocol}://{expected_subdomain}.{base_domain}/")
         return super().get(request, *args, **kwargs)
+    
+
+def upload_to_documents_word(document):
+    tenant_name = document.tenant.name
+    username = document.created_by.username if document.created_by else "anonymous"
+    return os.path.join('documents', tenant_name, username, 'word')
+
+def upload_to_documents_pdf(document):
+    tenant_name = document.tenant.name
+    username = document.created_by.username if document.created_by else "anonymous"
+    return os.path.join('documents', tenant_name, username, 'pdf')
 
 def send_approval_request(document):
     # Get all BDM emails for the document's tenant
@@ -200,7 +211,7 @@ def create_document(request):
     
     if request.method == "POST":
         print("POST request received")
-        formset = DocumentFormSet(request.POST, request.FILES, user=request.user)
+        formset = DocumentFormSet(request.POST, request.FILES)
         print("Formset data:", request.POST)
         print("Files:", request.FILES)
 
@@ -228,32 +239,31 @@ def create_document(request):
                     # Choose department or team for the folder (prefer department if available)
                     folder_defaults = {
                         'created_by': user,
-                        'department': department,
-                        'team': team if not department else None  # Use team only if no department
+                        'is_public': True,
                     }
 
                     try:
-                        template_folder, created = PublicFolder.objects.get_or_create(
+                        template_folder, created = Folder.objects.get_or_create(
                             tenant=request.tenant,
                             name="Template Document",
                             defaults=folder_defaults
                         )
                     except ValidationError as e:
-                        print(f"PublicFolder creation error: {e}")
+                        print(f"Folder creation error: {e}")
                         return HttpResponse(f"Error creating Template Document folder: {e}", status=400)
                         # raise BadRequest(f"Error creating Template Document folder: {e}")
 
                     # Validate folder access (similar to create_public_folder)
-                    if template_folder.department and template_folder.department != user.department:
-                        return HttpResponse("Invalid Department for Template Document folder.", status=403)
-                    if template_folder.team and template_folder.team not in user.teams.all():
-                        return HttpResponse("Invalid Team for Template Document folder.", status=403)
+                    # if template_folder.department and template_folder.department != user.department:
+                    #     return HttpResponse("Invalid Department for Template Document folder.", status=403)
+                    # if template_folder.team and template_folder.team not in user.teams.all():
+                    #     return HttpResponse("Invalid Team for Template Document folder.", status=403)
 
                     document.save()
 
                     creation_method = form.cleaned_data['creation_method']
-                    word_dir = os.path.join(settings.MEDIA_ROOT, "documents/word")
-                    pdf_dir = os.path.join(settings.MEDIA_ROOT, "documents/pdf")
+                    word_dir = os.path.join(settings.MEDIA_ROOT, upload_to_documents_word(document))
+                    pdf_dir = os.path.join(settings.MEDIA_ROOT, upload_to_documents_pdf(document))
                     os.makedirs(word_dir, exist_ok=True)
                     os.makedirs(pdf_dir, exist_ok=True)
 
@@ -289,15 +299,15 @@ def create_document(request):
                         word_filename = f"{base_filename}.docx"
                         word_path = os.path.join(word_dir, word_filename)
                         doc.save(word_path)
-                        document.word_file = os.path.join("documents/word", word_filename)
+                        document.word_file = os.path.join(upload_to_documents_word(document), word_filename)
 
-                        # Save Word file to PublicFile
-                        public_word_file = PublicFile(
+                        # Save Word file to File
+                        public_word_file = File(
                             tenant=request.tenant,
                             original_name=word_filename,
-                            file=os.path.join("documents/word", word_filename),
+                            file=os.path.join(upload_to_documents_word(document), word_filename),
                             folder=template_folder,
-                            created_by=user
+                            uploaded_by=user
                         )
                         public_word_file.save()
                     else:
@@ -310,15 +320,15 @@ def create_document(request):
                             with open(word_path, 'wb') as f:
                                 for chunk in uploaded_file.chunks():
                                     f.write(chunk)
-                            document.word_file = os.path.join("documents/word", word_filename)
+                            document.word_file = os.path.join(upload_to_documents_word(document), word_filename)
 
-                            # Save Word file to PublicFile
-                            public_word_file = PublicFile(
+                            # Save Word file to File
+                            public_word_file = File(
                                 tenant=request.tenant,
                                 original_name=word_filename,
-                                file=os.path.join("documents/word", word_filename),
+                                file=os.path.join(upload_to_documents_word(document), word_filename),
                                 folder=template_folder,
-                                created_by=user
+                                uploaded_by=user
                             )
                             public_word_file.save()
                         elif file_extension == 'pdf':
@@ -327,16 +337,16 @@ def create_document(request):
                             with open(pdf_path, 'wb') as f:
                                 for chunk in uploaded_file.chunks():
                                     f.write(chunk)
-                            document.pdf_file = os.path.join("documents/pdf", pdf_filename)
+                            document.pdf_file = os.path.join(upload_to_documents_pdf(document), pdf_filename)
                             document.save()
 
-                            # Save PDF file to PublicFile
-                            public_pdf_file = PublicFile(
+                            # Save PDF file to File
+                            public_pdf_file = File(
                                 tenant=request.tenant,
                                 original_name=pdf_filename,
-                                file=os.path.join("documents/pdf", pdf_filename),
+                                file=os.path.join(upload_to_documents_pdf(document), pdf_filename),
                                 folder=template_folder,
-                                created_by=user
+                                uploaded_by=user
                             )
                             public_pdf_file.save()
 
@@ -345,7 +355,7 @@ def create_document(request):
                             continue
 
                     pdf_filename = f"{base_filename}.pdf"
-                    relative_pdf_path = os.path.join("documents/pdf", pdf_filename)
+                    relative_pdf_path = os.path.join(upload_to_documents_pdf(document), pdf_filename)
                     absolute_pdf_path = os.path.join(settings.MEDIA_ROOT, relative_pdf_path)
 
                     # Choose the right LibreOffice path
@@ -387,13 +397,13 @@ def create_document(request):
                             document.pdf_file = relative_pdf_path
                             document.save()
 
-                            # Save PDF file to PublicFile
-                            public_pdf_file = PublicFile(
+                            # Save PDF file to File
+                            public_pdf_file = File(
                                 tenant=request.tenant,
                                 original_name=pdf_filename,
                                 file=relative_pdf_path,
                                 folder=template_folder,
-                                created_by=user
+                                uploaded_by=user
                             )
                             public_pdf_file.save()
                         else:
@@ -903,6 +913,16 @@ def create_from_editor(request):
     # Validate that the user belongs to the current tenant
     if request.user.tenant != request.tenant:
         return HttpResponseForbidden("Unauthorized: User does not belong to the current tenant.")
+    
+    def documents_word_upload(request):
+        tenant_name = request.tenant.name
+        username = request.user.username if request.user else "anonymous"
+        return os.path.join('documents', tenant_name, username, 'word')
+
+    def documents_pdf_upload(request):
+        tenant_name = request.tenant.name
+        username = request.user.username if request.user else "anonymous"
+        return os.path.join('documents', tenant_name, username, 'pdf')
 
     if request.method == "POST":
         form = CreateDocumentForm(request.POST)
@@ -918,8 +938,8 @@ def create_from_editor(request):
             soup = BeautifulSoup(content, 'html.parser')
 
             # Define file paths
-            word_dir = os.path.join(settings.MEDIA_ROOT, "documents/word")
-            pdf_dir = os.path.join(settings.MEDIA_ROOT, "documents/pdf")
+            word_dir = os.path.join(settings.MEDIA_ROOT, documents_word_upload(request))
+            pdf_dir = os.path.join(settings.MEDIA_ROOT, documents_pdf_upload(request))
             os.makedirs(word_dir, exist_ok=True)
             os.makedirs(pdf_dir, exist_ok=True)
 
@@ -939,28 +959,27 @@ def create_from_editor(request):
             # Choose department or team for the folder (prefer department if available)
             folder_defaults = {
                 'created_by': user,
-                'department': department,
-                'team': team if not department else None
+                'is_public': True,
             }
 
             try:
-                template_folder, created = PublicFolder.objects.get_or_create(
+                template_folder, created = Folder.objects.get_or_create(
                     tenant=request.tenant,
                     name="Template Document",
                     defaults=folder_defaults
                 )
             except ValidationError as e:
-                print(f"PublicFolder creation error: {e}")
+                print(f"Folder creation error: {e}")
                 messages.error(request, f"Error creating Template Document folder: {e}")
                 return render(request, 'documents/create_from_editor.html', {'form': form})
 
             # Validate folder access
-            if template_folder.department and template_folder.department != user.department:
-                messages.error(request, "Invalid Department for Template Document folder.")
-                return render(request, 'documents/create_from_editor.html', {'form': form})
-            if template_folder.team and template_folder.team not in user.teams.all():
-                messages.error(request, "Invalid Team for Template Document folder.")
-                return render(request, 'documents/create_from_editor.html', {'form': form})
+            # if template_folder.department and template_folder.department != user.department:
+            #     messages.error(request, "Invalid Department for Template Document folder.")
+            #     return render(request, 'documents/create_from_editor.html', {'form': form})
+            # if template_folder.team and template_folder.team not in user.teams.all():
+            #     messages.error(request, "Invalid Team for Template Document folder.")
+            #     return render(request, 'documents/create_from_editor.html', {'form': form})
 
             # Save the .docx file
             word_filename = f"{slugify(title)}_{request.user.id}_{template_folder.id}.docx"
@@ -974,7 +993,7 @@ def create_from_editor(request):
 
             # Generate and save the .pdf file using LibreOffice
             pdf_filename = f"{slugify(title)}_{request.user.id}_{template_folder.id}.pdf"
-            relative_pdf_path = os.path.join("documents/pdf", pdf_filename)
+            relative_pdf_path = os.path.join(documents_pdf_upload(request), pdf_filename)
             absolute_pdf_path = os.path.join(settings.MEDIA_ROOT, relative_pdf_path)
 
             # Choose the right LibreOffice path
@@ -1029,27 +1048,27 @@ def create_from_editor(request):
                 messages.error(request, f"Unexpected error converting to PDF: {e}")
                 return render(request, 'documents/create_from_editor.html', {'form': form})
 
-            # Save to PublicFile
+            # Save to File
             try:
-                public_word_file = PublicFile(
+                public_word_file = File(
                     tenant=request.tenant,
                     original_name=word_filename,
-                    file=os.path.join("documents/word", word_filename),
+                    file=os.path.join(documents_word_upload(request), word_filename),
                     folder=template_folder,
-                    created_by=user
+                    uploaded_by=user
                 )
                 public_word_file.save()
 
-                public_pdf_file = PublicFile(
+                public_pdf_file = File(
                     tenant=request.tenant,
                     original_name=pdf_filename,
                     file=relative_pdf_path,
                     folder=template_folder,
-                    created_by=user
+                    uploaded_by=user
                 )
                 public_pdf_file.save()
             except Exception as e:
-                print(f"Error saving to PublicFile: {e}")
+                print(f"Error saving to File: {e}")
                 messages.error(request, f"Error saving files to public storage: {e}")
                 return render(request, 'documents/create_from_editor.html', {'form': form})
 
@@ -1065,7 +1084,7 @@ def create_from_editor(request):
                 sales_rep='N/A',
                 created_by=request.user,
                 tenant=request.tenant,
-                word_file=os.path.join("documents/word", word_filename),
+                word_file=os.path.join(documents_pdf_upload(request), word_filename),
                 pdf_file=relative_pdf_path
             )
             try:
@@ -1083,26 +1102,101 @@ def create_from_editor(request):
         form = CreateDocumentForm()
     return render(request, 'documents/create_from_editor.html', {'form': form})
 
-
 @login_required
-def folder_list(request, parent_id=None):
+def folder_view(request, public_folder_id=None, personal_folder_id=None):
     if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
         return HttpResponseForbidden("You are not authorized for this tenant.")
-    
-    parent = None
-    if parent_id:
-        parent = get_object_or_404(Folder, id=parent_id, created_by=request.user, tenant=request.tenant)
 
-    folders = Folder.objects.filter(created_by=request.user, parent=parent, tenant=request.tenant)
-    files = File.objects.filter(folder=parent, uploaded_by=request.user, tenant=request.tenant)
+    # Get active tab, default to 'public'
+    active_tab = request.GET.get('tab', 'public')
 
-    folder_form = FolderForm(initial={'parent': parent})
+    # Public tab context
+    public_parent = None
+    if public_folder_id:
+        public_parent = get_object_or_404(
+            Folder,
+            id=public_folder_id,
+            # created_by=request.user,
+            tenant=request.tenant,
+            is_public=True
+        )
+    public_folders = Folder.objects.filter(
+        # created_by=request.user,
+        parent=public_parent,
+        tenant=request.tenant,
+        is_public=True
+    )
+    public_files = File.objects.filter(
+        folder=public_parent,
+        # uploaded_by=request.user,
+        tenant=request.tenant
+    )
+
+    # Personal tab context
+    personal_parent = None
+    if personal_folder_id:
+        personal_parent = get_object_or_404(
+            Folder,
+            id=personal_folder_id,
+            created_by=request.user,
+            tenant=request.tenant,
+            is_public=False
+        )
+    personal_folders = Folder.objects.filter(
+        created_by=request.user,
+        parent=personal_parent,
+        tenant=request.tenant,
+        is_public=False
+    )
+    personal_files_1 = File.objects.filter(
+        folder=personal_parent,
+        uploaded_by=request.user,
+        tenant=request.tenant,
+        is_public = False
+    )
+    personal_files_2 = File.objects.filter(
+        folder=personal_parent,
+        # uploaded_by=request.user,
+        tenant=request.tenant,
+        is_public=False
+    )
+    personal_files = personal_files_1.union(personal_files_2)
+
+    now = timezone.now()
+    # today = now.date()
+
+    # Generate shareable links for files
+    for file in public_files:
+        file.shareable_link = request.build_absolute_uri(file.get_shareable_link()) if file.is_shared else None
+    for file in personal_files:
+        file.shareable_link = request.build_absolute_uri(file.get_shareable_link()) if file.is_shared else None
+
+    # Generate shareable links for folders
+    for folder in public_folders:
+        folder.shareable_link = request.build_absolute_uri(folder.get_shareable_link()) if folder.is_shared else None
+        if folder.share_time_end and folder.share_time_end < now:
+            folder.is_shared = False
+            # folder.save()
+            # folder.shareable_link = None
+    for folder in personal_folders:
+        folder.shareable_link = request.build_absolute_uri(folder.get_shareable_link()) if folder.is_shared else None
+        if folder.share_time_end and folder.share_time_end < now:
+            folder.is_shared = False
+            # folder.save()
+            # folder.shareable_link = None
+
+
+    folder_form = FolderForm(initial={'parent': public_parent if active_tab == 'public' else personal_parent})
     file_form = FileUploadForm()
 
-    return render(request, 'folder/folder_list.html', {
-        'parent': parent,
-        'folders': folders,
-        'files': files,
+    return render(request, 'folder/folders.html', {
+        'active_tab': active_tab,
+        'public_parent': public_parent,
+        'public_folders': public_folders,
+        'public_files': public_files,
+        'personal_parent': personal_parent,
+        'personal_folders': personal_folders,
+        'personal_files': personal_files,
         'folder_form': folder_form,
         'file_form': file_form,
     })
@@ -1111,17 +1205,31 @@ def folder_list(request, parent_id=None):
 def create_folder(request):
     if request.method == 'POST':
         form = FolderForm(request.POST)
+        active_tab = request.GET.get('tab', 'public')
         if form.is_valid():
             folder = form.save(commit=False)
             folder.created_by = request.user
             folder.tenant = request.tenant
+            if active_tab == 'public':
+                folder.is_public = True
             # Validate that the user belongs to the same tenant
             if folder.created_by.tenant != request.tenant:
                 return HttpResponse("Unauthorized: User does not belong to the current tenant.", status=403)
-            parent_id = request.POST.get('parent')
+            # parent_id = request.POST.get('public_parent' if active_tab == 'public' else 'personal_parent')
+            if active_tab == 'public':
+                parent_id = request.GET.get('public_parent')
+                print("Public parent ID:", parent_id)
+            elif active_tab == 'personal':
+                parent_id = request.GET.get('personal_parent')
+                print("Personal parent ID:", parent_id)
+            else:
+                parent_id = None
+            print(f"Parent ID: {parent_id}, Active tab: {active_tab}")
             if parent_id:
                 folder.parent = Folder.objects.get(id=parent_id, tenant=request.tenant)
             folder.save()
+            public_folder_id = request.GET.get('public_folder_id')
+            personal_folder_id = request.GET.get('personal_folder_id')
             return JsonResponse({'success': True})
     return JsonResponse({'success': False, 'errors': form.errors}, status=400)
     # raise BadRequest("Invalid request")
@@ -1131,31 +1239,271 @@ def delete_folder(request, folder_id):
     if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
         return HttpResponseForbidden("You are not authorized for this tenant.")
     folder = get_object_or_404(Folder, id=folder_id, created_by=request.user, tenant=request.tenant)
+    if folder.created_by != request.user:
+        return HttpResponseForbidden("You are not authorized to delete this folder.")
     folder.delete()
     return JsonResponse({'success': True})
     # return JsonResponse({'success': False, 'errors': form.errors}, status=400)
 
 @login_required
-def upload_file(request):
+def upload_file(request, public_folder_id=None, personal_folder_id=None):
+    # Check tenant authorization first
+    if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+        return HttpResponseForbidden("You are not authorized for this tenant.")
+
+    active_tab = request.GET.get('tab', 'public')
+    parent_folder = None
+    if active_tab == 'public' and public_folder_id:
+        parent_folder = Folder.objects.get(
+            id=public_folder_id, 
+            created_by=request.user, 
+            tenant=request.tenant, 
+            is_public=True
+        )
+    elif active_tab == 'personal' and personal_folder_id:
+        parent_folder = Folder.objects.get(
+            id=personal_folder_id, 
+            created_by=request.user, 
+            tenant=request.tenant, 
+            is_public=False
+        )
+
     if request.method == 'POST':
         form = FileUploadForm(request.POST, request.FILES)
         if form.is_valid():
             uploaded_file = form.save(commit=False)
             uploaded_file.uploaded_by = request.user
-            uploaded_file.original_name = request.FILES['file'].name
+            print("uploaded by", uploaded_file.uploaded_by.username)
             uploaded_file.tenant = request.tenant
-            if uploaded_file.uploaded_by.tenant != request.tenant:
-                return HttpResponse("Unauthorized: User does not belong to the current tenant.", status=403)
+            uploaded_file.original_name = request.FILES['file'].name
+            uploaded_file.folder = parent_folder  # Assign to the current folder
+            if uploaded_file.folder.is_public:
+                uploaded_file.is_public = True
             uploaded_file.save()
-        return JsonResponse({'success': True})
-    return JsonResponse({'success': False, 'errors': form.errors}, status=400)
-    # raise BadRequest("Invalid Request")
+            
+            return JsonResponse({"success": True, "file_id": uploaded_file.id})
+        else:
+            # If form is invalid, re-render the form with errors
+            # Re-render the form with errors (adjust context as needed)
+            return render(request, 'folder/folders.html', {
+                'file_form': form,
+                'active_tab': active_tab,
+                'public_parent': parent_folder if active_tab == 'public' else None,
+                'personal_parent': parent_folder if active_tab == 'personal' else None,
+                'public_folders': Folder.objects.filter(created_by=request.user, parent=parent_folder if active_tab == 'public' else None, tenant=request.tenant, is_public=True),
+                'public_files': File.objects.filter(folder=parent_folder if active_tab == 'public' else None, uploaded_by=request.user, tenant=request.tenant),
+                'personal_folders': Folder.objects.filter(created_by=request.user, parent=parent_folder if active_tab == 'personal' else None, tenant=request.tenant, is_public=False),
+                'personal_files': File.objects.filter(folder=parent_folder if active_tab == 'personal' else None, uploaded_by=request.user, tenant=request.tenant),
+                'folder_form': FolderForm(initial={'parent': parent_folder}),
+            })
+    else:
+        return JsonResponse({"success": False, "errors": form.errors})
+
+from documents.forms import FileUploadAnonForm
+def upload_file_anon(request, public_folder_id=None, personal_folder_id=None):
+    # Check tenant authorization first
+    # if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+    #     return HttpResponseForbidden("You are not authorized for this tenant.")
+
+    # active_tab = request.GET.get('tab', 'public')
+    print("Public folder id:", public_folder_id)
+    public_parent_folder = None
+    personal_parent_folder = None
+    if public_folder_id:
+        public_parent_folder = Folder.objects.get(
+            id=public_folder_id, 
+            tenant=request.tenant, 
+            is_public=True
+        )
+    elif personal_folder_id:
+        personal_parent_folder = Folder.objects.get(
+            id=personal_folder_id,
+            tenant=request.tenant, 
+            is_public=False
+        )
+    else:
+        folder_id = None
+
+    if request.method == 'POST':
+        form = FileUploadAnonForm(request.POST, request.FILES)
+        if form.is_valid():
+            uploaded_file = form.save(commit=False)
+            # uploaded_file.uploaded_by = None
+            uploaded_file.anon_name = form.cleaned_data["anon_name"]
+            # print("uploaded by", uploaded_file.uploaded_by.username)
+            print("uploaded by: ", form.cleaned_data["anon_name"])
+            uploaded_file.tenant = request.tenant
+            uploaded_file.original_name = request.FILES['file'].name
+            if public_parent_folder:
+                uploaded_file.folder = public_parent_folder  # Assign to the current folder
+            else:
+                uploaded_file.folder = personal_parent_folder
+            if uploaded_file.folder.is_public:
+                uploaded_file.is_public = True
+            uploaded_file.save()
+            
+            return JsonResponse({"success": True, "file_id": uploaded_file.id})
+        else:
+            # If form is invalid, re-render the form with errors
+            # Re-render the form with errors (adjust context as needed)
+            return render(request, 'folder/folders.html', {
+                'file_form': form,
+                'public_parent': public_parent_folder,
+                'personal_parent': personal_parent_folder,
+                'public_folders': Folder.objects.filter(created_by=request.user, parent=public_parent_folder, tenant=request.tenant, is_public=True),
+                'public_files': File.objects.filter(folder=public_parent_folder, uploaded_by=request.user, tenant=request.tenant),
+                'personal_folders': Folder.objects.filter(created_by=request.user, parent=personal_parent_folder, tenant=request.tenant, is_public=False),
+                'personal_files': File.objects.filter(folder=personal_parent_folder, uploaded_by=request.user, tenant=request.tenant),
+                'folder_form': FolderForm(initial={'parent': public_parent_folder if public_folder_id else personal_parent_folder}),
+            })
+    else:
+        return JsonResponse({"success": False, "errors": form.errors})
+    
+@login_required
+def enable_folder_sharing(request, folder_id):
+    # View to toggle the sharing status of a file
+    folder = get_object_or_404(Folder, id=folder_id, tenant=request.user.tenant)
+    
+    # Optional: Add permission checks (e.g., only allow certain users to toggle sharing)
+    # if public_file.created_by != request.user:
+    #     # return HttpResponseForbidden("You do not have permission to modify this file.")
+    #     raise PermissionDenied("You do not have permission to modify this file.")
+
+    if request.method == 'POST':
+        end_date = request.POST.get('end_date')  # Already handled; could be empty string or None
+        share_subfolders = 'share_folders' in request.POST  # True if checked, False otherwise
+        share_files = 'share_files' in request.POST  # True if checked, False otherwise
+
+        folder.is_shared = not folder.is_shared
+        folder.share_time = timezone.now()
+        folder.share_time_end = end_date if end_date else None
+        folder.shared_by = request.user
+        folder.share_subfolders = share_subfolders
+        folder.share_files = share_files
+
+        folder.save()
+        if end_date:
+            folder.share_time_end = end_date
+        if share_subfolders:
+            folder.share_subfolders = True
+            for subfolder in Folder.objects.filter(parent=folder, tenant=request.tenant):
+                subfolder.is_shared = True
+                subfolder.share_time = timezone.now()
+                subfolder.share_time_end = end_date if end_date else None
+                subfolder.shared_by = request.user
+                subfolder.share_subfolders = share_subfolders
+                subfolder.share_files = share_files
+                subfolder.save()
+        if share_files:
+            for file in folder.files.all():  # Adjust based on your model
+                    file.is_shared = True
+                    file.share_time = timezone.now()
+                    file.share_time_end = end_date if end_date else None
+                    file.shared_by = request.user
+                    file.save()
+        # folder.shared_by = request.user
+        # folder.save()
+        active_tab = request.GET.get('tab', 'public')
+        
+    # Determine the correct URL based on folder.is_public and active_tab
+    if folder.parent:
+        if folder.is_public:
+            url_name = 'folder_view_public'
+            kwargs = {'public_folder_id': folder.parent.id}
+        else:
+            url_name = 'folder_view_personal'
+            kwargs = {'personal_folder_id': folder.parent.id}
+    else:
+        url_name = 'folder_view'
+        kwargs = {}
+
+    # return redirect(f"{reverse(url_name, kwargs=kwargs)}?tab={active_tab}")
+    return JsonResponse({"success": True, "folder_id": folder.id})
+
+@login_required
+def enable_file_sharing(request, file_id):
+    # View to toggle the sharing status of a file
+    file = get_object_or_404(File, id=file_id, tenant=request.user.tenant)
+    end_date = request.POST.get('end_date')
+
+    if request.method == 'POST':
+        file.is_shared = not file.is_shared
+        file.share_time = timezone.now()
+        if end_date:
+            file.share_time_end = end_date
+        file.shared_by = request.user
+        file.save()
+        active_tab = request.GET.get('tab', 'public')
+        
+    # Determine the correct URL based on file.is_public and active_tab
+    if file.folder:
+        if file.is_public:
+            url_name = 'folder_view_public'
+            kwargs = {'public_folder_id': file.folder.id}
+        else:
+            url_name = 'folder_view_personal'
+        kwargs = {'personal_folder_id': file.folder.id}
+    else:
+        url_name = 'folder_view'
+        kwargs = {}
+
+    # return redirect(f"{reverse(url_name, kwargs=kwargs)}?tab={active_tab}")
+    return JsonResponse({"success": True, "file_id": file.id})
+
+def shared_folder_view(request, token):
+    # Retrieve the folder by share token
+    folder = get_object_or_404(Folder, share_token=token, is_shared=True)
+    folders = Folder.objects.filter(parent=folder, tenant=request.tenant)
+    files = File.objects.filter(
+        folder=folder,
+        # uploaded_by=request.user,
+        tenant=request.tenant
+    )
+    file_form = FileUploadAnonForm()
+    
+    # Optional: Add additional checks (e.g., tenant status, file availability)
+    if not folder.name:
+        return HttpResponseForbidden("File not available.")
+    
+    for fold in folders:
+        fold.is_shared = True
+        fold.shareable_link = request.build_absolute_uri(fold.get_shareable_link())
+        fold.share_time = timezone.now()
+        fold.share_time_end = fold.parent.share_time_end
+        fold.shared_by = fold.parent.shared_by
+        fold.save()
+    
+    context = {
+        'folder': folder,
+        'folders': folders if folder.share_subfolders else [],
+        'files': files if folder.share_files else [],
+        'file_form': file_form,
+        # 'file_url': file.file.url,  # URL to access the file
+    }
+    return render(request, 'folder/shared_folder_view.html', context)
+
+def shared_file_view(request, token):
+    # Retrieve the file by share token
+    file = get_object_or_404(File, share_token=token, is_shared=True)
+    
+    # Optional: Add additional checks (e.g., tenant status, file availability)
+    if not file.file:
+        return HttpResponseForbidden("File not available.")
+    
+    context = {
+        'file': file,
+        'file_url': file.file.url,  # URL to access the file
+    }
+    return render(request, 'folder/shared_file_view.html', context)
+
 
 @login_required
 def delete_file(request, file_id):
     if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
         return HttpResponseForbidden("You are not authorized for this tenant.")
     file = get_object_or_404(File, id=file_id, uploaded_by=request.user, tenant=request.tenant)
+    if file.uploaded_by != request.user:
+        return HttpResponseForbidden("You are not authorized to delete this file.")
     file.delete()
     return JsonResponse({'success': True})
     # return JsonResponse({'success': False, 'errors': form.errors}, status=400)
@@ -1165,6 +1513,8 @@ def rename_folder(request, folder_id):
     if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
         return HttpResponseForbidden("You are not authorized for this tenant.")
     folder = get_object_or_404(Folder, id=folder_id, created_by=request.user, tenant=request.tenant)
+    if folder.created_by != request.user:
+        return HttpResponseForbidden("You are not authorized to rename this folder.")
     if request.method == 'POST':
         new_name = request.POST.get('name', '').strip()
 
@@ -1248,6 +1598,7 @@ def move_file(request, file_id):
             file.save()
         return JsonResponse({'success': True})
     return JsonResponse({'success': False}, status=400)
+
 # Tasks
 @login_required
 def create_task(request):
@@ -1917,6 +2268,39 @@ class EventViewSet(viewsets.ModelViewSet):
             return Response({"detail": "You can only delete events you created."}, status=403)
         return super().destroy(request, *args, **kwargs)
 
+from documents.serializers import UserSerializer
+class UserViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = CustomUser.objects.all()
+    serializer_class = UserSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        # Filter users by tenant
+        return CustomUser.objects.filter(tenant=self.request.tenant)
+    
+from rest_framework.views import APIView
+from rest_framework import status
+
+class EventParticipantResponseView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, event_id):
+        tenant = request.tenant
+        user = request.user
+        print("Event User: ", user)
+        response = request.data.get('response')
+
+        if response not in ['accepted', 'declined']:
+            return Response({'error': 'Invalid response'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            participant = EventParticipant.objects.get(event_id=event_id, user=user, tenant=tenant)
+            participant.response = response
+            participant.save()
+            return Response({'message': 'Response updated successfully'}, status=status.HTTP_200_OK)
+        except EventParticipant.DoesNotExist:
+            return Response({'error': 'You are not a participant of this event'}, status=status.HTTP_403_FORBIDDEN)
+
 
 from django.middleware.csrf import get_token
 
@@ -1971,232 +2355,6 @@ def export_staff_csv(request):
         ])
 
     return response
-
-# Public Folder Views
-@login_required
-def public_folder_list(request, public_folder_id=None):
-    user = request.user
-    parent_public_folder = get_object_or_404(PublicFolder, id=public_folder_id, tenant=user.tenant) if public_folder_id else None
-
-    public_folders = PublicFolder.objects.filter(
-        Q(department=user.department) | Q(team__in=user.teams.all()) if user.department else Q(),
-        parent=parent_public_folder,
-        tenant=user.tenant
-    ).distinct()
-
-    public_files = PublicFile.objects.filter(
-        Q(folder=parent_public_folder) &
-        (Q(folder__department=user.department) | Q(folder__team__in=user.teams.all()) if user.department else Q()), tenant=user.tenant
-    ).distinct()
-
-    # Generate shareable links for files where sharing is enabled
-    for file in public_files:
-        file.shareable_link = request.build_absolute_uri(file.get_shareable_link()) if file.is_shared else None
-
-    context = {
-        'parent': parent_public_folder,
-        'public_folders': public_folders,
-        'public_files': public_files,
-        'folder_form': PublicFolderForm(),
-        'file_form': PublicFileForm(),
-    }
-    return render(request, 'folder/public_folder_list.html', context)
-
-@login_required
-def toggle_file_sharing(request, file_id):
-    # View to toggle the sharing status of a file
-    public_file = get_object_or_404(PublicFile, id=file_id, tenant=request.user.tenant)
-    
-    # Optional: Add permission checks (e.g., only allow certain users to toggle sharing)
-    # if public_file.created_by != request.user:
-    #     # return HttpResponseForbidden("You do not have permission to modify this file.")
-    #     raise PermissionDenied("You do not have permission to modify this file.")
-
-    if request.method == 'POST':
-        public_file.is_shared = not public_file.is_shared
-        public_file.shared_by = request.user
-        public_file.save()
-        return redirect('public_folder_list', public_folder_id=public_file.folder.id if public_file.folder else None)
-    
-    return redirect('public_folder_list', public_folder_id=public_file.folder.id if public_file.folder else None)
-
-
-def shared_file_view(request, token):
-    # Retrieve the file by share token
-    public_file = get_object_or_404(PublicFile, share_token=token, is_shared=True)
-    
-    # Optional: Add additional checks (e.g., tenant status, file availability)
-    if not public_file.file:
-        return HttpResponseForbidden("File not available.")
-    
-    context = {
-        'public_file': public_file,
-        'file_url': public_file.file.url,  # URL to access the file
-    }
-    return render(request, 'folder/shared_file_view.html', context)
-
-@login_required
-@require_POST
-def create_public_folder(request):
-    if request.method == 'POST':
-        form = PublicFolderForm(request.POST)
-        if form.is_valid():
-            folder = form.save(commit=False)
-            folder.created_by = request.user
-            folder.tenant = request.tenant
-            folder.department = request.user.department
-            # Validate that the user belongs to the same tenant
-            if folder.created_by.tenant != request.tenant:
-                return HttpResponse("Unauthorized: User does not belong to the current tenant.", status=403)
-            parent_id = request.POST.get('parent')
-            if parent_id:
-                folder.parent = PublicFolder.objects.get(id=parent_id, tenant=request.tenant)
-            folder.save()
-            print(f"Folder {folder.id} has been successfully created")
-            return JsonResponse({'success': True})
-    return JsonResponse({'success': False, 'errors': form.errors}, status=400)
-
-# @login_required
-# @require_POST
-# def create_public_folder(request):
-#     form = PublicFolderForm(request.POST, user=request.user, tenant=request.tenant)
-#     if form.is_valid():
-#         folder = form.save(commit=False)
-#         folder.department = request.user.department
-#         folder.created_by = request.user
-#         user = request.user
-
-#         if folder.department and folder.department != user.department:
-#             print("Wrong Department")
-#             return JsonResponse({'success': False, 'errors': {'department': ['Invalid department']}}, status=403)
-#             # return render(request, 'folder/error.html', {'message': 'Invalid Department.'})
-#         if folder.team and folder.team not in user.teams.all():
-#             print("Wrong Team")
-#             return JsonResponse({'success': False, 'errors': {'team': ['Invalid team']}}, status=403)
-#         if folder.parent and not (folder.parent.department == user.department or folder.parent.team in user.teams.all()):
-#             print("Wrong Parent Folder")
-#             return JsonResponse({'success': False, 'errors': {'parent': ['No access to parent folder']}}, status=403)
-
-#         try:
-#             folder.save()
-#             print(f"Folder {folder.id} successfully created")
-#             return JsonResponse({'success': True, 'folder_id': folder.id})
-#         except ValidationError as e:
-#             return JsonResponse({'success': False, 'errors': {'name': [str(e)]}}, status=400)
-#     return JsonResponse({'success': False, 'errors': form.errors}, status=400)
-
-@login_required
-@require_POST
-def rename_public_folder(request, folder_id):
-    folder = get_object_or_404(PublicFolder, id=folder_id, tenant=request.tenant)
-    if folder.created_by != request.user:
-        return JsonResponse({'success': False, 'errors': {'name': ['You can only rename your own folders']}}, status=403)
-    name = request.POST.get('name')
-    if not name:
-        return JsonResponse({'success': False, 'errors': {'name': ['Name is required']}}, status=400)
-    folder.name = name
-    folder.save()
-    return JsonResponse({'success': True})
-
-@login_required
-@require_POST
-def move_public_folder(request, folder_id):
-    folder = get_object_or_404(PublicFolder, id=folder_id, tenant=request.tenant)
-    if folder.created_by != request.user:
-        return JsonResponse({'success': False, 'errors': {'new_parent_id': ['You can only move your own folders']}}, status=403)
-    new_parent_id = request.POST.get('new_parent_id')
-    user = request.user
-    if new_parent_id:
-        new_parent = get_object_or_404(PublicFolder, id=new_parent_id, tenant=request.tenant)
-        folder.parent = new_parent
-    else:
-        folder.parent = None
-    folder.save()
-    return JsonResponse({'success': True})
-
-# @require_POST
-# @login_required
-# def move_public_folder(request, folder_id):
-#     if not hasattr (request, 'tenant') or request.user.tenant != request.tenant:
-#         return HttpResponseForbidden("You are not authorized for this tenant.")
-#     folder = get_object_or_404(PublicFolder, id=folder_id, created_by=request.user, tenant=request.tenant)
-#     if request.method == 'POST':
-#         new_parent_id = request.POST.get('new_parent_id')
-#         if new_parent_id:
-#             folder.parent = PublicFolder.objects.get(id=new_parent_id, tenant=request.tenant)
-#             folder.save()
-#         return JsonResponse({'success': True})
-#     return JsonResponse({'success': False}, status=400)
-
-@login_required
-@require_POST
-def delete_public_folder(request, folder_id):
-    folder = get_object_or_404(PublicFolder, id=folder_id, tenant=request.tenant)
-    if folder.created_by != request.user:
-        return JsonResponse({'success': False, 'errors': {'folder': ['You can only delete your own folders']}}, status=403)
-    folder.delete()
-    return JsonResponse({'success': True})
-
-@login_required
-@require_POST
-def upload_public_file(request):
-    form = PublicFileForm(request.POST, request.FILES)
-    if form.is_valid():
-        file = form.save(commit=False)
-        file.created_by = request.user
-        file.original_name = request.FILES['file'].name
-        file.tenant = request.tenant
-        public_folder_id = request.POST.get('folder')
-        if public_folder_id:
-            public_folder = get_object_or_404(PublicFolder, id=public_folder_id, tenant=request.tenant)
-            user = request.user
-            if not (public_folder.department == user.department or public_folder.team in user.teams.all()):
-                return JsonResponse({'success': False, 'errors': {'folder': ['No access to folder']}}, status=403)
-            file.folder = public_folder
-        file.save()
-        return JsonResponse({'success': True, 'file_id': file.id})
-    return JsonResponse({'success': False, 'errors': form.errors}, status=400)
-
-
-@login_required
-@require_POST
-def rename_public_file(request, file_id):
-    file = get_object_or_404(PublicFile, id=file_id, tenant=request.tenant)
-    if file.created_by != request.user:
-        return JsonResponse({'success': False, 'errors': {'name': ['You can only rename your own files']}}, status=403)
-    name = request.POST.get('name')
-    if not name:
-        return JsonResponse({'success': False, 'errors': {'name': ['Name is required']}}, status=400)
-    file.original_name = name
-    file.save()
-    return JsonResponse({'success': True})
-
-@login_required
-@require_POST
-def move_public_file(request, file_id):
-    file = get_object_or_404(PublicFile, id=file_id, tenant=request.tenant)
-    if file.created_by != request.user:
-        return JsonResponse({'success': False, 'errors': {'new_folder_id': ['You can only move your own files']}}, status=403)
-    new_folder_id = request.POST.get('new_folder_id')
-    user = request.user
-    if new_folder_id:
-        new_folder = get_object_or_404(PublicFolder, id=new_folder_id, tenant=request.tenant)
-        if not (new_folder.department == user.department or new_folder.team in user.teams.all()):
-            return JsonResponse({'success': False, 'errors': {'new_folder_id': ['No access to destination']}}, status=403)
-        file.folder = new_folder
-    else:
-        file.folder = None
-    file.save()
-    return JsonResponse({'success': True})
-
-@login_required
-@require_POST
-def delete_public_file(request, file_id):
-    file = get_object_or_404(PublicFile, id=file_id, tenant=request.tenant)
-    if file.created_by != request.user:
-        return JsonResponse({'success': False, 'errors': {'file': ['You can only delete your own files']}}, status=403)
-    file.delete()
-    return JsonResponse({'success': True})
 
 # ...................................................................................................................
 

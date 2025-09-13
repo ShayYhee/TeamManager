@@ -32,6 +32,12 @@ class TenantApplicationForm(forms.ModelForm):
         slug = self.cleaned_data['slug']
         if TenantApplication.objects.filter(slug=slug).exists() or Tenant.objects.filter(slug=slug).exists():
             raise forms.ValidationError("This slug is already in use.")
+        if "_" in slug:
+            raise forms.ValidationError("Slug cannot contain underscores. Use hyphens instead.")
+        if slug.isnumeric():
+            raise forms.ValidationError("Slug cannot be numeric. Start with a letter.")
+        if slug.length > 20:
+            raise forms.ValidationError("Slug must be under 20 characters.")
         return slug.lower()
 
     def clean(self):

@@ -8,11 +8,10 @@ from documents.views import register, home, approve_document, send_approved_emai
 from documents.views import edit_my_profile, staff_directory, view_staff_profile, staff_list, notifications_view
 from documents.views import dismiss_notification, add_staff_document, delete_staff_document, email_config, calendar_view
 from documents.views import users_list, approve_user, account_activation_sent, delete_user, edit_user, custom_ckeditor_upload
-from documents.views import dismiss_all_notifications, export_staff_csv, performance_dashboard, hod_performance_dashboard, folder_list
+from documents.views import dismiss_all_notifications, export_staff_csv, performance_dashboard, hod_performance_dashboard
 from documents.views import create_folder, upload_file, update_task_status, create_task, task_list, task_detail, reassign_task, delete_task
 from documents.views import delete_folder, delete_file, rename_folder, rename_file, move_folder, move_file, task_edit, delete_task_document
-from documents.views import performance_dashboard, hod_performance_dashboard, create_public_folder, delete_public_folder, rename_public_folder
-from documents.views import public_folder_list, move_public_folder, upload_public_file, delete_public_file, rename_public_file, move_public_file
+from documents.views import performance_dashboard, hod_performance_dashboard
 from documents.views import view_user_details, admin_dashboard, admin_delete_document, admin_delete_file, admin_delete_folder, admin_document_details
 from documents.views import admin_folder_list, admin_folder_details, admin_file_list, department_list, bulk_delete, create_user, bulk_action_users
 from documents.views import delete_department, edit_department, create_department, admin_team_list, create_team, delete_team, edit_team
@@ -21,13 +20,14 @@ from documents.views import event_participant_list, create_event_participant, ed
 from documents.views import admin_notification_list, create_notification, edit_notification, delete_notification, edit_company_profile, view_company_profile
 from documents.views import user_notification_list, create_user_notification, edit_user_notification, delete_user_notification
 from documents.views import custom_404, custom_403, custom_500, custom_400, post_login_redirect, contact_list, create_contact, edit_contact, delete_contact, view_contact_detail
-from documents.views import email_list, send_email, edit_email, delete_email, email_detail, save_draft, contact_search, CustomLoginView
-from documents.views import add_company_document, delete_company_document, toggle_file_sharing, shared_file_view, contact_support
-from documents.views import EventViewSet
+from documents.views import email_list, send_email, edit_email, delete_email, email_detail, save_draft, contact_search, CustomLoginView, upload_file_anon
+from documents.views import add_company_document, delete_company_document, shared_file_view, shared_folder_view, contact_support, folder_view, enable_folder_sharing, enable_file_sharing
+from documents.views import EventViewSet, UserViewSet, EventParticipantResponseView
 from django.http import HttpResponse
 
 router = DefaultRouter()
 router.register('events', EventViewSet, basename='events')
+router.register('users', UserViewSet, basename='event_users')
 
 def handle_well_known(request, path):
     return HttpResponse(status=204)  # Return 204 No Content
@@ -63,6 +63,7 @@ urlpatterns = [
     path('notifications/dismiss-all/', dismiss_all_notifications, name='dismiss_all_notifications'),
     path('dashboard/email-config/', email_config, name='email_config'),
     path('api/', include(router.urls)),
+    path('api/events/<int:event_id>/respond/', EventParticipantResponseView.as_view(), name='event_participant_response'),
     path('calendar/', calendar_view, name='calendar'),
     path("dashboard/my-profile/", view_my_profile, name="view_my_profile"),
     path("dashboard/my-profile/edit/", edit_my_profile, name="edit_my_profile"),
@@ -80,28 +81,29 @@ urlpatterns = [
     path('contacts/search/', contact_search, name='contact_search'),
     path('dashboard/emails/edit/<int:email_id>', edit_email, name='edit_email'),
     path('dashboard/emails/delete/<int:email_id>', delete_email, name='delete_email'),
-    path('folders/', folder_list, name='folder_list'),
-    path('folders/<int:parent_id>/', folder_list, name='folder_list'),
+    path('folders/', folder_view, name="folder_view"),
+    path('folders/public/<int:public_folder_id>/', folder_view, name='folder_view_public'),
+    path('folders/personal/<int:personal_folder_id>/', folder_view, name='folder_view_personal'),
+    path('folders/both/<int:public_folder_id>/<int:personal_folder_id>/', folder_view, name='folder_view_both'),
+    path('share/<uuid:token>/', shared_file_view, name='shared_file_view'),
+    path('share/folder/<uuid:token>/', shared_folder_view, name='shared_folder_view'),
+    path('folders/<int:folder_id>/share/', enable_folder_sharing, name='enable_folder_sharing'),
+    path('files/<int:file_id>/share/', enable_file_sharing, name='enable_file_sharing'),
     path('folders/create/', create_folder, name='create_folder'),
-    path('folders/upload/', upload_file, name='upload_file'),
+    # Updated upload_file patterns
+    path('upload/', upload_file, name='upload_file'),  # Root-level upload
+    path('upload/public/<int:public_folder_id>/', upload_file, name='upload_file_public'),  # Public folder upload
+    path('upload/personal/<int:personal_folder_id>/', upload_file, name='upload_file_personal'),  # Personal folder upload
+    path('upload/both/<int:public_folder_id>/<int:personal_folder_id>/', upload_file, name='upload_file_both'),  # Both folders
+    path('upload/shared/<int:folder_id>/', upload_file_anon, name='upload_file_public_anon'),  # Shared folder upload
+    path('upload/public/shared/<int:public_folder_id>/', upload_file_anon, name='upload_file_public_anon'),  # Shared folder public upload
+    path('upload/personal/shared/<int:personal_folder_id>/', upload_file_anon, name='upload_file_personal_anon'),  # Shared folder personal upload
     path('folders/<int:folder_id>/delete/', delete_folder, name='delete_folder'),
     path('folders/files/<int:file_id>/delete/', delete_file, name='delete_file'),
     path('folders/<int:folder_id>/rename/', rename_folder, name='rename_folder'),
     path('folders/files/<int:file_id>/rename/', rename_file, name='rename_file'),
     path('folders/<int:folder_id>/move/', move_folder, name='move_folder'),
     path('folders/files/<int:file_id>/move/', move_file, name='move_file'),
-    path('public-folders/', public_folder_list, name='public_folder_list'),
-    path('public-folders/<int:public_folder_id>/', public_folder_list, name='public_folder_list'),
-    path('public-folders/create/', create_public_folder, name='create_public_folder'),
-    path('public-folders/<int:folder_id>/rename/', rename_public_folder, name='rename_public_folder'),
-    path('public-folders/<int:folder_id>/move/', move_public_folder, name='move_public_folder'),
-    path('public-folders/<int:folder_id>/delete/', delete_public_folder, name='delete_public_folder'),
-    path('public-folders/files/upload/', upload_public_file, name='upload_public_file'),
-    path('public-folders/files/<int:file_id>/rename/', rename_public_file, name='rename_public_file'),
-    path('public-folders/files/<int:file_id>/move/', move_public_file, name='move_public_file'),
-    path('public-folders/files/<int:file_id>/delete/', delete_public_file, name='delete_public_file'),
-    path('share/<uuid:token>/', shared_file_view, name='shared_file_view'),
-    path('file/<int:file_id>/toggle-sharing/', toggle_file_sharing, name='toggle_file_sharing'),
     path('tasks/', task_list, name='task_list'),
     path('tasks/create/', create_task, name='create_task'),
     path('tasks/<int:task_id>/update-status/', update_task_status, name='update_task_status'),

@@ -104,7 +104,7 @@
                                                     {% else %}
                                                         {{ ass|default:"Unassigned" }}
                                                     {% endif %}
-                                                    ,
+                                                    {% if not forloop.last %},{% endif %}
                                             {% endfor %}
                                         </small>
                                         {% if task.documents.exists %}
