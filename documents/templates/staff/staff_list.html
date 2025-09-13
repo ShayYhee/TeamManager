@@ -24,14 +24,17 @@
                         <button id="resetButton" class="btn btn-outline-secondary btn-sm" title="Reset filters and search">
                             <i class="fas fa-undo me-1"></i> Reset
                         </button>
-                        <div class="dropdown">
+                        <button class="btn btn-primary btn-sm" type="button">
+                            <a class="dropdown-item" href="#" id="exportCsv">Export Selected to CSV</a>
+                        </button>
+                        {% comment %} <div class="dropdown">
                             <button class="btn btn-primary btn-sm dropdown-toggle" type="button" id="bulkActions" data-bs-toggle="dropdown" aria-expanded="false" disabled>
                                 <i class="fas fa-cog me-1"></i> Bulk Actions
                             </button>
                             <ul class="dropdown-menu" aria-labelledby="bulkActions">
                                 <li><a class="dropdown-item" href="#" id="exportCsv">Export Selected to CSV</a></li>
                             </ul>
-                        </div>
+                        </div> {% endcomment %}
                     </div>
                 </div>
                 <div class="card-body">

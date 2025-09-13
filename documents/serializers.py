@@ -33,10 +33,11 @@ class EventParticipantSerializer(serializers.ModelSerializer):
 
 class EventSerializer(serializers.ModelSerializer):
     participants = EventParticipantSerializer(many=True, required=False)
+    created_by = serializers.PrimaryKeyRelatedField(read_only=True)  # Add created_by
 
     class Meta:
         model = Event
-        fields = ['id', 'title', 'description', 'start_time', 'end_time', 'participants', 'event_link']
+        fields = ['id', 'title', 'description', 'start_time', 'end_time', 'participants', 'event_link', 'created_by']
 
     def to_representation(self, instance):
         representation = super().to_representation(instance)
@@ -47,9 +48,12 @@ class EventSerializer(serializers.ModelSerializer):
             'end': instance.end_time.isoformat(),
             'description': instance.description,
             'participants': [
-                participant.user.username for participant in instance.participants.all()
+                {'id': participant.user.id, 'username': participant.user.username, 'response': participant.response}
+                for participant in instance.participants.all()
+                # participant.user.username for participant in instance.participants.all()
             ],
-            'event_link': instance.event_link
+            'event_link': instance.event_link,
+            'created_by': instance.created_by.id  # Return creator's ID
         }
 
     def validate(self, data):
@@ -104,17 +108,36 @@ class EventSerializer(serializers.ModelSerializer):
         if instance.tenant != request.tenant:
             logger.error(f"Unauthorized update attempt on event {instance.id} by user {request.user.username}")
             raise serializers.ValidationError("You are not authorized to update this event.")
-        
+
         participants_data = validated_data.pop('participants', None)
+        # Update event fields
         instance = super().update(instance, validated_data)
+
         if participants_data is not None:
-            # Clear existing participants
-            instance.participants.all().delete()
-            # Add new participants
+            # Get current participants
+            current_participants = {p.user_id: p for p in instance.participants.all()}
+            new_participant_ids = {p['user'].id for p in participants_data}
+
+            # Remove participants not in the new list
+            for user_id, participant in list(current_participants.items()):
+                if user_id not in new_participant_ids:
+                    participant.delete()
+
+            # Add or update participants
             for participant_data in participants_data:
                 user = participant_data['user']
+                participant_data['tenant'] = request.tenant
                 if user.tenant != request.tenant:
                     logger.error(f"Invalid participant {user.username}: tenant mismatch")
                     raise serializers.ValidationError(f"User {user.username} does not belong to the tenant.")
-                EventParticipant.objects.create(event=instance, **participant_data)
+                # Check if participant already exists
+                if user.id not in current_participants:
+                    EventParticipant.objects.create(event=instance, **participant_data)
+
         return instance
+    
+
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CustomUser
+        fields = ['id', 'username']

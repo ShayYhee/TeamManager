@@ -5,7 +5,7 @@ from django.urls import reverse
 from urllib.parse import urlparse, urlunparse
 from django.shortcuts import redirect, render
 from django.conf import settings
-from django.contrib.auth import authenticate, login
+from django.contrib.auth import authenticate, login, logout  # Added logout import
 from django.core.exceptions import PermissionDenied
 from documents.models import CustomUser
 from tenants.models import Tenant
@@ -35,7 +35,8 @@ class TenantMiddleware:
         if host == main_domain or host == 'localhost':
             print("Request to main domain or localhost, no tenant required")
             request.tenant = None
-            return self.get_response(request)
+            # NEW: For base domain, if authenticated non-superuser, we'll handle in association check below
+            # (no early return here to allow the association check to trigger redirect)
 
         # Extract subdomain (assumes format like tenant.teammanager.com)
         domain_parts = host.split('.')
@@ -46,14 +47,19 @@ class TenantMiddleware:
                 print(f"Invalid subdomain detected: {subdomain}")
                 return HttpResponseNotFound("Invalid subdomain format")
         else:
+            subdomain = None  # NEW: Explicitly set for base domain case
             print(f"Invalid host format or no subdomain: {host}")
-            return HttpResponseNotFound("Invalid host format or no subdomain")
+            # For base domain, don't return 404; proceed to set tenant=None
 
         # Try to find tenant by subdomain
         try:
-            tenant = Tenant.objects.get(slug=subdomain)
-            print(f"Found tenant: {tenant.slug}")
-            request.tenant = tenant
+            if subdomain:
+                tenant = Tenant.objects.get(slug=subdomain)
+                print(f"Found tenant: {tenant.slug}")
+                request.tenant = tenant
+            else:
+                request.tenant = None
+                print("No subdomain; tenant set to None")
         except Tenant.DoesNotExist:
             print(f"Tenant with subdomain '{subdomain}' not found.")
             if settings.DEBUG:
@@ -70,7 +76,7 @@ class TenantMiddleware:
             print(f"Unexpected error in tenant lookup: {e}")
             return HttpResponseServerError("An unexpected server error occurred.")
 
-       # Restrict access for authenticated non-superusers
+        # Restrict access for authenticated non-superusers
         if hasattr(request, 'user') and request.user.is_authenticated:
             if not CustomUser.objects.filter(id=request.user.id, tenant=request.tenant).exists():
                 print(f"User {request.user.username} not associated with tenant {request.tenant.slug if request.tenant else 'None'}")
@@ -80,12 +86,17 @@ class TenantMiddleware:
                     else None
                 )
                 if expected_subdomain is None:
+                    # NEW: Optional logout for cleaner state before error
+                    logout(request)
                     # return HttpResponseForbidden("You have no associated tenant. Contact support.")
                     raise PermissionDenied("You have no associated tenant. Contact support. faith.osebi@transnetcloud.com")
                 print(f"Wrong user tenant slug: {expected_subdomain}")
                 base_domain = "localhost:8000" if settings.DEBUG else "teammanager.ng"
                 protocol = "http" if settings.DEBUG else "https"
-                login_url = f"{protocol}://{expected_subdomain}.{base_domain}/accounts/login"
-                return redirect(login_url)
+                # CHANGED: Redirect to tenant home/root instead of login for better UX (leverages auth session)
+                # Assumes home is at '/', adjust if your dashboard is at e.g., '/dashboard/'
+                home_url = f"{protocol}://{expected_subdomain}.{base_domain}/"
+                print(f"Redirecting to tenant home: {home_url}")
+                return redirect(home_url)
         print(f"Set request.tenant to: {request.tenant.slug if request.tenant else 'None'}")
         return self.get_response(request)

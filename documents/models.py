@@ -13,6 +13,15 @@ from tenants.models import Tenant
 ENCRYPTION_KEY = os.getenv('ENCRYPTION_KEY', Fernet.generate_key())
 cipher = Fernet(ENCRYPTION_KEY)
 
+def upload_to_documents_word(instance, filename):
+    tenant_name = instance.tenant.name
+    username = instance.created_by.username if instance.created_by else "anonymous"
+    return os.path.join('documents', tenant_name, username, 'word', filename)
+
+def upload_to_documents_pdf(instance, filename):
+    tenant_name = instance.tenant.name
+    username = instance.created_by.username if instance.created_by else "anonymous"
+    return os.path.join('documents', tenant_name, username, 'pdf', filename)
 
 class Document(models.Model):
     STATUS_CHOICES = [
@@ -46,8 +55,8 @@ class Document(models.Model):
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='pending')
     created_at = models.DateTimeField(auto_now_add=True)
 
-    word_file = models.FileField(upload_to="documents/word/")
-    pdf_file = models.FileField(upload_to="documents/pdf/", null=True, blank=True)
+    word_file = models.FileField(upload_to=upload_to_documents_word)
+    pdf_file = models.FileField(upload_to=upload_to_documents_pdf, null=True, blank=True)
     # uploaded_file = models.FileField(upload_to='documents/', blank=True, null=True)
 
     document_source = models.CharField(max_length=20, choices=DOCUMENT_SOURCE_CHOICES, default='template')
@@ -115,25 +124,78 @@ class CustomUser(AbstractUser):
 class Folder(models.Model):
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
     name = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
     parent = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='subfolders')
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)
+    is_public = models.BooleanField(default=False)
+    share_token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    is_shared = models.BooleanField(default=False, help_text="Enable external sharing for this folders.")
+    shared_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='shared_folders')
+    share_time = models.DateTimeField(null=True, blank=True)
+    share_time_end = models.DateTimeField(null=True, blank=True)
+    share_subfolders = models.BooleanField(default=False, null=True, blank=True)
+    share_files = models.BooleanField(default=False, null=True, blank=True)
+
+    def get_shareable_link(self):
+        from django.urls import reverse
+        return reverse('shared_folder_view', kwargs={'token': str(self.share_token)})
 
     def __str__(self):
         return self.name
     
 def upload_to_folder(instance, filename):
-    folder_name = instance.folder.name if instance.folder else "unassigned"
-    return os.path.join('uploads', folder_name, filename)
+    if instance.folder:
+        tenant_name = instance.folder.tenant.name
+        username = instance.folder.created_by.username if instance.folder.created_by else "anonymous"
+        folder_name = instance.folder.name
+        
+        # Handle anonymous subdir
+        if instance.anon_name or instance.anon_email or instance.anon_phone:
+            subdir = instance.anon_name or instance.anon_email or instance.anon_phone.replace(' ', '_').replace('/', '_')[:50]  # Sanitize
+        else:
+            subdir = "anonymous_uploads"
+        
+        return os.path.join('uploads', tenant_name, username, folder_name, subdir, filename)
+    elif instance.tenant:
+        tenant_name = instance.tenant.name
+        username = "anonymous"
+        folder_name = "unassigned"
+        return os.path.join('uploads', tenant_name, username, folder_name, filename)
+    else:
+        tenant_name = "unassigned"
+        username = "anonymous"
+        folder_name = "unassigned"
+        return os.path.join('uploads', tenant_name, username, folder_name, filename)
 
 
 class File(models.Model):
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
-    folder = models.ForeignKey(Folder, on_delete=models.CASCADE, related_name='files')
-    uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    folder = models.ForeignKey(Folder, on_delete=models.CASCADE, related_name='files', null=True, blank=True)
+    uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True, blank=True)
+    anon_name = models.CharField(max_length=255, blank=True, null=True, help_text="Name of uploader if anonymous")
+    anon_email = models.EmailField(blank=True, null=True, help_text="Email of uploader if anonymous")
+    anon_phone = models.CharField(max_length=20, blank=True, null=True, help_text="Phone number of uploader if anonymous")
     file = models.FileField(upload_to=upload_to_folder)
     original_name = models.CharField(max_length=255)
     uploaded_at = models.DateTimeField(auto_now_add=True)
+    is_public = models.BooleanField(default=False)
+    share_token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    is_shared = models.BooleanField(default=False, help_text="Enable external sharing for this file")
+    shared_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='shared_files')
+    share_time = models.DateTimeField(null=True, blank=True)
+    share_time_end = models.DateTimeField(null=True, blank=True)
+
+    def get_uploaded_by_display(self):
+        if self.uploaded_by:
+            return str(self.uploaded_by)
+        elif self.anon_name:
+            return self.anon_name
+        return "Anonymous"
+
+    def get_shareable_link(self):
+        from django.urls import reverse
+        return reverse('shared_file_view', kwargs={'token': str(self.share_token)})
 
     def __str__(self):
         return self.original_name
@@ -151,7 +213,7 @@ class Task(models.Model):
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
     title = models.CharField(max_length=255, help_text="Required. Title of the task")
     description = models.TextField(help_text="Any notes or details about the task")
-    documents = models.ManyToManyField('PublicFile', blank=True, help_text="Attach documents for this task from Public Files")
+    documents = models.ManyToManyField('File', blank=True, help_text="Attach documents for this task from Public Files")
     assigned_to = models.ManyToManyField(settings.AUTH_USER_MODEL, null=True, blank=True, help_text="Select staff to assign this task to")
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='created_tasks')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending', help_text="Current status of the task")
@@ -199,6 +261,11 @@ class Team(models.Model):
     def __str__(self):
         return self.name
     
+def upload_to_staff_photos(instance, filename):
+    tenant_name = instance.tenant.name
+    username = instance.user.username if instance.user.username else "anonymous"
+    return os.path.join('staff_photos', tenant_name, username, filename)
+    
 class StaffProfile(models.Model):
     RELIGION_CHOICES = [
         ('islam', 'Islam'),
@@ -228,7 +295,7 @@ class StaffProfile(models.Model):
 
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="staff_profile")
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="staff_profile")
-    photo = models.ImageField(upload_to='staff_photos/', null=True, blank=True)
+    photo = models.ImageField(upload_to=upload_to_staff_photos, null=True, blank=True)
     first_name = models.CharField(max_length=255)
     last_name = models.CharField(max_length=255)
     middle_name = models.CharField(max_length=255, null=True, blank=True)
@@ -307,8 +374,11 @@ class UserNotification(models.Model):
     class Meta:
         unique_together = ('user', 'notification')
 
-from django.db import models
-from django.conf import settings
+
+def upload_to_staff_documents(instance, filename):
+    tenant_name = instance.tenant.name
+    username = instance.staff_profile.user.username if instance.staff_profile.user else "anonymous"
+    return os.path.join('staff_documents', tenant_name, username, filename)
 
 class StaffDocument(models.Model):
     DOCUMENT_TYPES = [
@@ -320,7 +390,7 @@ class StaffDocument(models.Model):
 
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="staff_document")
     staff_profile = models.ForeignKey('StaffProfile', on_delete=models.CASCADE, related_name='documents')
-    file = models.FileField(upload_to='staff_documents/')
+    file = models.FileField(upload_to=upload_to_staff_documents)
     document_type = models.CharField(max_length=50, choices=DOCUMENT_TYPES, default='other')
     description = models.CharField(max_length=255, blank=True, null=True)
     uploaded_at = models.DateTimeField(auto_now_add=True)
@@ -352,53 +422,16 @@ class EventParticipant(models.Model):
     class Meta:
         unique_together = ('event', 'user')
 
-class PublicFolder(models.Model):
-    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
-    name = models.CharField(max_length=255)
-    parent = models.ForeignKey('self', null=True, blank=True, on_delete=models.CASCADE, related_name='subfolders')
-    department = models.ForeignKey('Department', null=True, blank=True, on_delete=models.SET_NULL, related_name='public_folders')
-    team = models.ForeignKey('Team', null=True, blank=True, on_delete=models.SET_NULL, related_name='public_folders')
-    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='created_public_folders')
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    # class Meta:
-    #     constraints = [
-    #         models.CheckConstraint(
-    #             check=Q(department__isnull=False) | Q(team__isnull=False),
-    #             name='public_folder_department_or_team_required'
-    #         )
-    #     ]
-
-    def __str__(self):
-        return self.name
-    
 def upload_to_public_folder(instance, filename):
     folder_name = instance.folder.name if instance.folder else "unassigned"
     return os.path.join('uploads/public', folder_name, filename)
 
-class PublicFile(models.Model):
-    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
-    original_name = models.CharField(max_length=255)
-    file = models.FileField(upload_to=upload_to_public_folder)
-    folder = models.ForeignKey(PublicFolder, null=True, blank=True, on_delete=models.CASCADE, related_name='public_files')
-    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='created_public_files')
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    share_token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
-    is_shared = models.BooleanField(default=False, help_text="Enable external sharing for this file")
-    shared_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='shared_public_files')
-
-    def get_shareable_link(self):
-        from django.urls import reverse
-        return reverse('shared_file_view', kwargs={'token': str(self.share_token)})
-
-    def __str__(self):
-        return self.original_name
-    
+def upload_to_company_photos(instance, filename):
+    tenant_name = instance.tenant.name
+    return os.path.join('company_photos', tenant_name, filename)
 
 class CompanyProfile(models.Model):
-    photo = models.ImageField(upload_to='tenant_profile/', null=True, blank=True)
+    photo = models.ImageField(upload_to=upload_to_company_photos, null=True, blank=True)
     tenant = models.OneToOneField(Tenant, on_delete=models.CASCADE, related_name="company_profile")
     company_name = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
@@ -495,9 +528,14 @@ class Email(models.Model):
 #     sent = models.BooleanField(default=False)
 #     sent_at = models.DateTimeField(null=True, blank=True)
 
+def upload_to_email_attachments(instance, filename):
+    tenant_name = instance.email.tenant.name
+    username = instance.email.sender.username if instance.email.sender.username else "anonymous"
+    return os.path.join('email_attachments', tenant_name, username, filename)
+
 class Attachment(models.Model):
     email = models.ForeignKey(Email, on_delete=models.CASCADE, related_name='attachments')
-    file = models.FileField(upload_to='email_attachments/')
+    file = models.FileField(upload_to=upload_to_email_attachments)
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -593,6 +631,9 @@ class Payment(models.Model):
     def __str__(self):
         return f"Payment of {self.amount} to {self.payee} by {self.tenant}"
     
+def upload_to_company_documents(instance, filename):
+    tenant_name = instance.tenant.name
+    return os.path.join('company_documents', tenant_name, filename)
 
 class CompanyDocument(models.Model):
     DOCUMENT_TYPES = [
@@ -605,7 +646,7 @@ class CompanyDocument(models.Model):
 
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="company_document")
     company_profile = models.ForeignKey('CompanyProfile', on_delete=models.CASCADE, related_name='documents')
-    file = models.FileField(upload_to='company_documents/')
+    file = models.FileField(upload_to=upload_to_company_documents)
     document_type = models.CharField(max_length=50, choices=DOCUMENT_TYPES, default='other')
     description = models.CharField(max_length=255, blank=True, null=True)
     uploaded_at = models.DateTimeField(auto_now_add=True)
