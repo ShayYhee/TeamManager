@@ -5,6 +5,14 @@ from django.db import migrations, models
 import django.db.models.deletion
 import uuid
 
+def generate_unique_share_tokens(apps, schema_editor):
+    # Get the File model from the historical schema
+    file = apps.get_model('documents', 'File')
+    # Update all existing File records with unique share_token values
+    for f in file.objects.all():
+        f.share_token = uuid.uuid4()
+        f.save()
+
 
 class Migration(migrations.Migration):
 
@@ -26,11 +34,25 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='file',
             name='share_token',
-            field=models.UUIDField(default=uuid.uuid4, editable=False, unique=True),
+            field=models.UUIDField(default=uuid.uuid4, editable=False, null=True),  # Allow null temporarily
         ),
         migrations.AddField(
             model_name='file',
             name='shared_by',
             field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='shared_files', to=settings.AUTH_USER_MODEL),
+        ),
+        migrations.RunPython(
+            code=generate_unique_share_tokens,
+            reverse_code=migrations.RunPython.noop,  # No-op for reverse migration
+        ),
+        migrations.AlterField(
+            model_name='file',
+            name='share_token',
+            field=models.UUIDField(default=uuid.uuid4, editable=False, unique=True),  # Remove null=True
+        ),
+        migrations.AlterField(
+            model_name='file',
+            name='uploaded_by',
+            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL),
         ),
     ]
