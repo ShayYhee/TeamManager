@@ -4,8 +4,7 @@ from django.conf import settings
 from django.urls import reverse
 from urllib.parse import urlparse, urlunparse
 from django.shortcuts import redirect, render
-from django.conf import settings
-from django.contrib.auth import authenticate, login, logout  # Added logout import
+from django.contrib.auth import authenticate, login, logout
 from django.core.exceptions import PermissionDenied
 from documents.models import CustomUser
 from tenants.models import Tenant
@@ -31,50 +30,44 @@ class TenantMiddleware:
         print(f"Raw host: {request.get_host()}, Processed host: {host}, REMOTE_ADDR: {request.META.get('REMOTE_ADDR')}")
 
         # Check if the request is for the main domain (no subdomain)
-        main_domain = settings.MAIN_DOMAIN.split(':')[0]  # Remove port from MAIN_DOMAIN
+        main_domain = settings.MAIN_DOMAIN.split(':')[0]  # e.g., 'teammanager.ng'
+        main_domain_parts = main_domain.split('.')  # e.g., ['teammanager', 'ng']
+        domain_parts = host.split('.')  # e.g., ['teammanager', 'ng'] or ['sub', 'teammanager', 'ng']
+
+        # NEW: Check if host matches main domain exactly or is localhost
         if host == main_domain or host == 'localhost':
             print("Request to main domain or localhost, no tenant required")
             request.tenant = None
-            # NEW: For base domain, if authenticated non-superuser, we'll handle in association check below
-            # (no early return here to allow the association check to trigger redirect)
-
-        # Extract subdomain (assumes format like tenant.teammanager.com)
-        domain_parts = host.split('.')
-        if len(domain_parts) > 1:
-            subdomain = domain_parts[0]
-            # Validate subdomain to ensure it's not  (prevent issues like ip addresses '13')
-            if isinstance(subdomain, int):
-                print(f"Invalid subdomain detected: {subdomain}")
-                return HttpResponseNotFound("Invalid subdomain format")
+            # Proceed to association check for authenticated users
         else:
-            subdomain = None  # NEW: Explicitly set for base domain case
-            print(f"Invalid host format or no subdomain: {host}")
-            # For base domain, don't return 404; proceed to set tenant=None
+            # Extract subdomain only if host has more parts than main domain
+            if len(domain_parts) > len(main_domain_parts):
+                subdomain = domain_parts[0]  # e.g., 'sub' from 'sub.teammanager.ng'
+                print(f"Extracted subdomain: {subdomain}")
+            else:
+                print(f"Invalid host format or no subdomain: {host}")
+                return HttpResponseNotFound("Invalid host format or no subdomain")
 
-        # Try to find tenant by subdomain
-        try:
-            if subdomain:
+            # Try to find tenant by subdomain
+            try:
                 tenant = Tenant.objects.get(slug=subdomain)
                 print(f"Found tenant: {tenant.slug}")
                 request.tenant = tenant
-            else:
-                request.tenant = None
-                print("No subdomain; tenant set to None")
-        except Tenant.DoesNotExist:
-            print(f"Tenant with subdomain '{subdomain}' not found.")
-            if settings.DEBUG:
-                tenant = Tenant.objects.first()
-                if tenant:
-                    print(f"Falling back to default tenant: {tenant.slug}")
-                    request.tenant = tenant
+            except Tenant.DoesNotExist:
+                print(f"Tenant with subdomain '{subdomain}' not found.")
+                if settings.DEBUG:
+                    tenant = Tenant.objects.first()
+                    if tenant:
+                        print(f"Falling back to default tenant: {tenant.slug}")
+                        request.tenant = tenant
+                    else:
+                        print("No tenants found in the database.")
+                        return HttpResponseNotFound("No tenants found in the database.")
                 else:
-                    print("No tenants found in the database.")
-                    return HttpResponseNotFound("No tenants found in the database.")
-            else:
-                return HttpResponseNotFound(f"Tenant with subdomain '{subdomain}' not found.")
-        except Exception as e:
-            print(f"Unexpected error in tenant lookup: {e}")
-            return HttpResponseServerError("An unexpected server error occurred.")
+                    return HttpResponseNotFound(f"Tenant with subdomain '{subdomain}' not found.")
+            except Exception as e:
+                print(f"Unexpected error in tenant lookup: {e}")
+                return HttpResponseServerError("An unexpected server error occurred.")
 
         # Restrict access for authenticated non-superusers
         if hasattr(request, 'user') and request.user.is_authenticated:
@@ -86,15 +79,11 @@ class TenantMiddleware:
                     else None
                 )
                 if expected_subdomain is None:
-                    # NEW: Optional logout for cleaner state before error
                     logout(request)
-                    # return HttpResponseForbidden("You have no associated tenant. Contact support.")
                     raise PermissionDenied("You have no associated tenant. Contact support. faith.osebi@transnetcloud.com")
                 print(f"Wrong user tenant slug: {expected_subdomain}")
                 base_domain = "localhost:8000" if settings.DEBUG else "teammanager.ng"
                 protocol = "http" if settings.DEBUG else "https"
-                # CHANGED: Redirect to tenant home/root instead of login for better UX (leverages auth session)
-                # Assumes home is at '/', adjust if your dashboard is at e.g., '/dashboard/'
                 home_url = f"{protocol}://{expected_subdomain}.{base_domain}/"
                 print(f"Redirecting to tenant home: {home_url}")
                 return redirect(home_url)
