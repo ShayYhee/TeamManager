@@ -34,7 +34,6 @@ import csv
 import subprocess
 import platform
 import shutil
-import pdfkit
 import re
 from raadaa import settings
 from html2docx import html2docx
@@ -52,8 +51,6 @@ from rest_framework import viewsets, permissions
 import json
 import logging
 logger = logging.getLogger(__name__)
-
-pdf_config = pdfkit.configuration()
 
 User = get_user_model()
 

@@ -1,2 +1,4 @@
 .vercel
 *.pyc
+documents/migrations/
+media/
