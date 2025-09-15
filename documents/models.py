@@ -172,7 +172,8 @@ class Task(models.Model):
 class Department(models.Model):
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="department")
     name = models.CharField(max_length=255)
-    hod = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='hod_department')
+    # hod = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='hod_department')
+    hod = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True, blank=True, related_name='hod')
 
     def save(self, *args, **kwargs):
         if self.hod and not self.hod.is_hod():
@@ -612,3 +613,36 @@ class CompanyDocument(models.Model):
 
     def __str__(self):
         return f"{self.document_type} - {self.company_profile.full_name} ({self.uploaded_at})"
+
+
+# class JobPost(models.Model):
+#     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="recruitment")
+#     job_title = models.CharField(max_length=255, blank=False, null=False)
+#     description = models.CharField(blank=True, null=True)
+#     skills = models.CharField(max_length=1000, blank=False, null=False)
+#     eligibility = models.CharField(max_length=1000, blank=False, null=False)
+#     created_at = models.DateTimeField(auto_now_add=True)
+#     updated_at = models.DateTimeField(auto_now=True)
+
+#     def __str__(self):
+#         return f"Job post for position {self.job_title} by {self.tenant}"
+
+# def upload_to_job_cvs(instance, filename):
+#     tenant_name = instance.tenant.name if instance.tenant else "unassigned"
+#     job_title = instance.job.position_title if instance.job else "N/A"
+#     return os.path.join('job_cvs', tenant_name, job_title, filename)
+
+# class JobApplication(models.Model):
+#     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="job_applications")
+#     first_name = models.CharField(max_length=255, blank=False, null=False)
+#     last_name = models.CharField(max_length=255, blank=False, null=False)
+#     middle_name = models.CharField(max_length=255, blank=True, null=True)
+#     job = models.ForeignKey(JobPost, on_delete=models.CASCADE, related_name="applications")
+#     cv = models.FileField(upload_to=upload_to_job_cvs)
+
+
+
+
+
+
+    

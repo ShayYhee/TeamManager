@@ -9,15 +9,35 @@
         <div class="col-lg-10 col-md-12">
             <div class="card shadow-sm border-0 mb-4" style="border-radius: 12px;">
                 <div class="card-header bg-transparent d-flex align-items-center justify-content-between flex-wrap gap-3">
-                    <h2 class="mb-0"><i class="fas fa-chart-pie me-2 text-primary"></i> Department Performance: {{ department }} (Corporate Tasks)</h2>
+                    <h2 class="mb-0"><i class="fas fa-chart-pie me-2 text-primary"></i> 
+                        {% if selected_department_id == 'all' %}
+                            All Departments Performance (Corporate Tasks)
+                        {% else %}
+                            {% for dept in departments %}
+                                {% if dept.id|stringformat:"s" == selected_department_id %}
+                                    {{ dept.name }} Performance (Corporate Tasks)
+                                {% endif %}
+                            {% endfor %}
+                        {% endif %}
+                    </h2>
                     <div class="d-flex flex-wrap gap-3 align-items-center">
-                        <select id="userSelect" class="form-select" style="max-width: 200px;" data-bs-toggle="tooltip" title="Select user or all">
+                        <!-- Department Filter -->
+                        <select id="departmentSelect" class="form-select" style="max-width: 200px;" data-bs-toggle="tooltip" title="Select department">
+                            <option value="all" {% if selected_department_id == 'all' %}selected{% endif %}>All Departments</option>
+                            {% for dept in departments %}
+                                <option value="{{ dept.id }}" {% if selected_department_id == dept.id|stringformat:"s" %}selected{% endif %}>{{ dept.name }}</option>
+                            {% endfor %}
+                        </select>
+                        
+                        <!-- User Filter -->
+                        <select id="userSelect" class="form-select" style="max-width: 200px;" data-bs-toggle="tooltip" title="Select user" {% if not department_users %}disabled{% endif %}>
                             <option value="all" {% if selected_user_id == 'all' %}selected{% endif %}>All Users</option>
                             {% for user in department_users %}
                                 <option value="{{ user.id }}" {% if selected_user_id == user.id|stringformat:"s" %}selected{% endif %}>{{ user.get_full_name|default:user.username }}</option>
                             {% endfor %}
                         </select>
-                        <button id="resetButton" class="btn btn-outline-secondary btn-sm" title="Reset to All Users">
+                        
+                        <button id="resetButton" class="btn btn-outline-secondary btn-sm" title="Reset Filters">
                             <i class="fas fa-undo me-1"></i> Reset
                         </button>
                     </div>
@@ -28,7 +48,13 @@
                         <div class="col-12 col-md-6">
                             <div class="card h-100 shadow-sm border-0" style="border-radius: 8px;">
                                 <div class="card-body text-center">
-                                    <h3 class="card-title font-semibold">Team Completion Percentage</h3>
+                                    <h3 class="card-title font-semibold">
+                                        {% if selected_department_id == 'all' %}
+                                            Overall Completion Percentage
+                                        {% else %}
+                                            Department Completion Percentage
+                                        {% endif %}
+                                    </h3>
                                     <div style="max-width: 200px; margin: 0 auto;">
                                         <canvas id="completionChart"></canvas>
                                     </div>
@@ -48,6 +74,7 @@
                                             <thead>
                                                 <tr>
                                                     <th scope="col">User</th>
+                                                    <th scope="col">Department</th>
                                                     <th scope="col">Completion %</th>
                                                     <th scope="col">Total Tasks</th>
                                                     <th scope="col">Completed</th>
@@ -57,13 +84,14 @@
                                                 {% for metric in user_metrics %}
                                                     <tr>
                                                         <td>{{ metric.full_name }}</td>
+                                                        <td>{{ metric.department }}</td>
                                                         <td>{{ metric.completion_percentage }}%</td>
                                                         <td>{{ metric.total_tasks }}</td>
                                                         <td>{{ metric.completed_tasks }}</td>
                                                     </tr>
                                                 {% empty %}
                                                     <tr>
-                                                        <td colspan="4" class="text-center">No user metrics available.</td>
+                                                        <td colspan="5" class="text-center">No user metrics available.</td>
                                                     </tr>
                                                 {% endfor %}
                                             </tbody>
@@ -180,7 +208,7 @@
         .text-sm {
             font-size: 0.85rem;
         }
-        #userSelect, #resetButton {
+        #departmentSelect, #userSelect, #resetButton {
             max-width: 100%;
             margin-bottom: 10px;
         }
@@ -208,13 +236,22 @@
 
 <script>
 $(document).ready(function() {
+    // Initialize Select2 for department dropdown
+    $('#departmentSelect').select2({
+        theme: 'bootstrap-5',
+        width: '100%',
+        placeholder: 'Select Department'
+    }).on('change', function() {
+        updateUrl();
+    });
+
     // Initialize Select2 for user dropdown
     $('#userSelect').select2({
         theme: 'bootstrap-5',
         width: '100%',
         placeholder: 'Select User'
     }).on('change', function() {
-        window.location.href = '{% url "hod_performance_dashboard" %}?user_id=' + $(this).val();
+        updateUrl();
     });
 
     // Initialize Bootstrap tooltips
@@ -223,8 +260,31 @@ $(document).ready(function() {
     // Reset button
     $('#resetButton').on('click', function(e) {
         e.preventDefault();
-        window.location.href = '{% url "hod_performance_dashboard" %}?user_id=all';
+        window.location.href = '{% url "hod_performance_dashboard" %}?department_id=all&user_id=all';
     });
+
+    // Function to update URL with selected filters
+    function updateUrl() {
+        const departmentId = $('#departmentSelect').val();
+        const userId = $('#userSelect').val();
+        
+        let url = '{% url "hod_performance_dashboard" %}?';
+        
+        if (departmentId) {
+            url += 'department_id=' + departmentId + '&';
+        }
+        
+        if (userId) {
+            url += 'user_id=' + userId;
+        }
+        
+        // Remove trailing & if exists
+        if (url.endsWith('&')) {
+            url = url.slice(0, -1);
+        }
+        
+        window.location.href = url;
+    }
 
     // Dark mode chart adjustments
     if ($('body').hasClass('dark-mode')) {
