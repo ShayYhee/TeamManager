@@ -1,6 +1,6 @@
 from django import forms
 from django.forms import modelformset_factory
-from .models import Document, User, CustomUser, Folder, File, Task, StaffProfile, StaffDocument, Department, Team, PublicFolder, PublicFile, Role, Event, EventParticipant, Notification, UserNotification, CompanyProfile, Contact, Email, Attachment, CompanyDocument
+from .models import Document, User, CustomUser, Folder, File, Task, StaffProfile, StaffDocument, Department, Team, Role, Event, EventParticipant, Notification, UserNotification, CompanyProfile, Contact, Email, Attachment, CompanyDocument
 from tenants.models import Tenant
 from ckeditor.widgets import CKEditorWidget
 from ckeditor_uploader.widgets import CKEditorUploadingWidget
@@ -203,10 +203,12 @@ class EditUserForm(forms.ModelForm):
 class FolderForm(forms.ModelForm):
     class Meta:
         model = Folder
-        fields = ['name', 'parent']
+        fields = ['name', 'parent', 'description']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'parent': forms.HiddenInput(),
+            # 'is_public': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 5}),
             # 'parent': forms.ModelChoiceField(queryset=Folder.objects.all(), required=False, widget=forms.HiddenInput),
         }
 
@@ -218,6 +220,16 @@ class FileUploadForm(forms.ModelForm):
             'folder': forms.HiddenInput(),
         }
 
+class FileUploadAnonForm(forms.ModelForm):
+    class Meta:
+        model = File
+        fields = ['folder', 'file', 'anon_name', 'anon_email', 'anon_phone']
+        widgets = {
+            'folder': forms.HiddenInput(),
+            'anon_name': forms.TextInput(attrs={'class':'form-control'}),
+            'anon_email': forms.TextInput(attrs={'class':'form-control'}),
+            'anon_phone': forms.TextInput(attrs={'class':'form-control'}),
+        }
 
 class TaskForm(forms.ModelForm):
     class Meta:
@@ -240,10 +252,10 @@ class TaskForm(forms.ModelForm):
             tenant = getattr(user, 'tenant', None)
             if tenant:
                 self.fields['assigned_to'].queryset = CustomUser.objects.filter(tenant=tenant)
-                self.fields['documents'].queryset = PublicFile.objects.filter(tenant=tenant, created_by=user)
+                self.fields['documents'].queryset = File.objects.filter(tenant=tenant)
             else:
                 self.fields['assigned_to'].queryset = CustomUser.objects.none()
-                self.fields['documents'].queryset = PublicFile.objects.none()
+                self.fields['documents'].queryset = File.objects.none()
 
 class ReassignTaskForm(forms.ModelForm):
     class Meta:
@@ -318,20 +330,6 @@ class EmailConfigForm(forms.ModelForm):
             'zoho_email': forms.EmailInput(attrs={'class': 'form-control'}),
             'zoho_password': forms.PasswordInput(attrs={'class': 'form-control'}),
         }
-
-class PublicFolderForm(forms.ModelForm):
-    class Meta:
-        model = PublicFolder
-        fields = ['name', 'parent']
-        widgets = {
-            'name': forms.TextInput(attrs={'class': 'form-control'}),
-            'parent': forms.HiddenInput(),
-        }
-
-class PublicFileForm(forms.ModelForm):
-    class Meta:
-        model = PublicFile
-        fields = ['file']
 
 class DepartmentForm(forms.ModelForm):
     class Meta:

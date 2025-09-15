@@ -200,10 +200,14 @@
                 padding: 0;
                 overflow: hidden; {% endcomment %}
                 position: fixed;
-                margin-top: 50px;
+                margin-top: 30px;
                 left: 0;
-                height: 100%;
+                height: calc(100vh - 30px);
                 width: 250px;
+                padding-top: 20px;
+                transition: all 0.3s ease;
+                overflow-x: hidden;
+                box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
                 z-index: 1000; /* Ensure sidebar is above main content */
                 transform: translateX(-100%); /* Hide sidebar by default */
             }
@@ -217,7 +221,7 @@
                 margin-left: 20px;
                 padding: 15px;
             } {% endcomment %}
-             .toggle-sidebar {
+            .toggle-sidebar {
                 display: block;
                 position: fixed;
                 top: 10px;
@@ -234,6 +238,7 @@
             }
             .navbar {
                 margin-left: 0 !important;
+                padding-left: 25px;
             }
             .navbar .container-fluid {
                 padding: 0 10px;
@@ -377,8 +382,7 @@
             <a href="{% url 'document_list' %}" {% if request.path == '/documents/list/' %}class="active"{% endif %}><i class="fas fa-file-alt"></i> Document List</a>
             <a href="{% url 'create_document' %}" {% if request.path == '/documents/create/' %}class="active"{% endif %}><i class="fas fa-bolt"></i> Generate Document</a>
             <a href="{% url 'create_from_editor' %}" {% if request.path == '/documents/create-editor/' %}class="active"{% endif %}><i class="fas fa-edit"></i> Document Editor</a>
-            <a href="{% url 'folder_list' %}" {% if request.path == '/folders/' %}class="active"{% endif %}><i class="fas fa-folder"></i> Folders</a>
-            <a href="{% url 'public_folder_list' %}" {% if request.path == '/public-folders/' %}class="active"{% endif %}><i class="fas fa-folder-open"></i> Public Folders</a>
+            <a href="{% url 'folder_view' %}" {% if request.path == '/folders/' %}class="active"{% endif %}><i class="fas fa-folder"></i> My Folders</a>
             <a href="{% url 'performance_dashboard' %}" {% if request.path == '/dashboard/performance-dashboard/' %}class="active"{% endif %}><i class="fas fa-chart-line" style="color: #ffffff;"></i> Performance</a>
             {% for role in user.roles.all %}
                 {% if role.name == "HOD" %}
@@ -409,8 +413,7 @@
             <a href="{% url 'task_list' %}" {% if request.path == '/tasks/' %}class="active"{% endif %}><i class="fas fa-tasks"></i> Tasks</a>
             <a href="{% url 'document_list' %}" {% if request.path == '/documents/list/' %}class="active"{% endif %}><i class="fas fa-file-alt"></i> Document List</a>
             <a href="{% url 'create_from_editor' %}" {% if request.path == '/documents/create-editor/' %}class="active"{% endif %}><i class="fas fa-edit"></i> Document Editor</a>
-            <a href="{% url 'folder_list' %}" {% if request.path == '/folders/' %}class="active"{% endif %}><i class="fas fa-folder"></i> Folders</a>
-            <a href="{% url 'public_folder_list' %}" {% if request.path == '/public-folders/' %}class="active"{% endif %}><i class="fas fa-folder-open"></i> Public Folders</a>
+            <a href="{% url 'folder_view' %}" {% if request.path == '/folders/' %}class="active"{% endif %}><i class="fas fa-folder"></i> My Folders</a>
             <a href="{% url 'performance_dashboard' %}" {% if request.path == '/dashboard/performance-dashboard/' %}class="active"{% endif %}><i class="fas fa-chart-line" style="color: #ffffff;"></i> Performance</a>
             {% for role in user.roles.all %}
                 {% if role.name == "HOD" %}
@@ -434,7 +437,7 @@
         {%endif%}
     </div>
     {% endif %}
-    {% if not user.tenant or user.is_superuser %}
+    {% if not user.is_superuser and not user.tenant %}
         <nav class="navbar navbar-light bg-light fixed-top no-tenant" id="navbar">
             <div class="container-fluid">
                 <a class="navbar-brand ms-3" href="{% url 'tenant_home' %}"><i class="fas fa-briefcase mr-4" style="color: #319795;"></i> <span style="color: #319795;"><strong>Team Manager</strong></span></a>
@@ -472,7 +475,7 @@
                 </div>
             </div>
         </nav>
-    {% else %}
+    {% elif user.is_authenticated or user.is_superuser %}
     <nav class="navbar navbar-light bg-light fixed-top" id="navbar">
         <div class="container-fluid">
             {% if user.is_authenticated %}
@@ -487,10 +490,10 @@
                     {% else %}
                         <img src="{% static 'teammanager_logo.png' %}" alt="Team Manager Logo" class="company-logo me-2" style="max-height: 40px; object-fit: contain; background: rgba(255, 255, 255, 0.95); padding: 8px;">
                     {% endif %}
-                    <span style="color: #319795;"><strong>{{ request.tenant.company_profile.company_name|default:"Team Manager" }}</strong></span>
+                    <span id="tenant-name" style="color: #319795;"><strong>{{ request.tenant.company_profile.company_name|default:"Team Manager" }}</strong></span>
                 {% else %}
                     <i class="fas fa-briefcase me-2" style="color: #319795;"></i>
-                    <span style="color: #319795;"><strong>{{ request.tenant.name|default:"Team Manager" }}</strong></span>
+                    <span id="tenant-name" style="color: #319795;"><strong>{{ request.tenant.name|default:"Team Manager" }}</strong></span>
                 {% endif %}
             </a>
             <div class="d-flex align-items-center gap-4">
@@ -499,21 +502,28 @@
                 </button>
                 {% if user.is_authenticated %}
                     <span class="text-muted">Welcome, {{ user.username }}</span>
-                    <a class="nav-link position-relative" href="{% url 'view_my_profile' %}" title="Profile">
-                        <i class="fas fa-user fa-lg"></i>
-                    </a>
-                    <a class="nav-link position-relative" href="{% url 'notifications' %}" title="Notifications">
-                        <i class="fas fa-bell fa-lg"></i>
-                        {% if unseen_notification_count > 0 %}
-                            <span class="badge bg-danger position-absolute top-0 start-100 translate-middle pulse">
-                                {{ unseen_notification_count }}
-                            </span>
-                        {% endif %}
-                    </a>
-                    <form action="{% url 'logout' %}" method="post" style="display: inline;">
-                        {% csrf_token %}
-                        <button type="submit" class="btn btn-link text-primary" style="padding: 0; text-decoration: none;">Logout</button>
-                    </form>
+                    {% if user.is_superuser %}
+                        <form action="{% url 'logout' %}" method="post" style="display: inline;">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-link text-primary" style="padding: 0; text-decoration: none;">Logout</button>
+                        </form>
+                    {% else %}
+                        <a class="nav-link position-relative" href="{% url 'view_my_profile' %}" title="Profile">
+                            <i class="fas fa-user fa-lg"></i>
+                        </a>
+                        <a class="nav-link position-relative" href="{% url 'notifications' %}" title="Notifications">
+                            <i class="fas fa-bell fa-lg"></i>
+                            {% if unseen_notification_count > 0 %}
+                                <span class="badge bg-danger position-absolute top-0 start-100 translate-middle pulse">
+                                    {{ unseen_notification_count }}
+                                </span>
+                            {% endif %}
+                        </a>
+                        <form action="{% url 'logout' %}" method="post" style="display: inline;">
+                            {% csrf_token %}
+                            <button type="submit" class="btn btn-link text-primary" style="padding: 0; text-decoration: none;">Logout</button>
+                        </form>
+                    {% endif %}
                 {% else %}
                     <a href="{% url 'login' %}" class="btn btn-primary">Login</a>
                     <a href="{% url 'register' %}" class="btn btn-outline-primary">Register</a>
@@ -600,12 +610,15 @@
             var sidebar = document.getElementById("sidebar");
             var mainContent = document.getElementById("main-content");
             var navbar = document.getElementById("navbar");
+            var tenant_name = document.getElementById("tenant-name");
             if (window.innerWidth > 768){
                 sidebar.classList.toggle("closed");
                 mainContent.classList.toggle("expanded");
                 navbar.style.marginLeft = sidebar.classList.contains("closed") ? "30px" : "250px";
             } else{
-                if (navbar) navbar.style.marginLeft = "0px";
+                if (navbar) {
+                    navbar.style.marginLeft = "0px";
+                }
                 sidebar.classList.toggle('active');
             }
         }
@@ -625,6 +638,14 @@
                 themeToggleBtn.innerHTML = isDarkMode ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
                 localStorage.setItem('theme', isDarkMode ? 'dark' : 'light');
             });
+            if (window.innerWidth < 768){
+                const tenantNameElement = document.getElementById('tenant-name');
+                let tenantName = tenantNameElement.textContent;
+                if (tenantName.length > 20 ){
+                    tenantName = tenantName.slice(0, 20);
+                    tenantNameElement.innerHTML = `<strong>${tenantName}...</strong>`;
+                }
+            }
         });
     </script>
     <div class="modal fade" id="mediaModal" tabindex="-1" aria-labelledby="mediaModalLabel" aria-hidden="true">

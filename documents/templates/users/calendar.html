@@ -49,8 +49,8 @@
                             <div class="invalid-feedback"></div>
                         </div>
                         <div class="col-12 col-md-6 mb-3">
-                            <label for="end_time" class="form-label fw-bold">End <span class="text-danger">*</span></label>
-                            <input type="datetime-local" id="end_time" name="end_time" class="form-control" required>
+                            <label for="end_time" class="form-label fw-bold">End</label>
+                            <input type="datetime-local" id="end_time" name="end_time" class="form-control">
                             <div class="invalid-feedback"></div>
                         </div>
                     </div>
@@ -65,7 +65,7 @@
                     </div>
                     <div class="mb-3">
                         <label for="eventParticipants" class="form-label fw-bold">Participants</label>
-                        <select multiple id="eventParticipants" name="participants" class="form-select"></select>
+                        <select multiple id="eventParticipants" name="participants" multiple class="form-select"></select>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -80,6 +80,57 @@
                 </div>
             </div>
         </form>
+    </div>
+</div>
+
+<!-- Details Modal (for participants) -->
+<div class="modal fade" id="eventDetailsModal" tabindex="-1" aria-labelledby="eventDetailsModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="eventDetailsModalLabel">Event Details</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="eventId" name="eventId">
+                <div class="form-group">
+                    <label><strong>Title</strong></label>
+                    <p id="details-title" class="form-control-plaintext"></p>
+                </div>
+                <div class="form-group">
+                    <label><strong>Description</strong></label>
+                    <p id="details-description" class="form-control-plaintext"></p>
+                </div>
+                <div class="form-group">
+                    <label><strong>Start</strong></label>
+                    <p id="details-start" class="form-control-plaintext"></p>
+                </div>
+                <div class="form-group">
+                    <label><strong>End</strong></label>
+                    <p id="details-end" class="form-control-plaintext"></p>
+                </div>
+                <div class="form-group">
+                    <label><strong>Meeting Link</strong></label>
+                    <p id="details-link" class="form-control-plaintext"></p>
+                </div>
+                <div class="form-group">
+                    <label><strong>Participants</strong></label>
+                    <p id="details-participants" class="form-control-plaintext"></p>
+                </div>
+                <div class="form-group">
+                    <label for="participant-response"><strong>Your Response</strong></label>
+                    <select id="participant-response" class="form-control">
+                        <option value="pending" selected>Pending</option>
+                        <option value="accepted">Accept</option>
+                        <option value="declined">Decline</option>
+                    </select>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                <button type="button" class="btn btn-primary" id="save-response">Save Response</button>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -189,6 +240,90 @@
 </style>
 
 <script>
+    window.currentUserId = {{ request.user.id|default:0 }};
+    // Function to open the edit modal
+    function openEditModal(eventId) {
+        $.ajax({
+            url: `/api/events/${eventId}/`, // Your API endpoint for fetching event details
+            method: 'GET',
+            success: function(event) {
+                 // Get logged-in user ID (assuming it's available globally, e.g., via a script tag)
+                const loggedInUserId = window.currentUserId; // Set this in your template or via API
+
+                if (event.created_by === loggedInUserId) {
+                    // Populate modal fields
+                    $('#eventId').val(event.id); // Hidden input to store event ID
+                    $('#title').val(event.title);
+                    $('#description').val(event.description);
+                    $('#start_time').val(new Date(event.start).toISOString().slice(0, 16));
+                    $('#end_time').val(new Date(event.end).toISOString().slice(0, 16));
+                    $('#event_link').val(event.event_link);
+
+                    // Populate participants
+                    const $participantsSelect = $('#eventParticipants');
+                    $participantsSelect.empty(); // Clear existing options
+
+                    // Fetch available users (filtered by tenant)
+                    $.ajax({
+                        url: '/api/users/', // Endpoint to get tenant users
+                        method: 'GET',
+                        success: function(users) {
+                            users.forEach(user => {
+                                // Check if user is in the event's participants
+                                const isSelected = event.participants.some(p => p.id === user.id) ? 'selected' : '';
+                                $participantsSelect.append(
+                                    `<option value="${user.id}" ${isSelected}>${user.username}</option>`
+                                );
+                            });
+                            // Initialize Select2 (if used)
+                            $participantsSelect.select2({
+                                placeholder: "Select participants",
+                                allowClear: true
+                            });
+                        },
+                        error: function(xhr) {
+                            console.error('Error fetching users:', xhr.responseJSON?.detail);
+                        }
+                    });
+
+                    // Show the modal
+                    $('#eventModal').modal('show');
+                } else {
+                    // Open details modal for participants
+                    $('#eventId').val(event.id); // Hidden input to store event ID
+                    $('#details-title').text(event.title);
+                    $('#details-description').text(event.description || 'No description');
+                    $('#details-start').text(new Date(event.start).toLocaleString());
+                    $('#details-end').text(new Date(event.end).toLocaleString());
+                    $('#details-link').html(event.event_link ? `<a href="${event.event_link}" target="_blank">${event.event_link}</a>` : 'No link');
+                    $('#details-participants').text(event.participants.map(p => p.username).join(', ') || 'No participants');
+                    // $('#participant-response').val(participant.response);
+
+                    // Set current response if user is a participant
+                    const participant = event.participants.find(p => p.id === loggedInUserId);
+                    if (participant.response) {
+                        console.log("Participant: ", participant);
+                        console.log("Participant response: ", participant.response);
+                        const isSelected = participant.response ? 'selected' : '';
+                        $('#participant-response').append(
+                            `<option value="${participant.response}" ${isSelected}>${participant.response}</option>`
+                        );
+                        // $('#participant-response').val(participant.response);
+                        $('#save-response').prop('disabled', false);
+                    } else {
+                        $('#participant-response').val('pending');
+                        $('#save-response').prop('disabled', true); // Disable if not a participant
+                    }
+
+                    $('#eventDetailsModal').modal('show');
+                }
+            },
+            error: function(xhr) {
+                console.error('Error fetching event:', xhr.responseJSON?.detail);
+                alert('Failed to load event details.');
+            }
+        });
+    }
     document.addEventListener('DOMContentLoaded', function() {
 
         const calendar = new FullCalendar.Calendar(document.getElementById('calendar'), {
@@ -217,24 +352,28 @@
                 new bootstrap.Modal(document.getElementById('eventModal')).show();
             },
             eventClick: function(info) {
-                const event = info.event;
-                document.getElementById('eventId').value = event.id;
-                document.getElementById('title').value = event.title;
-                document.getElementById('start_time').value = event.start.toISOString().slice(0, 16);
-                document.getElementById('end_time').value = event.end ? event.end.toISOString().slice(0, 16) : '';
-                document.getElementById('description').value = event.extendedProps.description || '';
+                // Prevent default behavior
+                info.jsEvent.preventDefault();
+                // Call openEditModal with the event ID
+                openEditModal(info.event.id);
+                // const event = info.event;
+                // document.getElementById('eventId').value = event.id;
+                // document.getElementById('title').value = event.title;
+                // document.getElementById('start_time').value = event.start.toISOString().slice(0, 16);
+                // document.getElementById('end_time').value = event.end ? event.end.toISOString().slice(0, 16) : '';
+                // document.getElementById('description').value = event.extendedProps.description || '';
                 
-                const linkInput = document.getElementById('event_link');
-                linkInput.value = event.extendedProps.event_link || '';
-                const previewBtn = document.getElementById('previewLinkBtn');
-                previewBtn.style.display = linkInput.value && (linkInput.value.match(/\.(jpg|png|pdf)$/i)) ? 'inline-block' : 'none';
+                // const linkInput = document.getElementById('event_link');
+                // linkInput.value = event.extendedProps.event_link || '';
+                // const previewBtn = document.getElementById('previewLinkBtn');
+                // previewBtn.style.display = linkInput.value && (linkInput.value.match(/\.(jpg|png|pdf)$/i)) ? 'inline-block' : 'none';
                 
-                const participantSelect = $('#eventParticipants');
-                participantSelect.val((event.extendedProps.participant_ids || [])).trigger('change');
+                // const participantSelect = $('#eventParticipants');
+                // participantSelect.val((event.extendedProps.participant_ids || [])).trigger('change');
                 
-                document.getElementById('deleteBtn').style.display = 'inline-block';
-                document.getElementById('eventModalLabel').textContent = 'Edit Event';
-                new bootstrap.Modal(document.getElementById('eventModal')).show();
+                // document.getElementById('deleteBtn').style.display = 'inline-block';
+                // document.getElementById('eventModalLabel').textContent = 'Edit Event';
+                // new bootstrap.Modal(document.getElementById('eventModal')).show();
             },
             eventContent: function(info) {
                 const event = info.event;
@@ -288,6 +427,11 @@
                     { id: {{ user.id }}, text: '{{ user.get_full_name|default:user.username|escapejs }}' },
                 {% endfor %}
             ]
+        });
+
+        $('#participants').select2({
+            placeholder: "Select participants",
+            allowClear: true
         });
 
         // Update calendar view
@@ -357,6 +501,47 @@
                 saveBtn.querySelector('.spinner-border').classList.add('d-none');
                 saveBtn.disabled = false;
             }
+        });
+
+        // Function to get CSRF token from cookie
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        // Save participant response
+        $('#save-response').click(function() {
+            const eventId = document.getElementById('eventId').value;
+            const response = $('#participant-response').val();
+            const csrfToken = getCookie('csrftoken');
+
+            $.ajax({
+                url: `/api/events/${eventId}/respond/`,
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrfToken,
+                    'Content-Type': 'application/json',
+                },
+                data: JSON.stringify({ response: response }),
+                success: function(response) {
+                    $('#eventDetailsModal').modal('hide');
+                    alert('Response saved successfully');
+                },
+                error: function(xhr) {
+                    console.error('Error saving response:', xhr.responseJSON);
+                    alert('Error saving response: ' + xhr.responseJSON?.error || 'Unknown error');
+                }
+            });
         });
 
         // Delete event
