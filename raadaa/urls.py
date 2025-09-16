@@ -4,6 +4,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
+from documents import views
 from documents.views import register, home, approve_document, send_approved_email, delete_document, view_my_profile
 from documents.views import edit_my_profile, staff_directory, view_staff_profile, staff_list, notifications_view
 from documents.views import dismiss_notification, add_staff_document, delete_staff_document, email_config, calendar_view
@@ -164,6 +165,11 @@ urlpatterns = [
     path('admins/company/documents/delete/<int:document_id>/', delete_company_document, name="delete_company_document"),
     path('company-profile/', view_company_profile, name='view_company_profile'),
     path('contact-support/', contact_support, name='contact_support'),
+    # Password Reset URLs
+    path('forgot-password/', views.forgot_password, name='forgot_password'),
+    path('reset-password/<uidb64>/<token>/', views.reset_password, name='reset_password'),
+    path('password-reset-success/', views.password_reset_success, name='password_reset_success'),
+    path('password-reset-sent', views.password_reset_sent, name="password_reset_sent"),
 
     path('.well-known/<path:path>', handle_well_known),  # Handle .well-known requests
 ]

@@ -6,6 +6,13 @@ from ckeditor.widgets import CKEditorWidget
 from ckeditor_uploader.widgets import CKEditorUploadingWidget
 from django.contrib.auth import get_user_model
 import json
+from django.contrib.auth.forms import SetPasswordForm
+from django.contrib.auth.tokens import default_token_generator
+from django.utils.encoding import force_bytes
+from django.utils.http import urlsafe_base64_encode
+from django.core.exceptions import ValidationError
+from django.core.mail import send_mail, get_connection
+from django.urls import reverse
 
 User = get_user_model()
 
@@ -199,6 +206,59 @@ class EditUserForm(forms.ModelForm):
         else:
             self.fields['department'].queryset = Department.objects.none()
             self.fields['teams'].queryset = Team.objects.none()
+
+class ForgotPasswordForm(forms.Form):
+    email = forms.EmailField(label='Email', max_length=254)
+
+    def clean_email(self):
+        email = self.cleaned_data['email']
+        if not CustomUser.objects.filter(email=email, is_active=True).exists():
+            raise ValidationError("No active user found with this email address.")
+        return email
+
+    def save(self, request):
+        email = self.cleaned_data['email']
+        user = CustomUser.objects.get(email=email)
+        # Generate token and UID
+        token = default_token_generator.make_token(user)
+        uidb64 = urlsafe_base64_encode(force_bytes(user.pk))
+        # Build reset URL
+        reset_url = request.build_absolute_uri(
+            reverse('reset_password', kwargs={'uidb64': uidb64, 'token': token})
+        )
+        superuser = CustomUser.objects.get(is_superuser=True)
+        sender_email = superuser.zoho_email
+        sender_password = superuser.zoho_password
+        if sender_email and sender_password:
+            connection = get_connection(
+                backend="django.core.mail.backends.smtp.EmailBackend",
+                host="smtp.zoho.com",
+                port=587,
+                username=sender_email,
+                password=sender_password,
+                use_tls=True,
+            )
+            # Send email (customize content as needed)
+            subject = 'TeamManager Password Reset Request'
+            message = f"""
+            Hello {user.username},
+
+            You requested a password reset. Click the link below to set a new password:
+
+            {reset_url}
+
+            If you didn’t request this, ignore this email.
+
+            Thanks,
+            The TeamManager Team
+            """
+            send_mail(subject, message, sender_email, [user.email], connection=connection)
+
+class ResetPasswordForm(SetPasswordForm):
+    # Inherits new_password1 and new_password2 fields with validation
+    def __init__(self, user, *args, **kwargs):
+        self.user = user
+        super().__init__(user, *args, **kwargs)
 
 class FolderForm(forms.ModelForm):
     class Meta:

@@ -656,30 +656,37 @@ class CompanyDocument(models.Model):
         return f"{self.document_type} - {self.company_profile.full_name} ({self.uploaded_at})"
 
 
-# class JobPost(models.Model):
-#     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="recruitment")
-#     job_title = models.CharField(max_length=255, blank=False, null=False)
+# class Vacancy(models.Model):
+#     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="vacancy")
+#     title = models.CharField(max_length=255, blank=False, null=False)
 #     description = models.CharField(blank=True, null=True)
 #     skills = models.CharField(max_length=1000, blank=False, null=False)
 #     eligibility = models.CharField(max_length=1000, blank=False, null=False)
+#     salary_range = models.CharField(max_length=255, blank=False, null=False)
+#     location = models.CharField(max_length=255, blank=False, null=False)
 #     created_at = models.DateTimeField(auto_now_add=True)
 #     updated_at = models.DateTimeField(auto_now=True)
 
 #     def __str__(self):
-#         return f"Job post for position {self.job_title} by {self.tenant}"
+#         return f"Job post for position {self.title} by {self.tenant}"
 
 # def upload_to_job_cvs(instance, filename):
 #     tenant_name = instance.tenant.name if instance.tenant else "unassigned"
-#     job_title = instance.job.position_title if instance.job else "N/A"
-#     return os.path.join('job_cvs', tenant_name, job_title, filename)
+#     title = instance.job.title if instance.job else "N/A"
+#     return os.path.join('job_cvs', tenant_name, title, filename)
 
-# class JobApplication(models.Model):
-#     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="job_applications")
+# class VacancyApplication(models.Model):
+#     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="vacancy_application")
 #     first_name = models.CharField(max_length=255, blank=False, null=False)
 #     last_name = models.CharField(max_length=255, blank=False, null=False)
 #     middle_name = models.CharField(max_length=255, blank=True, null=True)
-#     job = models.ForeignKey(JobPost, on_delete=models.CASCADE, related_name="applications")
+#     phone = models.CharField(max_length=20, blank=False, null=False)
+#     email = models.EmailField(blank=False, null=False)
+#     job = models.ForeignKey(Vacancy, on_delete=models.CASCADE, related_name="applications")
 #     cv = models.FileField(upload_to=upload_to_job_cvs)
+#     cover_letter = models.TextField(blank=True, null=True)
+#     created_at = models.DateTimeField(auto_now_add=True)
+#     updated_at = models.DateTimeField(auto_now=True)
 
 
 
