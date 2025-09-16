@@ -4,6 +4,7 @@ from django.contrib.auth.models import User
 from django.contrib.admin.models import LogEntry, CHANGE, ADDITION, DELETION
 from django.contrib.auth import login, get_user_model
 from django.contrib.auth.signals import user_logged_in
+from django.contrib.auth.tokens import default_token_generator
 from django.contrib.auth.views import LoginView
 from django.contrib.contenttypes.models import ContentType
 from django.contrib import messages
@@ -17,6 +18,8 @@ from django.dispatch import receiver
 from django.forms import formset_factory
 from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
 from django.urls import reverse
+from django.utils.encoding import force_bytes, force_str
+from django.utils.http import urlsafe_base64_decode
 from django.utils.text import slugify
 from django.utils import timezone
 from django.utils.timezone import now
@@ -30,27 +33,17 @@ from .placeholders import replace_placeholders
 from docx import Document as DocxDocument
 from docx.shared import Inches
 from ckeditor_uploader.views import upload as ckeditor_upload
-import csv
-import subprocess
-import platform
-import shutil
-import pdfkit
-import re
+import csv, subprocess, platform, shutil, pdfkit, re, smtplib, os, requests, io, urllib.parse, json, logging
 from raadaa import settings
 from html2docx import html2docx
 from docx2txt import process
 from datetime import datetime, date, timedelta
-import smtplib
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from bs4 import BeautifulSoup
 from django.http import HttpResponse
-import os
-import requests
-import io
-import urllib.parse
 from rest_framework import viewsets, permissions
-import json
-import logging
+from .forms import ForgotPasswordForm, ResetPasswordForm
+
 logger = logging.getLogger(__name__)
 
 pdf_config = pdfkit.configuration()
@@ -131,6 +124,41 @@ class CustomLoginView(LoginView):
             return redirect(f"{protocol}://{expected_subdomain}.{base_domain}/")
         return super().get(request, *args, **kwargs)
     
+def forgot_password(request):
+    if request.method == 'POST':
+        form = ForgotPasswordForm(request.POST)
+        if form.is_valid():
+            form.save(request)
+            return redirect('password_reset_sent')  # Or a 'email sent' page if you want to add one
+    else:
+        form = ForgotPasswordForm()
+    return render(request, 'registration/forgot_password.html', {'form': form})
+
+def reset_password(request, uidb64, token):
+    try:
+        uid = force_str(urlsafe_base64_decode(uidb64))
+        user = User.objects.get(pk=uid)
+    except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+        user = None
+
+    if user and default_token_generator.check_token(user, token):
+        if request.method == 'POST':
+            form = ResetPasswordForm(user, request.POST)
+            if form.is_valid():
+                form.save()
+                return redirect('password_reset_success')
+        else:
+            form = ResetPasswordForm(user)
+        return render(request, 'registration/reset_password.html', {'form': form})
+    else:
+        # Invalid link (expired or tampered)
+        return render(request, 'registration/reset_password.html', {'error': 'Invalid or expired reset link.'})
+
+def password_reset_success(request):
+    return render(request, 'registration/password_reset_success.html')
+
+def password_reset_sent(request):
+    return render(request, 'registration/password_reset_sent.html')
 
 def upload_to_documents_word(document):
     tenant_name = document.tenant.name
@@ -1858,26 +1886,50 @@ def hod_performance_dashboard(request):
     if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
         logger.error(f"Unauthorized access by user {request.user.username}: tenant mismatch")
         return HttpResponseForbidden("You are not authorized for this tenant.")
+    
     user = request.user
     if not user.is_hod():
         return render(request, 'tasks/error.html', {'message': 'Access denied. HOD role required.'})
 
-    department = user.department
-    if not department:
-        return render(request, 'tasks/error.html', {'message': 'No department assigned.'})
+    # Get all departments where user is HOD
+    departments = Department.objects.filter(hod=user, tenant=request.tenant)
+    if not departments.exists():
+        return render(request, 'tasks/error.html', {'message': 'No departments assigned to you.'})
 
-    department_users = CustomUser.objects.filter(department=department, tenant=request.tenant).select_related('department')
+    # Get department filter from query parameter
+    selected_department_id = request.GET.get('department_id', 'all')
+    
+    # Filter departments if a specific one is selected
+    if selected_department_id != 'all':
+        try:
+            selected_department = departments.get(id=selected_department_id)
+            departments_to_show = [selected_department]
+        except Department.DoesNotExist:
+            departments_to_show = departments
+            selected_department_id = 'all'
+    else:
+        departments_to_show = departments
+
+    # Get all users from the selected department(s)
+    department_users = CustomUser.objects.filter(
+        department__in=departments_to_show, 
+        tenant=request.tenant
+    ).select_related('department')
+    
     users_ids = [u.id for u in department_users]
 
-    # Get user_id from query parameter (optional)
+    # Get user filter from query parameter (optional)
     selected_user_id = request.GET.get('user_id', 'all')
     
     # Base query: corporate tasks (created by department members, not personal)
-    tasks = Task.objects.filter(created_by__in=users_ids, tenant=request.tenant).exclude(created_by=F('assigned_to')).select_related('created_by', 'assigned_to')
+    tasks = Task.objects.filter(
+        created_by__in=users_ids, 
+        tenant=request.tenant
+    ).exclude(created_by=F('assigned_to')).select_related('created_by', 'assigned_to')
 
     # Filter by selected user if specified
     if selected_user_id != 'all':
-        tasks = tasks.filter(assigned_to_id=selected_user_id)
+        tasks = tasks.filter(assigned_to__id=selected_user_id)
 
     # Department-wide or user-specific metrics
     total_tasks = tasks.count()
@@ -1892,19 +1944,23 @@ def hod_performance_dashboard(request):
             assigned_to=dept_user,
             tenant=request.tenant
         ).exclude(created_by=F('assigned_to')).select_related('assigned_to')
+        
         user_total_tasks = user_tasks.count()
         user_completed_tasks = user_tasks.filter(status='completed').count()
         user_completion_percentage = (user_completed_tasks / user_total_tasks * 100) if user_total_tasks > 0 else 0
+        
         user_metrics.append({
             'user_id': dept_user.id,
             'full_name': dept_user.get_full_name() or dept_user.username,
+            'department': dept_user.department.name if dept_user.department else 'N/A',
             'total_tasks': user_total_tasks,
             'completed_tasks': user_completed_tasks,
             'completion_percentage': round(user_completion_percentage, 2),
         })
 
     context = {
-        'department': department.name,
+        'departments': departments,
+        'selected_department_id': selected_department_id,
         'completion_percentage': round(completion_percentage, 2),
         'total_tasks': total_tasks,
         'completed_tasks': completed_tasks,
@@ -1913,7 +1969,7 @@ def hod_performance_dashboard(request):
         'selected_user_id': selected_user_id,
     }
     return render(request, 'dashboard/hod_performance_dashboard.html', context)
-
+    
 @login_required
 def view_my_profile(request):
     if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
