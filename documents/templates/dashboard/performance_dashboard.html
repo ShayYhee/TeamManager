@@ -197,6 +197,8 @@ $(document).ready(function() {
         window.location.href = '{% url "performance_dashboard" %}?category=overall';
     });
 
+    const isDarkMode = $('body').hasClass('dark-mode');
+
     // Dark mode chart adjustments
     if ($('body').hasClass('dark-mode')) {
         Chart.defaults.color = '#e2e8f0';
@@ -223,7 +225,7 @@ $(document).ready(function() {
                 legend: {
                     position: 'bottom',
                     labels: {
-                        color: '#2d3748'
+                        color: isDarkMode? '#e2e8f0' : '#2d3748'
                     }
                 },
                 tooltip: {

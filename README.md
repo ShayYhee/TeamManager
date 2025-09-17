@@ -12,7 +12,7 @@ A Django-based internal web application for Business Development teams to stream
 - 📄 Word to PDF conversion
 - 👀 In-browser PDF preview via modal
 - ✅ Approval workflow with status tracking
-- 📧 Email delivery (via Zoho Mail) with CC to Sales Rep and BDM
+- 📧 Email delivery (via Chosen mail provider) with CC to Sales Rep and BDM
 - 📆 Date & user filters on document list
 - 🔍 Column-specific filtering (company, type, status, created by, etc.)
 - 🧹 Auto-cleanup of old files
@@ -26,7 +26,7 @@ A Django-based internal web application for Business Development teams to stream
 - **Frontend:** Bootstrap, HTML, JavaScript
 - **PDF Conversion:** `python-docx`, `pdfkit`, `wkhtmltopdf`
 - **Database:** SQLite / PostgreSQL
-- **Email:** Zoho Mail SMTP Integration
+- **Email:** Chosen mail provider SMTP Integration
 
 ---
 

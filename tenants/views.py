@@ -67,8 +67,8 @@ def apply_for_tenant(request):
             # )
             # # Send email
             # superadmin = CustomUser.objects.get(is_superuser=True)
-            # email = superadmin.zoho_email
-            # password = superadmin.zoho_password
+            # email = superadmin.email_address
+            # password = superadmin.email_password
             # connection = get_connection(
             #     backend="django.core.mail.backends.smtp.EmailBackend",
             #     host="smtp.zoho.com",
