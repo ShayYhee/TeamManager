@@ -41,7 +41,8 @@
                     Don’t have an account? <a href="{% url 'register' %}" class="text-primary fw-medium">Register</a>
                 </p>
                 <p class="card-text">
-                    <a href="{% url 'password_reset' %}" class="text-primary fw-medium">Forgot Password?</a>
+                    {% comment %} <a href="{% url 'password_reset' %}" class="text-primary fw-medium">Forgot Password?</a> {% endcomment %}
+                    <a href="{% url 'forgot_password' %}" class="text-primary fw-medium">Forgot Password?</a>
                 </p>
             </form>
         </div>

@@ -4,6 +4,7 @@ from django.contrib.auth.models import User
 from django.contrib.admin.models import LogEntry, CHANGE, ADDITION, DELETION
 from django.contrib.auth import login, get_user_model
 from django.contrib.auth.signals import user_logged_in
+from django.contrib.auth.tokens import default_token_generator
 from django.contrib.auth.views import LoginView
 from django.contrib.contenttypes.models import ContentType
 from django.contrib import messages
@@ -17,6 +18,8 @@ from django.dispatch import receiver
 from django.forms import formset_factory
 from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
 from django.urls import reverse
+from django.utils.encoding import force_bytes, force_str
+from django.utils.http import urlsafe_base64_decode
 from django.utils.text import slugify
 from django.utils import timezone
 from django.utils.timezone import now
@@ -30,26 +33,17 @@ from .placeholders import replace_placeholders
 from docx import Document as DocxDocument
 from docx.shared import Inches
 from ckeditor_uploader.views import upload as ckeditor_upload
-import csv
-import subprocess
-import platform
-import shutil
-import re
+import csv, subprocess, platform, shutil, pdfkit, re, smtplib, os, requests, io, urllib.parse, json, logging
 from raadaa import settings
 from html2docx import html2docx
 from docx2txt import process
 from datetime import datetime, date, timedelta
-import smtplib
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from bs4 import BeautifulSoup
 from django.http import HttpResponse
-import os
-import requests
-import io
-import urllib.parse
 from rest_framework import viewsets, permissions
-import json
-import logging
+from .forms import ForgotPasswordForm, ResetPasswordForm
+
 logger = logging.getLogger(__name__)
 
 User = get_user_model()
@@ -128,6 +122,41 @@ class CustomLoginView(LoginView):
             return redirect(f"{protocol}://{expected_subdomain}.{base_domain}/")
         return super().get(request, *args, **kwargs)
     
+def forgot_password(request):
+    if request.method == 'POST':
+        form = ForgotPasswordForm(request.POST)
+        if form.is_valid():
+            form.save(request)
+            return redirect('password_reset_sent')  # Or a 'email sent' page if you want to add one
+    else:
+        form = ForgotPasswordForm()
+    return render(request, 'registration/forgot_password.html', {'form': form})
+
+def reset_password(request, uidb64, token):
+    try:
+        uid = force_str(urlsafe_base64_decode(uidb64))
+        user = User.objects.get(pk=uid)
+    except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+        user = None
+
+    if user and default_token_generator.check_token(user, token):
+        if request.method == 'POST':
+            form = ResetPasswordForm(user, request.POST)
+            if form.is_valid():
+                form.save()
+                return redirect('password_reset_success')
+        else:
+            form = ResetPasswordForm(user)
+        return render(request, 'registration/reset_password.html', {'form': form})
+    else:
+        # Invalid link (expired or tampered)
+        return render(request, 'registration/reset_password.html', {'error': 'Invalid or expired reset link.'})
+
+def password_reset_success(request):
+    return render(request, 'registration/password_reset_success.html')
+
+def password_reset_sent(request):
+    return render(request, 'registration/password_reset_sent.html')
 
 def upload_to_documents_word(document):
     tenant_name = document.tenant.name
