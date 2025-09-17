@@ -47,7 +47,7 @@
                             <th scope="col">Active</th>
                             <th scope="col">Date Joined</th>
                             <th scope="col">Position</th>
-                            <th scope="col">SMTP/Zoho Email</th>
+                            <th scope="col">SMTP/Mail Provider Email</th>
                             <th scope="col">Actions</th>
                             {% comment %} <th scope="col"><input type="checkbox" id="selectAll" aria-label="Select all users">Select All</th> {% endcomment %}
                             <th scope="col"><input type="checkbox" id="select_all" onclick="toggleSelectAll()"></th>
@@ -77,7 +77,7 @@
                             </td>
                             <td>{{ user.date_joined|date:"d M Y" }}</td>
                             <td>{{ user.position|default:'—' }}</td>
-                            <td>{{ user.zoho_email|default:'—' }}</td>
+                            <td>{{ user.email_address|default:'—' }}</td>
                             <td>
                                 <a href="{% url 'edit_user' user.id %}" class="btn btn-outline-primary btn-sm me-1" title="Edit User">
                                     <i class="fas fa-edit me-1"></i> Edit
