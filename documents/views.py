@@ -16,7 +16,7 @@ from django.db import transaction
 from django.db.models import Q, F
 from django.dispatch import receiver
 from django.forms import formset_factory
-from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
+from django.http import HttpResponse, HttpResponseForbidden, JsonResponse, HttpResponseRedirect
 from django.urls import reverse
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode
@@ -33,7 +33,7 @@ from .placeholders import replace_placeholders
 from docx import Document as DocxDocument
 from docx.shared import Inches
 from ckeditor_uploader.views import upload as ckeditor_upload
-import csv, subprocess, platform, shutil, pdfkit, re, smtplib, os, requests, io, urllib.parse, json, logging
+import csv, subprocess, platform, shutil, pdfkit, re, smtplib, os, requests, io, urllib.parse, json, logging, imaplib, email
 from raadaa import settings
 from html2docx import html2docx
 from docx2txt import process
@@ -80,6 +80,58 @@ def mail_connection(sender_email, sender_password):
         password=sender_password,
         use_tls=True,
     )
+
+def get_email_smtp_connection(sender_provider, sender_email, sender_password):
+    smtp_settings = {
+        "gmail": ("smtp.gmail.com", 587, True, False),
+        "zoho": ("smtp.zoho.com", 587, True, False),
+        "yahoo": ("smtp.mail.yahoo.com", 587, True, False),
+        "outlook": ("smtp-mail.outlook.com", 587, True, False),
+        "icloud": ("smtp.mail.me.com", 587, True, False),
+    }
+    
+    sender_provider = sender_provider.lower()
+    if sender_provider not in smtp_settings:
+        print(f"Unsupported email provider: {sender_provider}")
+        return None, f"Unsupported email provider: {sender_provider}"
+    
+    host, port, use_tls, use_ssl = smtp_settings[sender_provider]
+    try:
+        print(f"Connecting to {host}:{port} for {sender_email}")
+        connection = get_connection(
+            backend="django.core.mail.backends.smtp.EmailBackend",
+            host=host,
+            port=port,
+            username=sender_email,
+            password=sender_password,
+            use_tls=use_tls,
+        )
+        # Test the connection by opening it
+        connection.open()
+        # connection.close()
+        print(f"SMTP connection successful for {sender_provider}")
+        return connection, None  # Success: return connection and no error
+    except smtplib.SMTPAuthenticationError as e:
+        print(f"Authentication failed for {sender_provider}: {str(e)}")
+        return None, str(e)  # Return error message for user feedback
+    except Exception as e:
+        print(f"SMTP connection failed for {sender_provider}: {str(e)}")
+        return None, str(e)
+
+    
+def get_email_imap_connection(sender_provider, sender_email, sender_password):
+    if sender_provider == "gmail":
+        return imaplib.IMAP4_SSL("imap.gmail.com", 993)
+    elif sender_provider == "yahoo":
+        return imaplib.IMAP4_SSL("imap.mail.yahoo.com", 993)
+    elif sender_provider == "outlook":
+        return imaplib.IMAP4_SSL("outlook.office365.com", 993)
+    elif sender_provider == "zoho":
+        return imaplib.IMAP4_SSL("imap.zoho.com", 993)
+    elif sender_provider == "icloud":
+        return imaplib.IMAP4_SSL("imap.mail.me.com", 993)
+    else:
+        return None
 
 class CustomLoginView(LoginView):
     def form_valid(self, form):
@@ -189,20 +241,14 @@ def send_approval_request(document):
         'message': 'Unauthorized: Creator does not belong to the document\'s tenant.'
     }, status=403)
 
-    sender_email = document.created_by.zoho_email
-    sender_password = document.created_by.zoho_password
+    sender_provider = document.created_by.email_provider
+    sender_email = document.created_by.email_address
+    sender_password = document.created_by.email_password
 
     if not sender_email or not sender_password:
         return HttpResponseForbidden("Your email credentials are missing. Contact admin.")
 
-    connection = get_connection(
-        backend="django.core.mail.backends.smtp.EmailBackend",
-        host="smtp.zoho.com",
-        port=587,
-        username=sender_email,
-        password=sender_password,
-        use_tls=True,
-    )
+    connection, error_message = get_email_smtp_connection(sender_provider, sender_email, sender_password)
 
     subject = f"Approval Request: {document.company_name}"
     message = f"""
@@ -489,22 +535,16 @@ def register(request):
             admin_user = CustomUser.objects.filter(
                 tenant=request.tenant, roles__name="Admin"
             ).first()
-            if admin_user.zoho_email and admin_user.zoho_password:
-                sender_email = admin_user.zoho_email
-                sender_password = admin_user.zoho_password
+            if admin_user.email_address and admin_user.email_password:
+                sender_email = admin_user.email_address
+                sender_password = admin_user.email_password
             else:
                 superuser = CustomUser.objects.get(is_superuser=True)
-                sender_email = superuser.zoho_email
-                sender_password = superuser.zoho_password
+                sender_provider = superuser.email_provider
+                sender_email = superuser.email_address
+                sender_password = superuser.email_password
             if sender_email and sender_password:
-                connection = get_connection(
-                    backend="django.core.mail.backends.smtp.EmailBackend",
-                    host="smtp.zoho.com",
-                    port=587,
-                    username=sender_email,
-                    password=sender_password,
-                    use_tls=True,
-                )
+                connection, error_message = get_email_smtp_connection(sender_provider, sender_email, sender_password)
                 base_domain = "127.0.0.1:8000" if settings.DEBUG else "teammanager.ng"
                 protocol = "http" if settings.DEBUG else "https"
                 login_url = f"{protocol}://{request.tenant.slug}.{base_domain}/accounts/login"
@@ -661,21 +701,15 @@ def approve_document(request, document_id):
     document.save()
 
     # Ensure the BDM has SMTP credentials (or use tenant-specific SMTP settings)
-    sender_email = request.user.zoho_email
-    sender_password = request.user.zoho_password
+    sender_provider = request.user.email_provider
+    sender_email = request.user.email_address
+    sender_password = request.user.email_password
 
     if not sender_email or not sender_password:
         return HttpResponseForbidden("Your email credentials are missing. Contact admin.")
 
     # Configure SMTP settings dynamically
-    connection = get_connection(
-        backend="django.core.mail.backends.smtp.EmailBackend",
-        host="smtp.zoho.com",
-        port=587,
-        username=sender_email,
-        password=sender_password,
-        use_tls=True,
-    )
+    connection, error_message = get_email_smtp_connection(sender_provider, sender_email, sender_password)
 
     # Ensure the document's creator belongs to the same tenant
     if document.created_by.tenant != request.tenant:
@@ -726,9 +760,10 @@ def send_approved_email(request, document_id):
     if not document.pdf_file or not os.path.exists(document.pdf_file.path):
         return HttpResponseForbidden("PDF file not found.")
 
-    # Get sender credentials from the logged-in user
-    sender_email = request.user.zoho_email
-    sender_password = request.user.zoho_password
+    # Get sender credentials from the logged-in 
+    sender_provider = request.user.email_provider
+    sender_email = request.user.email_address
+    sender_password = request.user.email_password
 
     if not sender_email or not sender_password:
         return HttpResponseForbidden("Your email credentials are missing. Contact admin.")
@@ -754,14 +789,7 @@ def send_approved_email(request, document_id):
 
 
     # Configure SMTP settings dynamically
-    connection = get_connection(
-        backend="django.core.mail.backends.smtp.EmailBackend",
-        host="smtp.zoho.com",
-        port=587,
-        username=sender_email,
-        password=sender_password,
-        use_tls=True,
-    )
+    connection, error_message = get_email_smtp_connection(sender_provider, sender_email, sender_password)
 
     # Email subject based on document type
     subject = (
@@ -2287,11 +2315,74 @@ def email_config(request):
     if request.method == 'POST':
         email_config_form = EmailConfigForm(request.POST, instance=user)
         if email_config_form.is_valid():
-            email_config_form.save()
-            return redirect('view_my_profile')
+            email_provider = email_config_form.cleaned_data["email_provider"]
+            email_address = email_config_form.cleaned_data["email_address"]
+            email_password = email_config_form.cleaned_data["email_password"]
+            
+            # Test SMTP connection
+            connection, error_message = get_email_smtp_connection(email_provider, email_address, email_password)
+            
+            if connection:
+                # Save credentials to the user's profile
+                user = request.user
+                user.email_provider = email_provider
+                user.email_address = email_address
+                user.email_password = email_password  # Consider encrypting
+                user.save()
+                logger.info(f"Email config saved for {email_address}")
+                return HttpResponseRedirect("/dashboard/email-config/success/")
+            else:
+                # Handle specific errors (e.g., Gmail 534)
+                error_context = {"error": error_message}
+                if "534" in error_message and email_provider == "gmail":
+                    error_context["provider"] = "Gmail"
+                    error_context["help_url"] = "https://support.google.com/mail/?p=InvalidSecondFactor"
+                    error_context["message"] = (
+                        "Gmail requires an app-specific password for third-party apps. "
+                        "Please generate one in your Google Account settings and try again."
+                    )
+                elif email_provider == "zoho" and "authentication" in error_message.lower():
+                    error_context["provider"] = "Zoho"
+                    error_context["help_url"] = "https://www.zoho.com/mail/help/app-specific-passwords.html"
+                    error_context["message"] = (
+                        "Zoho requires an app-specific password for third-party apps. "
+                        "Please generate one in your Zoho Account settings and try again."
+                    )
+                elif email_provider == "outlook" and "535" in error_message:
+                    error_context["provider"] = "Outlook"
+                    error_context["help_url"] = "https://support.microsoft.com/en-us/office/pop-imap-and-smtp-settings-for-outlook-com-d088b986-291d-42b8-9564-9c414e2aa040"
+                    error_context["message"] = (
+                        "Outlook requires an app-specific password for third-party apps when two-factor authentication is enabled. "
+                        "Please generate one in your Microsoft Account settings and try again."
+                    )
+                elif email_provider == "yahoo" and "535" in error_message:
+                    error_context["provider"] = "Yahoo"
+                    error_context["help_url"] = "https://help.yahoo.com/kb/SLN15241.html"
+                    error_context["message"] = (
+                        "Yahoo requires an app-specific password for third-party apps when two-factor authentication is enabled. "
+                        "Please generate one in your Yahoo Account settings and try again."
+                    )
+                elif email_provider == "icloud" and "535" in error_message:
+                    error_context["provider"] = "iCloud"
+                    error_context["help_url"] = "https://support.apple.com/en-us/HT204397"
+                    error_context["message"] = (
+                        "iCloud requires an app-specific password for third-party apps. "
+                        "Please generate one in your Apple ID settings and try again."
+                    )
+                else:
+                    error_context["provider"] = email_provider.capitalize()
+                    error_context["help_url"] = ""  # Add generic help URL if needed
+                    error_context["message"] = "Failed to connect to the email server. Please check your credentials or network."
+                
+                return render(request, "settings/email_config_error.html", error_context)
+                # email_config_form.save()
+                # return redirect('view_my_profile')
     else:
         email_config_form = EmailConfigForm(instance=user)
-    return render(request, 'users/email_config.html', {'email_config_form': email_config_form})
+    return render(request, 'settings/email_config.html', {'email_config_form': email_config_form})
+
+def email_config_success_view(request):
+    return render(request, "settings/email_config_success.html")
 
 from django.db import models
 from rest_framework.authtoken.models import Token
@@ -2515,17 +2606,11 @@ def bulk_action_users(request):
             )
             # Send activation emails
             admin_user = request.user
-            sender_email = admin_user.zoho_email
-            sender_password = admin_user.zoho_password
+            sender_provider = admin_user.email_provider
+            sender_email = admin_user.email_address
+            sender_password = admin_user.email_password
             if sender_email and sender_password:
-                connection = get_connection(
-                    backend="django.core.mail.backends.smtp.EmailBackend",
-                    host="smtp.zoho.com",
-                    port=587,
-                    username=sender_email,
-                    password=sender_password,
-                    use_tls=True,
-                )
+                connection, error_message = get_email_smtp_connection(sender_provider, sender_email, sender_password)
                 if settings.DEBUG:
                     base_domain = "localhost:8000"
                     protocol = "http"
@@ -2614,7 +2699,7 @@ def view_user_details(request, user_id):
         user_view = CustomUser.objects.get(id=user_id, tenant=request.tenant)
         details = ['username', 'first_name', 'last_name', 'email', 
                  'is_active', 'roles', 'phone_number', 
-                  'department', 'teams', 'zoho_email', 'zoho_password']
+                  'department', 'teams', 'email_address', 'email_password']
     except CustomUser.DoesNotExist:
         # return HttpResponseForbidden("User not found or does not belong to your tenant.")
         raise PermissionDenied("User not found or does not belong to your tenant.")
@@ -2639,26 +2724,21 @@ def approve_user(request, user_id):
 
     # Use the admin's email credentials (request.user is already the admin)
     admin_user = request.user
-    if admin_user.zoho_email and admin_user.zoho_password:
-        sender_email = admin_user.zoho_email
-        sender_password = admin_user.zoho_password
+    if admin_user.email_address and admin_user.email_password:
+        sender_provider = admin_user.email_provider
+        sender_email = admin_user.email_address
+        sender_password = admin_user.email_password
     else:
         superuser = CustomUser.objects.get(is_superuser=True)
-        sender_email = superuser.zoho_email
-        sender_password = superuser.zoho_password
+        sender_provider = superuser.email_provider
+        sender_email = superuser.email_address
+        sender_password = superuser.email_password
 
     if not sender_email or not sender_password:
         return HttpResponseForbidden("Your email credentials are missing. Contact admin.")
 
     # Set up email connection
-    connection = get_connection(
-        backend="django.core.mail.backends.smtp.EmailBackend",
-        host="smtp.zoho.com",
-        port=587,
-        username=sender_email,
-        password=sender_password,
-        use_tls=True,
-    )
+    connection, error_message = get_email_smtp_connection(sender_provider, sender_email, sender_password)
 
     # Generate tenant-specific login URL
     # Determine base domain based on environment
@@ -3495,6 +3575,8 @@ def edit_email(request, email_id):
         return render(request, 'error.html', {'message': 'You can only edit your own emails.'})
     if email.sent:
         return redirect('email_detail', email_id=email_id)
+    
+    attachments = email.attachments.all()
 
     if request.method == 'POST':
         form = EmailForm(request.POST, request.FILES, instance=email)
@@ -3516,9 +3598,10 @@ def edit_email(request, email_id):
 
             # If user wants to send the email
             if 'send' in request.POST:
-                sender_email = request.user.zoho_email
-                sender_password = request.user.zoho_password
-                connection = mail_connection(sender_email, sender_password)
+                sender_provider = request.user.email_provider
+                sender_email = request.user.email_address
+                sender_password = request.user.email_password
+                connection, error_message = get_email_smtp_connection(sender_provider,sender_email, sender_password)
                 email_msg = EmailMessage(
                     subject=email.subject,
                     body=email.body,
@@ -3541,7 +3624,7 @@ def edit_email(request, email_id):
     else:
         form = EmailForm(instance=email)
 
-    return render(request, 'dashboard/edit_email.html', {'form': form, 'email': email})
+    return render(request, 'dashboard/edit_email.html', {'form': form, 'email': email, 'attachments': attachments})
 
 @login_required
 def save_draft(request):
@@ -3572,9 +3655,10 @@ def send_email(request):
         print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
         return render(request, 'error.html', {'message': 'You are not authorized for this tenant.'})
 
-    sender_email = request.user.zoho_email
-    sender_password = request.user.zoho_password
-    connection = mail_connection(sender_email, sender_password)
+    sender_provider = request.user.email_provider
+    sender_email = request.user.email_address
+    sender_password = request.user.email_password
+    connection, error_message = get_email_smtp_connection(sender_provider,sender_email, sender_password)
 
     if request.method == 'POST':
         form = EmailForm(request.POST, request.FILES)
@@ -3627,6 +3711,20 @@ def delete_email(request, email_id):
     return redirect('email_list')
 
 @login_required
+def delete_email_attachment(request, email_id, attachment_id):
+    email = get_object_or_404(Email, id=email_id, tenant=request.tenant)
+    attachment = get_object_or_404(Attachment, id=attachment_id, tenant=request.tenant)
+    if not (email.sender == request.user) or attachment not in email.attachmets.all():
+        return JsonResponse({'error': 'Access denied'}, status=403)
+    
+    if request.method == 'POST':
+        email.attachments.remove(attachment)
+        if not email.attachments.exists():
+            attachment.delete()
+        return JsonResponse({'success': True})
+    return JsonResponse({'error': 'Invalid request'}, status=400)
+
+@login_required
 def contact_search(request):
     query = request.GET.get('q', '')
     contacts = Contact.objects.filter(
@@ -3649,9 +3747,9 @@ def contact_support(request):
                 email = EmailMessage(
                     subject=form.cleaned_data['subject'],
                     body=form.cleaned_data['message'],
-                    from_email=request.user.zoho_email if request.user.is_authenticated else 'no-reply@teammanager.ng',
+                    from_email=request.user.email_address if request.user.is_authenticated else 'no-reply@teammanager.ng',
                     to=['faith.osebi@transnetcloud.com'],
-                    connection=mail_connection(request.user.zoho_email, request.user.zoho_password)
+                    connection=get_email_smtp_connection(request.user.email_provider, request.user.email_address, request.user.email_password)
                 )
                 
                 # Handle attachments

@@ -80,33 +80,41 @@ class Role(models.Model):
     
 
 class CustomUser(AbstractUser):
+    EMAIL_PROVIDERS = [
+        ('gmail', 'Gmail'),
+        ('yahoo', 'Yahoo'),
+        ('outlook', 'Outlook'),
+        ('zoho', 'Zoho'),
+        ('icloud', 'iCloud'),
+    ]
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, blank=True, null=True, related_name="customuser")
     roles = models.ManyToManyField(Role, blank=True)
     department = models.ForeignKey('Department', on_delete=models.SET_NULL, null=True, blank=True, related_name='members')
     teams = models.ManyToManyField('Team', blank=True, related_name='members')
     phone_number = models.CharField(max_length=15, blank=True, null=True)
-    zoho_email = models.EmailField(blank=True, null=True)
-    zoho_password = models.CharField(max_length=255, blank=True, null=True)  # Encrypted SMTP password
+    email_address = models.EmailField(blank=True, null=True, help_text="Email address for email provider. To enable email sending.")
+    email_password = models.CharField(max_length=255, blank=True, null=True, help_text="Password for email provider. To enable email sending.")  # Encrypted SMTP password
+    email_provider = models.CharField(max_length=20, choices=EMAIL_PROVIDERS, blank=True, null=True)
 
     def set_smtp_password(self, password):
         """Encrypt and store SMTP password."""
         if password:
-            self.zoho_password = cipher.encrypt(password.encode()).decode()
+            self.email_password = cipher.encrypt(password.encode()).decode()
         else:
-            self.zoho_password = None
+            self.email_password = None
 
     def get_smtp_password(self):
         """Decrypt and return SMTP password."""
-        if self.zoho_password:
-            return cipher.decrypt(self.zoho_password.encode()).decode()
+        if self.email_password:
+            return cipher.decrypt(self.email_password.encode()).decode()
         return None
 
     def clean(self):
         """Validate SMTP credentials."""
-        if self.zoho_email and not self.zoho_password:
-            raise ValidationError("Zoho password is required if Zoho email is provided. Necessary for email sending.")
-        if self.zoho_password and not self.zoho_email:
-            raise ValidationError("Zoho email is required if Zoho password is provided. Necessary for email sending.")
+        if self.email_address and not self.email_password:
+            raise ValidationError("Chosen mail provider password is required if Chosen mail provider email is provided. Necessary for email sending.")
+        if self.email_password and not self.email_address:
+            raise ValidationError("Chosen mail provider email is required if Chosen mail provider password is provided. Necessary for email sending.")
 
     def is_hod(self):
         return self.roles.filter(name='HOD').exists()
@@ -516,18 +524,6 @@ class Email(models.Model):
 
     def __str__(self):
         return self.subject
-
-# class Email(models.Model):
-#     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE)
-#     subject = models.CharField(max_length=255)
-#     body = models.TextField()
-#     to = models.ManyToManyField(Contact, blank=False, related_name='recipients')
-#     cc = models.ManyToManyField(Contact, blank=True, related_name='copy_recipients')
-#     bcc = models.ManyToManyField(Contact, blank=True, related_name='blind_recipients')
-#     sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='sender_email')
-#     created_at = models.DateTimeField(auto_now_add=True)
-#     sent = models.BooleanField(default=False)
-#     sent_at = models.DateTimeField(null=True, blank=True)
 
 def upload_to_email_attachments(instance, filename):
     tenant_name = instance.email.tenant.name

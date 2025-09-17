@@ -96,7 +96,7 @@ LOGOUT_REDIRECT_URL = "login"  # Redirect to login after logout
 # }
 AUTH_USER_MODEL = "documents.CustomUser"
 
-# Zoho email settings
+# Zoho mail provider email settings
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = "smtp.zoho.com"
 EMAIL_PORT = 587

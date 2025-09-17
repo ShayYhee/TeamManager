@@ -1,16 +1,20 @@
 {% extends 'base.html' %}
-{% block title %}Password Reset Success{% endblock %}
+{% block title %}Email Configuration Error{% endblock %}
 
 {% block content %}
 <div class="login-page">
     <div class="login card shadow-sm">
         <div class="card-body text-center">
-            <i class="fas fa-check fa-3x mb-3 text-primary"></i>
-            <h4 class="card-title">Password Reset Successful</h4>
+            <i class="fas fa-exclamation fa-3x mb-3 text-danger"></i>
+            <h4 class="card-title">Email Configuration Failed</h4>
             <p class="card-text">
-                Your password has been updated. You can now <a href="{% url 'login' %}" class="text-primary fw-medium">Log in</a> with your new password.
+                {{ message }}
+                {% if help_url %}
+                    <p>Visit <a href="{{ help_url }}" target="_blank">{{ provider }} Help</a> for instructions.</p>
+                {% endif %}
             </p>
             <div class="mt-4">
+                <p><a href="{% url 'email_config' %}">Wrong Password? Try Again</a></p>
                 <a href="{% url 'home' %}" class="btn btn-outline-primary">Back to Home</a>
             </div>
         </div>
