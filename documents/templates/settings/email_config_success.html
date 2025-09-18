@@ -1,14 +1,14 @@
 {% extends 'base.html' %}
-{% block title %}Password Reset Success{% endblock %}
+{% block title %}Email Configuration Success{% endblock %}
 
 {% block content %}
 <div class="login-page">
     <div class="login card shadow-sm">
         <div class="card-body text-center">
             <i class="fas fa-check fa-3x mb-3 text-primary"></i>
-            <h4 class="card-title">Password Reset Successful</h4>
+            <h4 class="card-title">Email Configuration Successful</h4>
             <p class="card-text">
-                Your password has been updated. You can now <a href="{% url 'login' %}" class="text-primary fw-medium">Log in</a> with your new password.
+                Your email settings have been saved and tested successfully.
             </p>
             <div class="mt-4">
                 <a href="{% url 'home' %}" class="btn btn-outline-primary">Back to Home</a>

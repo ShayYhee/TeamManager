@@ -138,7 +138,7 @@ class UserForm(forms.ModelForm):
         model = CustomUser
         fields = ['username', 'password', 'password_confirm', 'first_name', 'last_name', 'email', 
                   'is_active', 'roles', 'phone_number', 
-                  'department', 'teams', 'zoho_email', 'zoho_password']
+                  'department', 'teams', 'email_address', 'email_password']
         widgets = {
             'username': forms.TextInput(attrs={'class': 'form-control'}),
             'password': forms.PasswordInput(attrs={'class': 'form-control'}),
@@ -151,14 +151,14 @@ class UserForm(forms.ModelForm):
             'phone_number': forms.TextInput(attrs={'class': 'form-control'}),
             'department': forms.Select(attrs={'class': 'form-control'}),
             'teams': forms.SelectMultiple(attrs={'class': 'form-control'}),
-            'zoho_email': forms.EmailInput(attrs={'class': 'form-control'}),
-            'zoho_password': forms.PasswordInput(attrs={'class': 'form-control'}),
+            'email_address': forms.EmailInput(attrs={'class': 'form-control'}),
+            'email_password': forms.PasswordInput(attrs={'class': 'form-control'}),
         }
         help_texts = {
             'password': 'Choose a strong password',
             'password_confirm': 'Confirm your password',
-            'zoho_email': 'Enter your Zoho email address',
-            'zoho_password': 'Enter your Zoho password',
+            'email_address': 'Enter your Chosen mail provider email address',
+            'email_password': 'Enter your Chosen mail provider email password',
         }
 
     def __init__(self, *args, **kwargs):
@@ -227,8 +227,8 @@ class ForgotPasswordForm(forms.Form):
             reverse('reset_password', kwargs={'uidb64': uidb64, 'token': token})
         )
         superuser = CustomUser.objects.get(is_superuser=True)
-        sender_email = superuser.zoho_email
-        sender_password = superuser.zoho_password
+        sender_email = superuser.email_address
+        sender_password = superuser.email_password
         if sender_email and sender_password:
             connection = get_connection(
                 backend="django.core.mail.backends.smtp.EmailBackend",
@@ -385,10 +385,11 @@ class StaffDocumentForm(forms.ModelForm):
 class EmailConfigForm(forms.ModelForm):
     class Meta:
         model = CustomUser
-        fields = ['zoho_email', 'zoho_password' ]
+        fields = ['email_provider', 'email_address', 'email_password' ]
         widgets = {
-            'zoho_email': forms.EmailInput(attrs={'class': 'form-control'}),
-            'zoho_password': forms.PasswordInput(attrs={'class': 'form-control'}),
+            'email_provider': forms.Select(attrs={'class': 'form-control'}),
+            'email_address': forms.EmailInput(attrs={'class': 'form-control'}),
+            'email_password': forms.PasswordInput(attrs={'class': 'form-control'}),
         }
 
 class DepartmentForm(forms.ModelForm):
