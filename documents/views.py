@@ -3075,7 +3075,7 @@ def create_event(request):
         return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
 
     if request.method == "POST":
-        form = EventForm(request.POST, user=request.user)
+        form = EventForm(request.POST)
         if form.is_valid():
             event = form.save(commit=False)
             event.tenant = request.tenant
@@ -3083,7 +3083,7 @@ def create_event(request):
             event.save()
             return redirect("event_list")
     else:
-        form = EventForm(user=request.user)
+        form = EventForm()
     return render(request, "admin/create_event.html", {"form": form})
 
 @user_passes_test(is_admin)
@@ -3250,14 +3250,14 @@ def create_notification(request):
         return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
 
     if request.method == "POST":
-        form = NotificationForm(request.POST, user=request.user)
+        form = NotificationForm(request.POST)
         if form.is_valid():
             notification = form.save(commit=False)
             notification.tenant = request.tenant
             notification.save()
             return redirect("admin_notification_list")
     else:
-        form = NotificationForm(user=request.user)
+        form = NotificationForm()
     return render(request, "admin/create_notification.html", {"form": form})
 
 @user_passes_test(is_admin)
@@ -3269,12 +3269,12 @@ def edit_notification(request, notification_id):
     notification = get_object_or_404(Notification, id=notification_id, tenant=request.tenant)
 
     if request.method == "POST":
-        form = NotificationForm(request.POST, instance=notification, user=request.user)
+        form = NotificationForm(request.POST, instance=notification)
         if form.is_valid():
             form.save()
             return redirect("admin_notification_list")
     else:
-        form = NotificationForm(instance=notification, user=request.user)
+        form = NotificationForm(instance=notification)
     return render(request, "admin/edit_notification.html", {"form": form})
 
 @user_passes_test(is_admin)
