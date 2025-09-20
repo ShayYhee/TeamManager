@@ -36,7 +36,7 @@ class TenantApplicationForm(forms.ModelForm):
             raise forms.ValidationError("Slug cannot contain underscores. Use hyphens instead.")
         if slug.isnumeric():
             raise forms.ValidationError("Slug cannot be numeric. Start with a letter.")
-        if slug.length > 20:
+        if len(slug) > 20:
             raise forms.ValidationError("Slug must be under 20 characters.")
         return slug.lower()
 

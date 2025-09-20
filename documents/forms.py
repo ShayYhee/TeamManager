@@ -473,10 +473,11 @@ class EventParticipantForm(forms.ModelForm):
 class NotificationForm(forms.ModelForm):
     class Meta:
         model = Notification
-        fields = ['title', 'message', 'type', 'expires_at']
+        fields = ['title', 'message', 'type', 'expires_at', 'is_active']
         widgets = {
             'type': forms.Select(attrs={'class': 'form-control'}, choices=Notification.NotificationType),
             'expires_at': forms.DateTimeInput(attrs={'type': 'datetime-local', 'class': 'form-control'}),
+            'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'})
         }
 
 class UserNotificationForm(forms.ModelForm):
