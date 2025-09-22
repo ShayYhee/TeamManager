@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load custom_filters %}
 
 {% block title %}Staff List - Team Manager{% endblock %}
 
@@ -9,7 +10,7 @@
         <div class="col-lg-10 col-md-12">
             <div class="card shadow-sm border-0 mb-4" style="border-radius: 12px;">
                 <div class="card-header bg-transparent d-flex align-items-center justify-content-between flex-wrap gap-3">
-                    <h2 class="mb-0"><i class="fas fa-users me-2 text-primary"></i> Staff List</h2>
+                    <h2 class="mb-0"><i class="fas fa-users me-2 text-primary"></i> Staff List ({{ profiles|obj_count }})</h2>
                     <div class="d-flex flex-wrap gap-3 align-items-center">
                         <a href="{% url 'staff_directory' %}" class="btn btn-outline-primary btn-sm">
                             <i class="fas fa-sitemap me-1"></i> Hierarchical View
@@ -182,39 +183,45 @@
                     </form>
                     <!-- Pagination -->
                     {% if profiles.has_other_pages %}
-                        <nav aria-label="Staff pagination">
+                        <nav aria-label="Page navigation">
                             <ul class="pagination justify-content-center mt-3">
                                 {% if profiles.has_previous %}
                                     <li class="page-item">
-                                        <a class="page-link" href="?page={{ profiles.previous_page_number }}&sort_by={{ sort_by }}&sort_order={{ sort_order }}&search={{ search_query|urlencode }}&dept={{ filter_dept|urlencode }}" aria-label="Previous">
+                                        <a class="page-link" href="?page={{ profiles.previous_page_number }}" aria-label="Previous">
                                             <span aria-hidden="true">«</span>
                                         </a>
                                     </li>
-                                {% else %}
+                                {% endif %}
+                                <!--First page-->
+                                <li class="page-item {% if profiles.number == 1 %}active{% endif %}">
+                                    <a class="page-link" href="?page=1">1</a>
+                                </li>
+                                {% if profiles.number != 1 and profiles.number != 2 %}
                                     <li class="page-item disabled">
-                                        <span class="page-link">«</span>
+                                        <span class="page-link">...</span>
                                     </li>
                                 {% endif %}
-                                {% for num in profiles.paginator.page_range %}
-                                    {% if profiles.number == num %}
-                                        <li class="page-item active">
-                                            <span class="page-link">{{ num }}</span>
-                                        </li>
-                                    {% elif num > profiles.number|add:-3 and num < profiles.number|add:3 %}
-                                        <li class="page-item">
-                                            <a class="page-link" href="?page={{ num }}&sort_by={{ sort_by }}&sort_order={{ sort_order }}&search={{ search_query|urlencode }}&dept={{ filter_dept|urlencode }}">{{ num }}</a>
-                                        </li>
-                                    {% endif %}
-                                {% endfor %}
+                                {% if profiles.number != 1 %}
+                                    <li class="page-item {% if profiles.number %}active{% endif %}">
+                                        <a class="page-link" href="?page={{ profiles.number }}">{{ profiles.number }}</a>
+                                    </li>
+                                {% endif %}
+                                {% if profiles.number != profiles.paginator.num_pages and profiles.number != profiles.paginator.num_pages|add:-1 %}
+                                    <li class="page-item disabled">
+                                        <span class="page-link">...</span>
+                                    </li>
+                                {% endif %}
+                                <!-- Last page (only if not already shown) -->
+                                {% if profiles.number != profiles.paginator.num_pages %}
+                                    <li class="page-item {% if profiles.number == profiles.paginator.num_pages %}active{% endif %}">
+                                        <a class="page-link" href="?page={{ profiles.paginator.num_pages }}">{{ profiles.paginator.num_pages }}</a>
+                                    </li>
+                                {% endif %}
                                 {% if profiles.has_next %}
                                     <li class="page-item">
-                                        <a class="page-link" href="?page={{ profiles.next_page_number }}&sort_by={{ sort_by }}&sort_order={{ sort_order }}&search={{ search_query|urlencode }}&dept={{ filter_dept|urlencode }}" aria-label="Next">
+                                        <a class="page-link" href="?page={{ profiles.next_page_number }}" aria-label="Next">
                                             <span aria-hidden="true">»</span>
                                         </a>
-                                    </li>
-                                {% else %}
-                                    <li class="page-item disabled">
-                                        <span class="page-link">»</span>
                                     </li>
                                 {% endif %}
                             </ul>

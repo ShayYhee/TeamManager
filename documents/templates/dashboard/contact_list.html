@@ -67,23 +67,43 @@
                             <!-- Pagination -->
                             {% if contact_list.has_other_pages %}
                                 <nav aria-label="Page navigation">
-                                    <ul class="pagination justify-content-center mt-4">
+                                    <ul class="pagination justify-content-center mt-3">
                                         {% if contact_list.has_previous %}
                                             <li class="page-item">
                                                 <a class="page-link" href="?page={{ contact_list.previous_page_number }}" aria-label="Previous">
-                                                    <span aria-hidden="true">&laquo;</span>
+                                                    <span aria-hidden="true">«</span>
                                                 </a>
                                             </li>
                                         {% endif %}
-                                        {% for num in contact_list.paginator.page_range %}
-                                            <li class="page-item {% if contact_list.number == num %}active{% endif %}">
-                                                <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+                                        <!--First page-->
+                                        <li class="page-item {% if contact_list.number == 1 %}active{% endif %}">
+                                            <a class="page-link" href="?page=1">1</a>
+                                        </li>
+                                        {% if contact_list.number != 1 and contact_list.number != 2 %}
+                                            <li class="page-item disabled">
+                                                <span class="page-link">...</span>
                                             </li>
-                                        {% endfor %}
+                                        {% endif %}
+                                        {% if contact_list.number != 1 %}
+                                            <li class="page-item {% if contact_list.number %}active{% endif %}">
+                                                <a class="page-link" href="?page={{ contact_list.number }}">{{ contact_list.number }}</a>
+                                            </li>
+                                        {% endif %}
+                                        {% if contact_list.number != contact_list.paginator.num_pages and contact_list.number != contact_list.paginator.num_pages|add:-1 %}
+                                            <li class="page-item disabled">
+                                                <span class="page-link">...</span>
+                                            </li>
+                                        {% endif %}
+                                        <!-- Last page (only if not already shown) -->
+                                        {% if contact_list.number != contact_list.paginator.num_pages %}
+                                            <li class="page-item {% if contact_list.number == contact_list.paginator.num_pages %}active{% endif %}">
+                                                <a class="page-link" href="?page={{ contact_list.paginator.num_pages }}">{{ contact_list.paginator.num_pages }}</a>
+                                            </li>
+                                        {% endif %}
                                         {% if contact_list.has_next %}
                                             <li class="page-item">
                                                 <a class="page-link" href="?page={{ contact_list.next_page_number }}" aria-label="Next">
-                                                    <span aria-hidden="true">&raquo;</span>
+                                                    <span aria-hidden="true">»</span>
                                                 </a>
                                             </li>
                                         {% endif %}
@@ -130,23 +150,43 @@
                             <!-- Pagination -->
                             {% if contact_list_dept.has_other_pages %}
                                 <nav aria-label="Page navigation">
-                                    <ul class="pagination justify-content-center mt-4">
+                                    <ul class="pagination justify-content-center mt-3">
                                         {% if contact_list_dept.has_previous %}
                                             <li class="page-item">
                                                 <a class="page-link" href="?page={{ contact_list_dept.previous_page_number }}" aria-label="Previous">
-                                                    <span aria-hidden="true">&laquo;</span>
+                                                    <span aria-hidden="true">«</span>
                                                 </a>
                                             </li>
                                         {% endif %}
-                                        {% for num in contact_list_dept.paginator.page_range %}
-                                            <li class="page-item {% if contact_list_dept.number == num %}active{% endif %}">
-                                                <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+                                        <!--First page-->
+                                        <li class="page-item {% if contact_list_dept.number == 1 %}active{% endif %}">
+                                            <a class="page-link" href="?page=1">1</a>
+                                        </li>
+                                        {% if contact_list_dept.number != 1 and contact_list_dept.number != 2 %}
+                                            <li class="page-item disabled">
+                                                <span class="page-link">...</span>
                                             </li>
-                                        {% endfor %}
+                                        {% endif %}
+                                        {% if contact_list_dept.number != 1 %}
+                                            <li class="page-item {% if contact_list_dept.number %}active{% endif %}">
+                                                <a class="page-link" href="?page={{ contact_list_dept.number }}">{{ contact_list_dept.number }}</a>
+                                            </li>
+                                        {% endif %}
+                                        {% if contact_list_dept.number != contact_list_dept.paginator.num_pages and contact_list_dept.number != contact_list_dept.paginator.num_pages|add:-1 %}
+                                            <li class="page-item disabled">
+                                                <span class="page-link">...</span>
+                                            </li>
+                                        {% endif %}
+                                        <!-- Last page (only if not already shown) -->
+                                        {% if contact_list_dept.number != contact_list_dept.paginator.num_pages %}
+                                            <li class="page-item {% if contact_list_dept.number == contact_list_dept.paginator.num_pages %}active{% endif %}">
+                                                <a class="page-link" href="?page={{ contact_list_dept.paginator.num_pages }}">{{ contact_list_dept.paginator.num_pages }}</a>
+                                            </li>
+                                        {% endif %}
                                         {% if contact_list_dept.has_next %}
                                             <li class="page-item">
                                                 <a class="page-link" href="?page={{ contact_list_dept.next_page_number }}" aria-label="Next">
-                                                    <span aria-hidden="true">&raquo;</span>
+                                                    <span aria-hidden="true">»</span>
                                                 </a>
                                             </li>
                                         {% endif %}
@@ -191,23 +231,43 @@
                             <!-- Pagination -->
                             {% if contact_list_personal.has_other_pages %}
                                 <nav aria-label="Page navigation">
-                                    <ul class="pagination justify-content-center mt-4">
+                                    <ul class="pagination justify-content-center mt-3">
                                         {% if contact_list_personal.has_previous %}
                                             <li class="page-item">
                                                 <a class="page-link" href="?page={{ contact_list_personal.previous_page_number }}" aria-label="Previous">
-                                                    <span aria-hidden="true">&laquo;</span>
+                                                    <span aria-hidden="true">«</span>
                                                 </a>
                                             </li>
                                         {% endif %}
-                                        {% for num in contact_list_personal.paginator.page_range %}
-                                            <li class="page-item {% if contact_list_personal.number == num %}active{% endif %}">
-                                                <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+                                        <!--First page-->
+                                        <li class="page-item {% if contact_list_personal.number == 1 %}active{% endif %}">
+                                            <a class="page-link" href="?page=1">1</a>
+                                        </li>
+                                        {% if contact_list_personal.number != 1 and contact_list_personal.number != 2 %}
+                                            <li class="page-item disabled">
+                                                <span class="page-link">...</span>
                                             </li>
-                                        {% endfor %}
+                                        {% endif %}
+                                        {% if contact_list_personal.number != 1 %}
+                                            <li class="page-item {% if contact_list_personal.number %}active{% endif %}">
+                                                <a class="page-link" href="?page={{ contact_list_personal.number }}">{{ contact_list_personal.number }}</a>
+                                            </li>
+                                        {% endif %}
+                                        {% if contact_list_personal.number != contact_list_personal.paginator.num_pages and contact_list_personal.number != contact_list_personal.paginator.num_pages|add:-1 %}
+                                            <li class="page-item disabled">
+                                                <span class="page-link">...</span>
+                                            </li>
+                                        {% endif %}
+                                        <!-- Last page (only if not already shown) -->
+                                        {% if contact_list_personal.number != contact_list_personal.paginator.num_pages %}
+                                            <li class="page-item {% if contact_list_personal.number == contact_list_personal.paginator.num_pages %}active{% endif %}">
+                                                <a class="page-link" href="?page={{ contact_list_personal.paginator.num_pages }}">{{ contact_list_personal.paginator.num_pages }}</a>
+                                            </li>
+                                        {% endif %}
                                         {% if contact_list_personal.has_next %}
                                             <li class="page-item">
                                                 <a class="page-link" href="?page={{ contact_list_personal.next_page_number }}" aria-label="Next">
-                                                    <span aria-hidden="true">&raquo;</span>
+                                                    <span aria-hidden="true">»</span>
                                                 </a>
                                             </li>
                                         {% endif %}

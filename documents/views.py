@@ -1689,6 +1689,8 @@ def task_list(request):
         Q(assigned_to=request.user) | Q(created_by=request.user),
         tenant=request.tenant
     ).distinct()
+
+    reassign_form = ReassignTaskForm(user=request.user)
     
     # Apply category-specific filtering
     if category == 'personal':
@@ -1721,6 +1723,7 @@ def task_list(request):
         'user': request.user,
         'users': users,
         'category': category,
+        'reassign_form': reassign_form,
     }
     return render(request, 'tasks/task_list.html', context)
 
@@ -1763,48 +1766,51 @@ def reassign_task(request, task_id):
     # Fetch the task, ensuring it belongs to the current tenant
     task = get_object_or_404(Task, id=task_id, tenant=request.tenant)
 
-    # Check permissions: only the task creator or HOD can reassign
+    # Check permissions: only task creator or HOD can reassign
     if not (task.created_by == request.user or request.user.is_hod()):
         return JsonResponse({'error': 'Access denied.'}, status=403)
 
     if request.method == 'POST':
         try:
-            # Extract data from POST request
-            assigned_to_id = request.POST.get('assigned_to')
-            due_date = request.POST.get('due_date')
-            if not assigned_to_id:
-                return JsonResponse({'error': 'Assigned user is required.'}, status=400)
-            
-            if not due_date:
+            # Extract assigned user IDs from POST request
+            assigned_to_ids = request.POST.getlist('assigned_to')
+            due_date_str = request.POST.get('due_date')
+
+            # Validate inputs
+            if not assigned_to_ids:
+                return JsonResponse({'error': 'At least one assigned user is required.'}, status=400)
+            if not due_date_str:
                 return JsonResponse({'error': 'Due date is required.'}, status=400)
 
-            # Parse due date
-            due_date = datetime.strptime(due_date, '%Y-%m-%d').date()
-            if due_date < date.today():
-                return JsonResponse({'error': 'Due date cannot be in the past.'}, status=400)
-
-            # Fetch the user to assign the task to, ensuring they belong to the same tenant
-            from django.contrib.auth import get_user_model
-            CustomUser = get_user_model()
+            # Parse and validate due date
             try:
-                assigned_user = CustomUser.objects.get(id=assigned_to_id, tenant=request.tenant)
-            except CustomUser.DoesNotExist:
-                return JsonResponse({'error': 'Invalid user selected.'}, status=400)
+                due_date = datetime.strptime(due_date_str, '%Y-%m-%d').date()
+                if due_date < date.today():
+                    return JsonResponse({'error': 'Due date cannot be in the past.'}, status=400)
+            except ValueError:
+                return JsonResponse({'error': 'Invalid due date format. Use YYYY-MM-DD.'}, status=400)
 
-            # Update the task
-            if task.due_date != due_date:
-                task.due_date = due_date
-            task.assigned_to = assigned_user
+            # Fetch assigned users, ensuring they belong to the same tenant
+            assigned_users = CustomUser.objects.filter(id__in=assigned_to_ids, tenant=request.tenant)
+            if not assigned_users.exists() or len(assigned_users) != len(assigned_to_ids):
+                return JsonResponse({'error': 'One or more selected users are invalid or not in the tenant.'}, status=400)
+
+            # Update task fields
+            task.due_date = due_date
             task.status = 'in_progress'
             task.save()
+
+            # Update many-to-many relationship for assigned users
+            task.assigned_to.clear()  # Clear existing assignments
+            task.assigned_to.add(*assigned_users)  # Add new assignments
 
             return JsonResponse({'success': True, 'message': 'Task reassigned successfully.'})
         except ValidationError as e:
             return JsonResponse({'error': str(e)}, status=400)
         except Exception as e:
-            return JsonResponse({'error': 'An error occurred while reassigning the task.'}, status=500)
+            return JsonResponse({'error': f'An error occurred: {str(e)}'}, status=500)
 
-    return JsonResponse({'error': 'Invalid request method.'}, status=405)
+    return JsonResponse({'error': 'Invalid request method. Use POST.'}, status=405)
 
 @login_required
 def delete_task(request, task_id):

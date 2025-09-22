@@ -322,7 +322,7 @@ class ReassignTaskForm(forms.ModelForm):
         model = Task
         fields = ['assigned_to', 'due_date']
         widgets = {
-            'assigned_to': forms.Select(attrs={'class': 'form-control'}),
+            'assigned_to': forms.SelectMultiple(attrs={'class': 'form-control'}),
             'due_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'},)
         }
     def __init__(self, *args, **kwargs):
@@ -734,18 +734,18 @@ class SupportForm(forms.Form):
                 raise forms.ValidationError(f"File {f.name} is not a valid JPG/PNG file.")
         return files
 
-class VacancyForm(forms.ModelForm):
-    class Meta:
-        model = Vacancy
-        fields = ['title', 'description', 'skills', 'eligibility', 'salary_range', 'location']
-        widgets = {
-            'title': forms.TextInput(attrs={'class': 'form-control'}),
-            'description': forms.TextInput(attrs={'class': 'form-control'}),
-            'skills': forms.TextInput(attrs={'class': 'form-control'}),
-            'eligibility': forms.TextInput(attrs={'class': 'form-control'}),
-            'salary_range': forms.TextInput(attrs={'class': 'form-control'}),
-            'location': forms.TextInput(attrs={'class': 'form-control'}),
-        }
+# class VacancyForm(forms.ModelForm):
+#     class Meta:
+#         model = Vacancy
+#         fields = ['title', 'description', 'skills', 'eligibility', 'salary_range', 'location']
+#         widgets = {
+#             'title': forms.TextInput(attrs={'class': 'form-control'}),
+#             'description': forms.TextInput(attrs={'class': 'form-control'}),
+#             'skills': forms.TextInput(attrs={'class': 'form-control'}),
+#             'eligibility': forms.TextInput(attrs={'class': 'form-control'}),
+#             'salary_range': forms.TextInput(attrs={'class': 'form-control'}),
+#             'location': forms.TextInput(attrs={'class': 'form-control'}),
+#         }
     
 # class VacancyApplicationForm(forms.ModelForm):
     

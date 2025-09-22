@@ -128,3 +128,11 @@ def union(list1, list2):
             seen_ids.add(obj_id)
             result.append(obj)
     return result
+
+@register.filter
+def obj_count(value):
+    num_pages = value.paginator.num_pages
+    obj_count = 0
+    for num in range(1,num_pages+1):
+        obj_count += value.paginator.page(num).object_list.count()
+    return obj_count

@@ -1,12 +1,13 @@
 {% extends 'base.html' %}
 {% block title %}Teams - Team Manager{% endblock %}
+{% load custom_filters %}
 {% block content %}
 <div class="teams-page">
     <div class="card shadow-sm">
         <div class="card-header d-flex justify-content-between align-items-center">
             <h4 class="card-title mb-0">
                 <i class="fas fa-users me-2 text-primary" aria-hidden="true"></i>
-                Teams ({{ teams|length }})
+                Teams ({{ teams|obj_count }})
             </h4>
             <div class="mb-3">
                 <a href="{% url 'create_team' %}" class="btn btn-success">Add Team</a>
@@ -72,11 +73,31 @@
                                     </a>
                                 </li>
                             {% endif %}
-                            {% for num in teams.paginator.page_range %}
-                                <li class="page-item {% if teams.number == num %}active{% endif %}">
-                                    <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+                            <!--First page-->
+                            <li class="page-item {% if teams.number == 1 %}active{% endif %}">
+                                <a class="page-link" href="?page=1">1</a>
+                            </li>
+                            {% if teams.number != 1 and teams.number != 2 %}
+                                <li class="page-item disabled">
+                                    <span class="page-link">...</span>
                                 </li>
-                            {% endfor %}
+                            {% endif %}
+                            {% if teams.number != 1 %}
+                                <li class="page-item {% if teams.number %}active{% endif %}">
+                                    <a class="page-link" href="?page={{ teams.number }}">{{ teams.number }}</a>
+                                </li>
+                            {% endif %}
+                            {% if teams.number != teams.paginator.num_pages and teams.number != teams.paginator.num_pages|add:-1 %}
+                                <li class="page-item disabled">
+                                    <span class="page-link">...</span>
+                                </li>
+                            {% endif %}
+                            <!-- Last page (only if not already shown) -->
+                            {% if teams.number != teams.paginator.num_pages %}
+                                <li class="page-item {% if teams.number == teams.paginator.num_pages %}active{% endif %}">
+                                    <a class="page-link" href="?page={{ teams.paginator.num_pages }}">{{ teams.paginator.num_pages }}</a>
+                                </li>
+                            {% endif %}
                             {% if teams.has_next %}
                                 <li class="page-item">
                                     <a class="page-link" href="?page={{ teams.next_page_number }}" aria-label="Next">
