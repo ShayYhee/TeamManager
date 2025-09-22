@@ -678,7 +678,7 @@ class CompanyDocument(models.Model):
 #     middle_name = models.CharField(max_length=255, blank=True, null=True)
 #     phone = models.CharField(max_length=20, blank=False, null=False)
 #     email = models.EmailField(blank=False, null=False)
-#     job = models.ForeignKey(Vacancy, on_delete=models.CASCADE, related_name="applications")
+#     vacancy = models.ForeignKey(Vacancy, on_delete=models.CASCADE, related_name="applications")
 #     cv = models.FileField(upload_to=upload_to_job_cvs)
 #     cover_letter = models.TextField(blank=True, null=True)
 #     created_at = models.DateTimeField(auto_now_add=True)

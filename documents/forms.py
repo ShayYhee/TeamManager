@@ -1,6 +1,6 @@
 from django import forms
 from django.forms import modelformset_factory
-from .models import Document, User, CustomUser, Folder, File, Task, StaffProfile, StaffDocument, Department, Team, Role, Event, EventParticipant, Notification, UserNotification, CompanyProfile, Contact, Email, Attachment, CompanyDocument
+from .models import Document, User, CustomUser, Folder, File, Task, StaffProfile, StaffDocument, Department, Team, Role, Event, EventParticipant, Notification, UserNotification, CompanyProfile, Contact, Email, Attachment, CompanyDocument #, Vacancy, VacancyApplication
 from tenants.models import Tenant
 from ckeditor.widgets import CKEditorWidget
 from ckeditor_uploader.widgets import CKEditorUploadingWidget
@@ -733,3 +733,50 @@ class SupportForm(forms.Form):
             if f.content_type not in ['image/jpeg', 'image/png']:
                 raise forms.ValidationError(f"File {f.name} is not a valid JPG/PNG file.")
         return files
+
+class VacancyForm(forms.ModelForm):
+    class Meta:
+        model = Vacancy
+        fields = ['title', 'description', 'skills', 'eligibility', 'salary_range', 'location']
+        widgets = {
+            'title': forms.TextInput(attrs={'class': 'form-control'}),
+            'description': forms.TextInput(attrs={'class': 'form-control'}),
+            'skills': forms.TextInput(attrs={'class': 'form-control'}),
+            'eligibility': forms.TextInput(attrs={'class': 'form-control'}),
+            'salary_range': forms.TextInput(attrs={'class': 'form-control'}),
+            'location': forms.TextInput(attrs={'class': 'form-control'}),
+        }
+    
+# class VacancyApplicationForm(forms.ModelForm):
+    
+#     class Meta:
+#         model = VacancyApplication
+#         fields = ['first_name', 'last_name', 'middle_name', 'phone', 'email', 'vacancy', 'cv', 'cover_letter']
+#         widgets = {
+#             'first_name': forms.TextInput(attrs={'class': 'form-control'}),
+#             'last_name': forms.TextInput(attrs={'class': 'form-control'}),
+#             'middle_name': forms.TextInput(attrs={'class': 'form-control'}),
+#             'phone': forms.TextInput(attrs={'class': 'form-control'}),
+#             'email': forms.TextInput(attrs={'class': 'form-control'}),
+#             'vacancy': forms.TextInput(attrs={'class': 'form-control'}),
+#             'cv': forms.FileField(
+#                 widget=forms.FileInput(attrs={'class':'form-control'}),
+#                 required=True
+#             ),
+#             'cover_letter': forms.FileField(
+#                 widget=forms.FileInput(attrs={'class':'form-control'}),
+#                 required=False
+#             ),
+#         }
+
+#         def clean_attachments(self):
+#         files = self.files.getlist('attachments')
+#         print("Cleaning attachments: %s", [(f.name, f.size, f.content_type) for f in files])
+#         if not files:
+#             print("No attachments provided")
+#             return None
+#         for f in files:
+#             if f.size > 5 * 1024 * 1024:  # 5MB limit
+#                 raise forms.ValidationError(f"File {f.name} is too large (max 5MB).")
+#         return files
+
