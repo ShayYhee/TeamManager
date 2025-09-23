@@ -734,10 +734,11 @@ class SupportForm(forms.Form):
                 raise forms.ValidationError(f"File {f.name} is not a valid JPG/PNG file.")
         return files
 
+# from .models import Vacancy, VacancyApplication
 # class VacancyForm(forms.ModelForm):
 #     class Meta:
 #         model = Vacancy
-#         fields = ['title', 'description', 'skills', 'eligibility', 'salary_range', 'location']
+#         fields = ['title', 'description', 'skills', 'eligibility', 'salary_range', 'location', 'status']
 #         widgets = {
 #             'title': forms.TextInput(attrs={'class': 'form-control'}),
 #             'description': forms.TextInput(attrs={'class': 'form-control'}),
@@ -745,6 +746,7 @@ class SupportForm(forms.Form):
 #             'eligibility': forms.TextInput(attrs={'class': 'form-control'}),
 #             'salary_range': forms.TextInput(attrs={'class': 'form-control'}),
 #             'location': forms.TextInput(attrs={'class': 'form-control'}),
+#             'status': forms.Select(attrs={'class': 'form-control'}),
 #         }
     
 # class VacancyApplicationForm(forms.ModelForm):
@@ -770,13 +772,13 @@ class SupportForm(forms.Form):
 #         }
 
 #         def clean_attachments(self):
-#         files = self.files.getlist('attachments')
-#         print("Cleaning attachments: %s", [(f.name, f.size, f.content_type) for f in files])
-#         if not files:
-#             print("No attachments provided")
-#             return None
-#         for f in files:
-#             if f.size > 5 * 1024 * 1024:  # 5MB limit
-#                 raise forms.ValidationError(f"File {f.name} is too large (max 5MB).")
-#         return files
+#             cvs = self.cv.getlist('attachments')
+#             print("Cleaning attachments: %s", [(cv.name, cv.size, cv.content_type) for cv in cvs])
+#             if not cvs:
+#                 print("No attachments provided")
+#                 return None
+#             for cv in cvs:
+#                 if cv.size > 5 * 1024 * 1024:  # 5MB limit
+#                     raise forms.ValidationError(f"File {cv.name} is too large (max 5MB).")
+#             return cvs
 

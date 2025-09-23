@@ -78,6 +78,10 @@
             color: #e2e8f0;
         }
 
+        body.dark-mode .modal-title {
+            color: #e2e8f0;
+        }
+
         /* Scrollable row and card sizing for desktop */
         @media (min-width: 769px) {
             .scrollable-row {
@@ -88,7 +92,7 @@
                 padding-bottom: 1rem; /* Space for scrollbar */
             }
             .scrollable-row::-webkit-scrollbar {
-                height: 8px;
+                height: 4px;
             }
             .scrollable-row::-webkit-scrollbar-thumb {
                 background: #ccc;
@@ -105,6 +109,33 @@
                 width: 350px; /* Fixed task-card width */
                 margin-left: auto;
                 margin-right: auto;
+            }
+            {% comment %} .kanban-column {
+                height: 400px;
+            } {% endcomment %}
+            body.dark-mode .card {
+                background: #3b4a6b;
+                border-color: #4a5568; 
+            }
+            .kanban-column{
+                height: 400px;
+                overflow-y: auto;
+                overflow-x: hidden;
+                scroll-behavior: smooth;
+            }
+            .kanban-column::-webkit-scrollbar {
+                width: 4px;
+            }
+            .kanban-column::-webkit-scrollbar-thumb {
+                background: #ccc;
+                border-radius: 4px;
+            }
+            .kanban-column::-webkit-scrollbar-track {
+                background: transparent;
+            }
+            .kanban-column .col-md-4 {
+                flex: 0 0 auto;
+                width: 400px; /* Fixed card width for desktop */
             }
         }
 
