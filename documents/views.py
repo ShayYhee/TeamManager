@@ -69,15 +69,34 @@ def custom_400(request, exception):
 def custom_500(request):
     return render(request, '500.html', status=500)
 
-def mail_connection(sender_email, sender_password):
-    return get_connection(
-        backend="django.core.mail.backends.smtp.EmailBackend",
-        host="smtp.zoho.com",
-        port=587,
-        username=sender_email,
-        password=sender_password,
-        use_tls=True,
-    )
+# def mail_connection(sender_email, sender_password):
+#     return get_connection(
+#         backend="django.core.mail.backends.smtp.EmailBackend",
+#         host="smtp.zoho.com",
+#         port=587,
+#         username=sender_email,
+#         password=sender_password,
+#         use_tls=True,
+#     )
+
+def get_tenant_url(request):
+    if hasattr(request, 'user') and request.user.is_authenticated:
+        if not CustomUser.objects.filter(id=request.user.id, tenant=request.tenant).exists():
+            print(f"User {request.user.username} not associated with tenant {request.tenant.slug if request.tenant else 'None'}")
+            expected_subdomain = (
+                request.user.tenant.slug
+                if hasattr(request.user, 'tenant') and request.user.tenant
+                else None
+            )
+            if expected_subdomain is None:
+                logout(request)
+                raise PermissionDenied("You have no associated tenant. Contact support. faith.osebi@transnetcloud.com")
+            print(f"Wrong user tenant slug: {expected_subdomain}")
+            base_domain = "localhost:8000" if settings.DEBUG else "teammanager.ng"
+            protocol = "http" if settings.DEBUG else "https"
+            home_url = f"{protocol}://{expected_subdomain}.{base_domain}/"
+            print(f"Redirecting to tenant home: {home_url}")
+            return home_url
 
 def get_email_smtp_connection(sender_provider, sender_email, sender_password):
     smtp_settings = {
@@ -148,8 +167,7 @@ class CustomLoginView(LoginView):
             else None
         )
         if expected_subdomain is None:
-            return HttpResponseForbidden("You have no associated tenant. Contact support faith.osebi@transnetcloud.com.")
-        
+            return HttpResponseForbidden("You are not associated with this company. Please ensure your subdomain is correct or contact faith.osebi@transnetcloud.com")
         base_domain = "localhost:8000" if settings.DEBUG else "teammanager.ng"
         protocol = "http" if settings.DEBUG else "https"
         tenant_login_url = f"{protocol}://{expected_subdomain}.{base_domain}/accounts/login"
@@ -168,7 +186,7 @@ class CustomLoginView(LoginView):
                 else None
             )
             if expected_subdomain is None:
-                return HttpResponseForbidden("You have no associated tenant. Contact support.")
+                return HttpResponseForbidden("You are not associated with this company. Please ensure your subdomain is correct or contact faith.osebi@transnetcloud.com")
             base_domain = "localhost:8000" if settings.DEBUG else "teammanager.ng"
             protocol = "http" if settings.DEBUG else "https"
             return redirect(f"{protocol}://{expected_subdomain}.{base_domain}/")
@@ -236,7 +254,7 @@ def send_approval_request(document):
         # return HttpResponseForbidden("Unauthorized: Creator does not belong to the document's tenant.")
         return render('error.html', {
         'error_code': '403',
-        'message': 'Unauthorized: Creator does not belong to the document\'s tenant.'
+        'message': 'Unauthorized: User does not belong to the document\'s company.'
     }, status=403)
 
     sender_provider = document.created_by.email_provider
@@ -273,7 +291,8 @@ def send_approval_request(document):
 def create_document(request):
     if not hasattr(request, 'tenant') or not request.user.tenant == request.tenant:
         # return HttpResponseForbidden("You are not authorized to perform actions for this tenant.")
-        return render(request, 'tenant_error.html', {'message': 'Access denied.', 'user': request.user,}) 
+        tenant_url = get_tenant_url(request)
+        return render(request, 'tenant_error.html', {'error_code': '401', 'message': 'Access denied.', 'user': request.user, 'tenant_url': tenant_url,}) 
     
     if request.user.tenant.slug not in ["raadaa", "transnet-cloud"]:
         # return HttpResponseForbidden("Unauthorized: User can not view this page.")
@@ -297,7 +316,7 @@ def create_document(request):
                     document.tenant = request.tenant  # Set tenant from middleware
                     # Validate that the user belongs to the same tenant
                     if document.created_by.tenant != request.tenant:
-                        return HttpResponse("Unauthorized: User does not belong to the current tenant.", status=403)
+                        return HttpResponse("Unauthorized: User does not belong to the current company.", status=403)
 
                     # Get or create the "Template Document" folder
                     user = request.user
@@ -517,7 +536,7 @@ def register(request):
             user.is_active = True
             user.tenant = request.tenant
             if not request.tenant:
-                return HttpResponseForbidden("No tenant associated with this request.")
+                return HttpResponseForbidden("No company associated with this request.")
             user.save()
             try:
                 created = StaffProfile.objects.create(tenant=user.tenant, user=user)
@@ -571,7 +590,7 @@ def register(request):
 def delete_user(request, user_id):
     # Validate that the admin belongs to the current tenant
     if request.user.tenant != request.tenant:
-        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to this company.")
 
     # Get the user, ensuring they belong to the same tenant
     user = get_object_or_404(CustomUser, id=user_id, tenant=request.tenant)
@@ -592,7 +611,7 @@ def post_login_redirect(request):
 def document_list(request):
     # Validate that the user belongs to the current tenant
     if request.user.tenant != request.tenant:
-        return HttpResponseForbidden("Unauthorized: User does not belong to the current tenant.")
+        return HttpResponseForbidden("Unauthorized: User does not belong to this company.")
     
     # if request.user.tenant.slug not in ["raadaa", "transnet-cloud"]:
     #     return HttpResponseForbidden("Unauthorized: User can not view this page.")
@@ -684,7 +703,7 @@ def home(request):
 def approve_document(request, document_id):
     # Ensure the user belongs to the current tenant
     if not hasattr(request, 'tenant') or not request.user.tenant == request.tenant:
-        return HttpResponseForbidden("You are not authorized to perform actions for this tenant.")
+        return HttpResponseForbidden("You are not authorized to perform actions for this company.")
 
     # Fetch the document, ensuring it belongs to the current tenant
     document = get_object_or_404(Document, id=document_id, tenant=request.tenant)
@@ -711,7 +730,7 @@ def approve_document(request, document_id):
 
     # Ensure the document's creator belongs to the same tenant
     if document.created_by.tenant != request.tenant:
-        return HttpResponseForbidden("Invalid document creator for this tenant.")
+        return HttpResponseForbidden("Invalid document creator for this company.")
 
     # Send email notification to the BDA
     subject = f"Document Approved for {request.tenant.name}"
@@ -730,7 +749,7 @@ def approve_document(request, document_id):
 @login_required
 def autocomplete_sales_rep(request):
     if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
-        return HttpResponseForbidden("You are not authorized for this tenant.")
+        return HttpResponseForbidden("You are not authorized for this company.")
     if 'term' in request.GET:
         qs = CustomUser.objects.filter(
             tenant = request.tenant,
@@ -743,7 +762,7 @@ def autocomplete_sales_rep(request):
 
 def send_approved_email(request, document_id):
     if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
-        return HttpResponseForbidden("You are not authorized for this tenant.")
+        return HttpResponseForbidden("You are not authorized for this company.")
     document = get_object_or_404(Document, id=document_id, tenant=request.tenant)
 
     # Ensure the document is approved before sending an email
@@ -868,7 +887,7 @@ def send_approved_email(request, document_id):
 @user_passes_test(is_admin)
 def delete_document(request, document_id):
     if hasattr(request, 'tenant') and request.user.tenant != request.tenant:
-        return HttpResponseForbidden("You are not authorized to perform actions for this tenant.")
+        return HttpResponseForbidden("You are not authorized to perform actions for this company.")
     document = get_object_or_404(Document, id=document_id, tenant=request.tenant)
 
     # Ensure document files are deleted from storage
@@ -951,7 +970,7 @@ def add_formatted_content(doc, soup, word_dir):
 @csrf_exempt  # Required for CKEditor’s POST uploads
 def custom_ckeditor_upload(request):
     if hasattr(request, 'tenant') and request.user.tenant != request.tenant:
-        return HttpResponseForbidden("You are not authorized to perform actions for this tenant.")
+        return HttpResponseForbidden("You are not authorized to perform actions for this company.")
     if not request.user.is_authenticated:
         return HttpResponseForbidden("You must be logged in to upload images.")
     logger.info(f"User {request.user.username} uploading image to CKEditor")
@@ -966,7 +985,7 @@ def custom_ckeditor_upload(request):
 def create_from_editor(request):
     # Validate that the user belongs to the current tenant
     if request.user.tenant != request.tenant:
-        return HttpResponseForbidden("Unauthorized: User does not belong to the current tenant.")
+        return HttpResponseForbidden("Unauthorized: User does not belong to this company.")
     
     def documents_word_upload(request):
         tenant_name = request.tenant.name
@@ -1159,7 +1178,7 @@ def create_from_editor(request):
 @login_required
 def folder_view(request, public_folder_id=None, personal_folder_id=None):
     if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
-        return HttpResponseForbidden("You are not authorized for this tenant.")
+        return HttpResponseForbidden("You are not authorized for this company.")
 
     # Get active tab, default to 'public'
     active_tab = request.GET.get('tab', 'public')
@@ -1268,7 +1287,7 @@ def create_folder(request):
                 folder.is_public = True
             # Validate that the user belongs to the same tenant
             if folder.created_by.tenant != request.tenant:
-                return HttpResponse("Unauthorized: User does not belong to the current tenant.", status=403)
+                return HttpResponse("Unauthorized: User does not belong to this company.", status=403)
             # parent_id = request.POST.get('public_parent' if active_tab == 'public' else 'personal_parent')
             if active_tab == 'public':
                 parent_id = request.GET.get('public_parent')
@@ -1291,7 +1310,7 @@ def create_folder(request):
 @login_required
 def delete_folder(request, folder_id):
     if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
-        return HttpResponseForbidden("You are not authorized for this tenant.")
+        return HttpResponseForbidden("You are not authorized for this company.")
     folder = get_object_or_404(Folder, id=folder_id, created_by=request.user, tenant=request.tenant)
     if folder.created_by != request.user:
         return HttpResponseForbidden("You are not authorized to delete this folder.")
@@ -1303,7 +1322,7 @@ def delete_folder(request, folder_id):
 def upload_file(request, public_folder_id=None, personal_folder_id=None):
     # Check tenant authorization first
     if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
-        return HttpResponseForbidden("You are not authorized for this tenant.")
+        return HttpResponseForbidden("You are not authorized for this company.")
 
     active_tab = request.GET.get('tab', 'public')
     parent_folder = None
@@ -1554,7 +1573,7 @@ def shared_file_view(request, token):
 @login_required
 def delete_file(request, file_id):
     if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
-        return HttpResponseForbidden("You are not authorized for this tenant.")
+        return HttpResponseForbidden("You are not authorized for this company.")
     file = get_object_or_404(File, id=file_id, uploaded_by=request.user, tenant=request.tenant)
     if file.uploaded_by != request.user:
         return HttpResponseForbidden("You are not authorized to delete this file.")
@@ -1565,7 +1584,7 @@ def delete_file(request, file_id):
 @login_required
 def rename_folder(request, folder_id):
     if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
-        return HttpResponseForbidden("You are not authorized for this tenant.")
+        return HttpResponseForbidden("You are not authorized for this company.")
     folder = get_object_or_404(Folder, id=folder_id, created_by=request.user, tenant=request.tenant)
     if folder.created_by != request.user:
         return HttpResponseForbidden("You are not authorized to rename this folder.")
@@ -1601,7 +1620,7 @@ def rename_folder(request, folder_id):
 @login_required
 def rename_file(request, file_id):
     if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
-        return HttpResponseForbidden("You are not authorized for this tenant.")
+        return HttpResponseForbidden("You are not authorized for this company.")
     file = get_object_or_404(File, id=file_id, uploaded_by=request.user, tenant=request.tenant)
     if request.method == 'POST':
         new_name = request.POST.get('name')
@@ -1629,7 +1648,7 @@ def rename_file(request, file_id):
 @login_required
 def move_folder(request, folder_id):
     if not hasattr (request, 'tenant') or request.user.tenant != request.tenant:
-        return HttpResponseForbidden("You are not authorized for this tenant.")
+        return HttpResponseForbidden("You are not authorized for this company.")
     folder = get_object_or_404(Folder, id=folder_id, created_by=request.user, tenant=request.tenant)
     if request.method == 'POST':
         new_parent_id = request.POST.get('new_parent_id')
@@ -1643,7 +1662,7 @@ def move_folder(request, folder_id):
 @login_required
 def move_file(request, file_id):
     if not hasattr (request, 'tenant') or request.user.tenant != request.tenant:
-        return HttpResponseForbidden("You are not authorized for this tenant.")
+        return HttpResponseForbidden("You are not authorized for this company.")
     file = get_object_or_404(File, id=file_id, uploaded_by=request.user, tenant=request.tenant)
     if request.method == 'POST':
         new_folder_id = request.POST.get('new_folder_id')
@@ -1658,7 +1677,7 @@ def move_file(request, file_id):
 def create_task(request):
     # Ensure the user belongs to the current tenant
     if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
-        return HttpResponseForbidden("You are not authorized for this tenant.")
+        return HttpResponseForbidden("You are not authorized for this company.")
 
     if request.method == 'POST':
         form = TaskForm(request.POST, user=request.user)
@@ -1680,7 +1699,7 @@ def task_list(request):
     # Validate tenant access
     if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
         logger.error(f"Unauthorized access by user {request.user.username}: tenant mismatch")
-        return HttpResponseForbidden("You are not authorized for this tenant.")
+        return HttpResponseForbidden("You are not authorized for this company.")
 
     category = request.GET.get('category', 'overall')
     
@@ -1737,7 +1756,7 @@ def task_detail(request, task_id):
 def update_task_status(request, task_id):
     if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
         logger.error(f"Unauthorized access by user {request.user.username}: tenant mismatch")
-        return HttpResponseForbidden("You are not authorized for this tenant.") 
+        return HttpResponseForbidden("You are not authorized for this company.") 
     task = get_object_or_404(Task, id=task_id, tenant=request.tenant)
     if not (task.assigned_to == request.user or task.created_by == request.user or request.user.is_hod()):
         return JsonResponse({'error': 'Access denied'}, status=403)
@@ -1822,7 +1841,7 @@ def task_edit(request, task_id):
     # Validate tenant access
     if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
         logger.error(f"Unauthorized access by user {request.user.username}: tenant mismatch")
-        return HttpResponseForbidden("You are not authorized for this tenant.")
+        return HttpResponseForbidden("You are not authorized for this company.")
 
     # Fetch task with tenant filter
     task = get_object_or_404(Task, id=task_id, tenant=request.user.tenant)
@@ -1865,7 +1884,7 @@ def performance_dashboard(request):
     # Validate tenant access
     if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
         logger.error(f"Unauthorized access by user {request.user.username}: tenant mismatch")
-        return HttpResponseForbidden("You are not authorized for this tenant.")
+        return HttpResponseForbidden("You are not authorized for this company.")
 
     user = request.user
     category = request.GET.get('category', 'overall')
@@ -1911,7 +1930,7 @@ def hod_performance_dashboard(request):
     # Validate tenant access
     if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
         logger.error(f"Unauthorized access by user {request.user.username}: tenant mismatch")
-        return HttpResponseForbidden("You are not authorized for this tenant.")
+        return HttpResponseForbidden("You are not authorized for this company.")
     
     user = request.user
     if not user.is_hod():
@@ -2000,7 +2019,7 @@ def hod_performance_dashboard(request):
 def view_my_profile(request):
     if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
         logger.error(f"Unauthorized access by user {request.user.username}: tenant mismatch")
-        return HttpResponseForbidden("You are not authorized for this tenant.")
+        return HttpResponseForbidden("You are not authorized for this company.")
     
     profile, created = StaffProfile.objects.get_or_create(user=request.user, tenant=request.tenant)
     visible_fields = [
@@ -2020,7 +2039,7 @@ def view_my_profile(request):
 def edit_my_profile(request):
     if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
         logger.error(f"Unauthorized access by user {request.user.username}: tenant mismatch")
-        return HttpResponseForbidden("You are not authorized for this tenant.")
+        return HttpResponseForbidden("You are not authorized for this company.")
     
     profile,_ = StaffProfile.objects.get_or_create(user=request.user, tenant=request.tenant) # staff_profile = request.user.staff_profile  # Assuming one profile per user
     if request.method == 'POST':
@@ -2043,7 +2062,7 @@ def edit_my_profile(request):
 def add_staff_document(request):
     if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
         logger.error(f"Unauthorized access by user {request.user.username}: tenant mismatch")
-        return HttpResponseForbidden("You are not authorized for this tenant.")
+        return HttpResponseForbidden("You are not authorized for this company.")
     if request.method == 'POST':
         form = StaffDocumentForm(request.POST, request.FILES)
         if form.is_valid():
@@ -2072,7 +2091,7 @@ def add_staff_document(request):
 def delete_staff_document(request, document_id):
     if hasattr(request, 'tenant') and request.user.tenant != request.tenant:
         logger.error(f"Unauthorized access by user {request.user.username}: tenant mismatch")
-        return HttpResponseForbidden("You are not authorized for this tenant.")
+        return HttpResponseForbidden("You are not authorized for this company.")
     try:
         # Get the user's StaffProfile (assuming one profile per user)
         staff_profile = StaffProfile.objects.get(user=request.user, tenant=request.tenant)
@@ -2096,7 +2115,7 @@ def delete_staff_document(request, document_id):
 def staff_directory(request):
     if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
         logger.error(f"Unauthorized access by user {request.user.username}: tenant mismatch")
-        return HttpResponseForbidden("You are not authorized for this tenant.")
+        return HttpResponseForbidden("You are not authorized for this company.")
     
     # Filter staff profiles by tenant
     profiles = StaffProfile.objects.select_related(
@@ -2128,7 +2147,7 @@ def staff_directory(request):
 def view_staff_profile(request, user_id):
     if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
         logger.error(f"Unauthorized access by user {request.user.username}: tenant mismatch")
-        return HttpResponseForbidden("You are not authorized for this tenant.")
+        return HttpResponseForbidden("You are not authorized for this company.")
     
     profile = get_object_or_404(StaffProfile, user_id=user_id, tenant=request.tenant)
 
@@ -2167,7 +2186,7 @@ def view_staff_profile(request, user_id):
 def staff_list(request):
     if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
         logger.error(f"Unauthorized access by user {request.user.username}: tenant mismatch")
-        return HttpResponseForbidden("You are not authorized for this tenant.")
+        return HttpResponseForbidden("You are not authorized for this company.")
     
     # Get query parameters
     sort_by = request.GET.get('sort_by', 'name')
@@ -2239,7 +2258,7 @@ def notifications_view(request):
     # Validate tenant access
     if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
         logger.error(f"Unauthorized access by user {request.user.username}: tenant mismatch")
-        return HttpResponseForbidden("You are not authorized for this tenant.")
+        return HttpResponseForbidden("You are not authorized for this company.")
 
     # Filter notifications by tenant and active status
     all_notifications = Notification.objects.filter(
@@ -2524,7 +2543,7 @@ def bulk_delete(request, model_name):
     if request.method == "POST":
         # Validate tenant
         if request.user.tenant != request.tenant:
-            return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+            return HttpResponseForbidden("Unauthorized: Admin does not belong to this company.")
 
         # Map model names to actual model classes and their list view names
         model_mapping = {
@@ -2566,7 +2585,7 @@ def bulk_delete(request, model_name):
 @user_passes_test(is_admin)
 def bulk_action_users(request):
     if request.user.tenant != request.tenant:
-        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to this company.")
     
     if request.method != "POST":
         return HttpResponseForbidden("Invalid request method.")
@@ -2580,7 +2599,7 @@ def bulk_action_users(request):
     try:
         users = CustomUser.objects.filter(id__in=ids, tenant=request.tenant)
         if not users.exists():
-            return HttpResponseForbidden("No valid users found for this tenant.")
+            return HttpResponseForbidden("No valid users found for this company.")
         
         if action == "delete":
             users.delete()
@@ -2652,7 +2671,7 @@ def bulk_action_users(request):
 def users_list(request):
     # Validate that the requesting user belongs to the current tenant
     if request.user.tenant != request.tenant:
-        return HttpResponseForbidden("Unauthorized: User does not belong to the current tenant.")
+        return HttpResponseForbidden("Unauthorized: User does not belong to this company.")
 
     # Filter users by the current tenant
     users = CustomUser.objects.filter(tenant=request.tenant).order_by('date_joined')
@@ -2665,7 +2684,7 @@ def users_list(request):
 @user_passes_test(is_admin)
 def create_user(request):
     if request.user.tenant != request.tenant:
-        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to this company.")
     if request.method == "POST":
         form = UserForm(request.POST, tenant=request.tenant)
         if form.is_valid():
@@ -2690,7 +2709,7 @@ def create_user(request):
 def view_user_details(request, user_id):
     # Validate that the admin belongs to the current tenant
     if request.user.tenant != request.tenant:
-        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to this company.")
 
     # Get the user, ensuring they belong to the same tenant
     try:
@@ -2700,7 +2719,7 @@ def view_user_details(request, user_id):
                   'department', 'teams', 'email_address', 'email_password']
     except CustomUser.DoesNotExist:
         # return HttpResponseForbidden("User not found or does not belong to your tenant.")
-        raise PermissionDenied("User not found or does not belong to your tenant.")
+        raise PermissionDenied("User not found or does not belong to your company.")
 
     return render(request, "admin/view_user_details.html", {"user_view": user_view, "details": details})
 @user_passes_test(is_admin)
@@ -2708,13 +2727,13 @@ def view_user_details(request, user_id):
 def approve_user(request, user_id):
     # Validate that the admin belongs to the current tenant
     if request.user.tenant != request.tenant:
-        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to this company.")
 
     # Get the user, ensuring they belong to the same tenant
     try:
         user = CustomUser.objects.get(id=user_id, tenant=request.tenant)
     except CustomUser.DoesNotExist:
-        return HttpResponseForbidden("User not found or does not belong to your tenant.")
+        return HttpResponseForbidden("User not found or does not belong to your company.")
 
     # Activate the user
     user.is_active = True
@@ -2783,7 +2802,7 @@ def approve_user(request, user_id):
 def edit_user(request, user_id):
     # Validate that the admin belongs to the current tenant
     if request.user.tenant != request.tenant:
-        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to this company.")
 
     # Get the user, ensuring they belong to the same tenant
     user = get_object_or_404(CustomUser, id=user_id, tenant=request.tenant)
@@ -2811,7 +2830,7 @@ def edit_user(request, user_id):
 def admin_documents_list(request):
     # Validate that the admin belongs to the current tenant
     if request.user.tenant != request.tenant:
-        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to this company.")
 
     documents = Document.objects.filter(tenant=request.tenant)
     paginator = Paginator(documents, 10)  # 10 users per page
@@ -2823,20 +2842,20 @@ def admin_documents_list(request):
 def admin_document_details(request, document_id):
     # Validate that the admin belongs to the current tenant
     if request.user.tenant != request.tenant:
-        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to this company.")
 
     # Get the document, ensuring it belongs to the same tenant
     try:
         document_view = Document.objects.get(id=document_id, tenant=request.tenant)
     except Document.DoesNotExist:
-        return HttpResponseForbidden("Document not found or does not belong to your tenant.")
+        return HttpResponseForbidden("Document not found or does not belong to your company.")
 
     return render(request, "admin/view_document_details.html", {"document_view": document_view})
 
 @user_passes_test(is_admin)
 def admin_delete_document(request, document_id):
     if hasattr(request, 'tenant') and request.user.tenant != request.tenant:
-        return HttpResponseForbidden("You are not authorized to perform actions for this tenant.")
+        return HttpResponseForbidden("You are not authorized to perform actions for this company.")
     document = get_object_or_404(Document, id=document_id, tenant=request.tenant)
 
     # Ensure document files are deleted from storage
@@ -2852,7 +2871,7 @@ def admin_delete_document(request, document_id):
 def admin_folder_list(request):
     # Validate that the admin belongs to the current tenant
     if request.user.tenant != request.tenant:
-        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to this company.")
 
     folders = Folder.objects.filter(tenant=request.tenant)
     paginator = Paginator(folders, 10)  # 10 users per page
@@ -2864,13 +2883,13 @@ def admin_folder_list(request):
 def admin_folder_details(request, folder_id):
     # Validate that the admin belongs to the current tenant
     if request.user.tenant != request.tenant:
-        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to this company.")
 
     # Get the folder, ensuring it belongs to the same tenant
     try:
         folder_view = Folder.objects.get(id=folder_id, tenant=request.tenant)
     except Folder.DoesNotExist:
-        return HttpResponseForbidden("Folder not found or does not belong to your tenant.")
+        return HttpResponseForbidden("Folder not found or does not belong to your company.")
 
     return render(request, "admin/view_folder_details.html", {"folder_view": folder_view})
 
@@ -2878,7 +2897,7 @@ def admin_folder_details(request, folder_id):
 def admin_delete_folder(request, folder_id):
     # Validate that the admin belongs to the current tenant
     if request.user.tenant != request.tenant:
-        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to this company.")
 
     # Get the folder, ensuring it belongs to the same tenant
     folder = get_object_or_404(Folder, id=folder_id, created_by=request.user, tenant=request.tenant)
@@ -2889,7 +2908,7 @@ def admin_delete_folder(request, folder_id):
 def admin_file_list(request):
     # Validate that the admin belongs to the current tenant
     if request.user.tenant != request.tenant:
-        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to this company.")
 
     files = File.objects.filter(tenant=request.tenant)
     paginator = Paginator(files, 10)  # 10 users per page
@@ -2901,7 +2920,7 @@ def admin_file_list(request):
 def admin_delete_file(request, file_id):
     # Validate that the admin belongs to the current tenant
     if request.user.tenant != request.tenant:
-        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to this company.")
 
     # Get the file, ensuring it belongs to the same tenant
     file = get_object_or_404(File, id=file_id, uploaded_by=request.user, tenant=request.tenant)
@@ -2912,7 +2931,7 @@ def admin_delete_file(request, file_id):
 def admin_task_list(request):
     # Validate that the admin belongs to the current tenant
     if request.user.tenant != request.tenant:
-        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to this company.")
 
     tasks = Task.objects.filter(tenant=request.tenant)
     paginator = Paginator(tasks, 10)  # 10 users per page
@@ -2924,13 +2943,13 @@ def admin_task_list(request):
 def admin_task_detail(request, task_id):
     # Validate that the admin belongs to the current tenant
     if request.user.tenant != request.tenant:
-        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to this company.")
 
     # Get the task, ensuring it belongs to the same tenant
     try:
         task_view = Task.objects.get(id=task_id, tenant=request.tenant)
     except Task.DoesNotExist:
-        return HttpResponseForbidden("Task not found or does not belong to your tenant.")
+        return HttpResponseForbidden("Task not found or does not belong to your company.")
 
     return render(request, "admin/view_task_details.html", {"task_view": task_view})
 
@@ -2938,7 +2957,7 @@ def admin_task_detail(request, task_id):
 def department_list(request):
     # Validate that the admin belongs to the current tenant
     if request.user.tenant != request.tenant:
-        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to this company.")
     
     # Fetch all departments in that tenant
     departments = Department.objects.filter(tenant=request.tenant)
@@ -2951,7 +2970,7 @@ def department_list(request):
 def create_department(request):
     # Validate that the admin belongs to the current tenant
     if request.user.tenant != request.tenant:
-        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to this company.")
 
     if request.method == "POST":
         form = DepartmentForm(request.POST, user=request.user)
@@ -2970,7 +2989,7 @@ def create_department(request):
 def edit_department(request, department_id):
     # Validate that the admin belongs to the current tenant
     if request.user.tenant != request.tenant:
-        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to this company.")
 
     # Get the department, ensuring it belongs to the same tenant
     department = get_object_or_404(Department, id=department_id, tenant=request.tenant)
@@ -2991,7 +3010,7 @@ def edit_department(request, department_id):
 def delete_department(request, department_id):
     # Validate that the admin belongs to the current tenant
     if request.user.tenant != request.tenant:
-        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to this company.")
 
     # Get the department, ensuring it belongs to the same tenant
     department = get_object_or_404(Department, id=department_id, tenant=request.tenant)
@@ -3002,7 +3021,7 @@ def delete_department(request, department_id):
 def admin_team_list(request):
     # Validate that the admin belongs to the current tenant
     if request.user.tenant != request.tenant:
-        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to this company.")
 
     teams = Team.objects.filter(tenant=request.tenant).order_by('department')
     paginator = Paginator(teams, 10)  # 10 users per page
@@ -3014,7 +3033,7 @@ def admin_team_list(request):
 def create_team(request):
     # Validate that the admin belongs to the current tenant
     if request.user.tenant != request.tenant:
-        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to this company.")
 
     if request.method == "POST":
         form = TeamForm(request.POST, user=request.user)
@@ -3031,7 +3050,7 @@ def create_team(request):
 def delete_team(request, team_id):
     # Validate that the admin belongs to the current tenant
     if request.user.tenant != request.tenant:
-        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to this company.")
 
     # Get the team, ensuring it belongs to the same tenant
     team = get_object_or_404(Team, id=team_id, tenant=request.tenant)
@@ -3042,7 +3061,7 @@ def delete_team(request, team_id):
 def edit_team(request, team_id):
     # Validate that the admin belongs to the current tenant
     if request.user.tenant != request.tenant:
-        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to this company.")
     
     # Get the team, ensuring it belongs to the same tenant
     team = get_object_or_404(Team, id=team_id, tenant=request.tenant)
@@ -3060,7 +3079,7 @@ def edit_team(request, team_id):
 def event_list(request):
     # Validate that the admin belongs to the current tenant
     if request.user.tenant != request.tenant:
-        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to this company.")
 
     events = Event.objects.filter(tenant=request.tenant)
     paginator = Paginator(events, 10)  # 10 users per page
@@ -3072,7 +3091,7 @@ def event_list(request):
 def create_event(request):
     # Validate that the admin belongs to the current tenant
     if request.user.tenant != request.tenant:
-        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to this company.")
 
     if request.method == "POST":
         form = EventForm(request.POST)
@@ -3090,7 +3109,7 @@ def create_event(request):
 def edit_event(request, event_id):
     # Validate that the admin belongs to the current tenant
     if request.user.tenant != request.tenant:
-        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to this company.")
 
     # Get the event, ensuring it belongs to the same tenant
     event = get_object_or_404(Event, id=event_id, tenant=request.tenant)
@@ -3108,7 +3127,7 @@ def edit_event(request, event_id):
 def delete_event(request, event_id):
     # Validate that the admin belongs to the current tenant
     if request.user.tenant != request.tenant:
-        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to this company.")
 
     # Get the event, ensuring it belongs to the same tenant
     event = get_object_or_404(Event, id=event_id, tenant=request.tenant)
@@ -3119,7 +3138,7 @@ def delete_event(request, event_id):
 def event_participant_list(request):
     # Validate that the admin belongs to the current tenant
     if request.user.tenant != request.tenant:
-        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to this company.")
 
     participants = EventParticipant.objects.filter(tenant=request.tenant).order_by('event')
     paginator = Paginator(participants, 10)  # 10 users per page
@@ -3131,7 +3150,7 @@ def event_participant_list(request):
 def create_event_participant(request):
     # Validate that the admin belongs to the current tenant
     if request.user.tenant != request.tenant:
-        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to this company.")
 
     if request.method == "POST":
         form = EventParticipantForm(request.POST, user=request.user)
@@ -3148,7 +3167,7 @@ def create_event_participant(request):
 def edit_event_participant(request, event_participant_id):
     # Validate that the admin belongs to the current tenant
     if request.user.tenant != request.tenant:
-        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to this company.")
 
     # Get the event, ensuring it belongs to the same tenant
     event_participant = get_object_or_404(EventParticipant, id=event_participant_id, tenant=request.tenant)
@@ -3166,7 +3185,7 @@ def edit_event_participant(request, event_participant_id):
 def delete_event_participant(request, event_participant_id):
     # Validate that the admin belongs to the current tenant
     if request.user.tenant != request.tenant:
-        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to this company.")
 
     # Get the event, ensuring it belongs to the same tenant
     event_participant = get_object_or_404(EventParticipant, id=event_participant_id, tenant=request.tenant)
@@ -3177,7 +3196,7 @@ def delete_event_participant(request, event_participant_id):
 def staff_profile_list(request):
     # Validate that the admin belongs to the current tenant
     if request.user.tenant != request.tenant:
-        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to this company.")
 
     staff_profiles = StaffProfile.objects.filter(tenant=request.tenant)
     paginator = Paginator(staff_profiles, 10)  # 10 users per page
@@ -3189,7 +3208,7 @@ def staff_profile_list(request):
 def create_staff_profile(request):
     # Validate that the admin belongs to the current tenant
     if request.user.tenant != request.tenant:
-        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to this company.")
 
     if request.method == "POST":
         form = StaffProfileForm(request.POST, user=request.user)
@@ -3206,7 +3225,7 @@ def create_staff_profile(request):
 def edit_staff_profile(request, staff_profile_id):
     # Validate that the admin belongs to the current tenant
     if request.user.tenant != request.tenant:
-        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to this company.")
 
     # Get the event, ensuring it belongs to the same tenant
     staff_profile = get_object_or_404(StaffProfile, id=staff_profile_id, tenant=request.tenant)
@@ -3224,7 +3243,7 @@ def edit_staff_profile(request, staff_profile_id):
 def delete_staff_profile(request, staff_profile_id):
     # Validate that the admin belongs to the current tenant
     if request.user.tenant != request.tenant:
-        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to this company.")
 
     # Get the event, ensuring it belongs to the same tenant
     staff_profile = get_object_or_404(StaffProfile, id=staff_profile_id, tenant=request.tenant)
@@ -3235,7 +3254,7 @@ def delete_staff_profile(request, staff_profile_id):
 def admin_notification_list(request):
     # Validate that the admin belongs to the current tenant
     if request.user.tenant != request.tenant:
-        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to this company.")
 
     notifications = Notification.objects.filter(tenant=request.tenant).order_by('created_at')
     paginator = Paginator(notifications, 10)  # 10 users per page
@@ -3247,7 +3266,7 @@ def admin_notification_list(request):
 def create_notification(request):
     # Validate that the admin belongs to the current tenant
     if request.user.tenant != request.tenant:
-        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to this company.")
 
     if request.method == "POST":
         form = NotificationForm(request.POST)
@@ -3264,7 +3283,7 @@ def create_notification(request):
 def edit_notification(request, notification_id):
     # Validate taht the admin belongs to the current tenant
     if request.user.tenant != request.tenant:
-        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to this company.")
     
     notification = get_object_or_404(Notification, id=notification_id, tenant=request.tenant)
 
@@ -3281,7 +3300,7 @@ def edit_notification(request, notification_id):
 def delete_notification(request, notification_id):
     # Validate that the admin belongs to the current tenant
     if request.user.tenant != request.tenant:
-        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to this company.")
 
     # Get the event, ensuring it belongs to the same tenant
     notification = get_object_or_404(Notification, id=notification_id, tenant=request.tenant)
@@ -3292,7 +3311,7 @@ def delete_notification(request, notification_id):
 def user_notification_list(request):
     # Validate that the admin belongs to the current tenant
     if request.user.tenant != request.tenant:
-        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to this company.")
 
     user_notifications = UserNotification.objects.filter(tenant=request.tenant)
     paginator = Paginator(user_notifications, 10)  # 10 users per page
@@ -3304,7 +3323,7 @@ def user_notification_list(request):
 def create_user_notification(request):
     # Validate that the admin belongs to the current tenant
     if request.user.tenant != request.tenant:
-        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to this company.")
 
     if request.method == "POST":
         form = UserNotificationForm(request.POST, user=request.user)
@@ -3321,7 +3340,7 @@ def create_user_notification(request):
 def edit_user_notification(request, user_notification_id):
     # Validate taht the admin belongs to the current tenant
     if request.user.tenant != request.tenant:
-        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to this company.")
     
     user_notification = get_object_or_404(UserNotification, id=user_notification_id, tenant=request.tenant)
 
@@ -3338,7 +3357,7 @@ def edit_user_notification(request, user_notification_id):
 def delete_user_notification(request, user_notification_id):
     # Validate that the admin belongs to the current tenant
     if request.user.tenant != request.tenant:
-        return HttpResponseForbidden("Unauthorized: Admin does not belong to the current tenant.")
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to this company.")
 
     # Get the event, ensuring it belongs to the same tenant
     user_notification = get_object_or_404(UserNotification, id=user_notification_id, tenant=request.tenant)
@@ -3350,7 +3369,7 @@ def delete_user_notification(request, user_notification_id):
 def view_company_profile(request):
     if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
         logger.error(f"Unauthorized access by user {request.user.username}: tenant mismatch")
-        return HttpResponseForbidden("You are not authorized for this tenant.")
+        return HttpResponseForbidden("You are not authorized for this company.")
     print(f"User tenant: {request.user.tenant}. Request tenant: {request.tenant.name}")
     try: 
         tenant_profile, created = CompanyProfile.objects.get_or_create(
@@ -3379,7 +3398,7 @@ def view_company_profile(request):
 def edit_company_profile(request):
     if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
         logger.error(f"Unauthorized access by user {request.user.username}: tenant mismatch")
-        return HttpResponseForbidden("You are not authorized for this tenant.")
+        return HttpResponseForbidden("You are not authorized for this company.")
     
     company_profile, created = CompanyProfile.objects.get_or_create(
         tenant=request.tenant,
@@ -3401,7 +3420,7 @@ def edit_company_profile(request):
 def add_company_document(request):
     if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
         logger.error(f"Unauthorized access by user {request.user.username}: tenant mismatch")
-        return HttpResponseForbidden("You are not authorized for this tenant.")
+        return HttpResponseForbidden("You are not authorized for this company.")
     if request.method == 'POST':
         form = CompanyDocumentForm(request.POST, request.FILES)
         if form.is_valid():
@@ -3431,7 +3450,7 @@ def add_company_document(request):
 def delete_company_document(request, document_id):
     if hasattr(request, 'tenant') and request.user.tenant != request.tenant:
         logger.error(f"Unauthorized access by user {request.user.username}: tenant mismatch")
-        return HttpResponseForbidden("You are not authorized for this tenant.")
+        return HttpResponseForbidden("You are not authorized for this company.")
     
     try:
         # Get the user's StaffProfile (assuming one profile per user)
@@ -3457,7 +3476,7 @@ def delete_company_document(request, document_id):
 def contact_list(request):
     if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
         print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
-        return HttpResponseForbidden("You are not authorized for this tenant.")
+        return HttpResponseForbidden("You are not authorized for this company.")
     contact_list_dept = Contact.objects.filter(tenant=request.tenant, department=request.user.department, is_public=True)
     contact_list_personal = Contact.objects.filter(tenant=request.tenant, created_by=request.user)
     contact_list = contact_list_dept | contact_list_personal
@@ -3475,7 +3494,7 @@ def create_contact(request):
     if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
         print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
         # return HttpResponseForbidden("You are not authorized for this tenant.")
-        return render(request, 'error.html', {'message': 'You are not authorized for this tenant.'})
+        return render(request, 'error.html', {'message': 'You are not authorized for this company.'})
     if request.method == "POST":
         form = ContactForm(request.POST)
         if form.is_valid():
@@ -3516,7 +3535,7 @@ def edit_contact(request, contact_id):
     if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
         print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
         # return HttpResponseForbidden("You are not authorized for this tenant.")
-        return render(request, 'error.html', {'message': 'You are not authorized for this tenant.'})
+        return render(request, 'error.html', {'message': 'You are not authorized for this company.'})
     contact = get_object_or_404(Contact, id=contact_id, tenant=request.tenant)
     print(f"Contact to edit: {contact}")
     if request.method == "POST":
@@ -3536,7 +3555,7 @@ def delete_contact(request, contact_id):
     if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
         print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
         # return HttpResponseForbidden("You are not authorized for this tenant.")
-        return render(request, 'error.html', {'message': 'You are not authorized for this tenant.'})
+        return render(request, 'error.html', {'message': 'You are not authorized for this company.'})
     contact = get_object_or_404(Contact, id=contact_id, tenant=request.tenant)
     if contact.created_by != request.user:
         return JsonResponse({'success': False, 'errors': {'folder': ['You can only delete your own contacts']}}, status=403)
@@ -3548,7 +3567,7 @@ def email_list(request):
     if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
         print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
         # return HttpResponseForbidden("You are not authorized for this tenant.")
-        return render(request, 'error.html', {'message': 'You are not authorized for this tenant.'})
+        return render(request, 'error.html', {'message': 'You are not authorized for this company.'})
         
     email_list = Email.objects.filter(tenant=request.tenant, sender=request.user)
     email_list_draft = Email.objects.filter(tenant=request.tenant, sender=request.user, sent=False)
@@ -3566,7 +3585,7 @@ def email_list(request):
 def edit_email(request, email_id):
     if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
         print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
-        return render(request, 'error.html', {'message': 'You are not authorized for this tenant.'})
+        return render(request, 'error.html', {'message': 'You are not authorized for this company.'})
 
     email = get_object_or_404(Email, id=email_id, tenant=request.tenant, sender=request.user)
     if email.sender != request.user:
@@ -3694,14 +3713,14 @@ def send_email(request):
 def email_detail(request, email_id):
     if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
         print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
-        return HttpResponseForbidden("You are not authorized for this tenant.")
+        return HttpResponseForbidden("You are not authorized for this company.")
     email = get_object_or_404(Email, id=email_id, tenant=request.tenant, sender=request.user)
     return render(request, 'dashboard/email_detail.html', {'email': email})
 
 def delete_email(request, email_id):
     if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
         print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
-        return HttpResponseForbidden("You are not authorized for this tenant.")
+        return HttpResponseForbidden("You are not authorized for this company.")
     email = get_object_or_404(Email, id=email_id, tenant=request.tenant, sender=request.user)
     if email.sender != request.user:
         raise HttpResponseForbidden('You can only delete your own emails')

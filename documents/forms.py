@@ -734,18 +734,18 @@ class SupportForm(forms.Form):
                 raise forms.ValidationError(f"File {f.name} is not a valid JPG/PNG file.")
         return files
 
-class VacancyForm(forms.ModelForm):
-    class Meta:
-        model = Vacancy
-        fields = ['title', 'description', 'skills', 'eligibility', 'salary_range', 'location']
-        widgets = {
-            'title': forms.TextInput(attrs={'class': 'form-control'}),
-            'description': forms.TextInput(attrs={'class': 'form-control'}),
-            'skills': forms.TextInput(attrs={'class': 'form-control'}),
-            'eligibility': forms.TextInput(attrs={'class': 'form-control'}),
-            'salary_range': forms.TextInput(attrs={'class': 'form-control'}),
-            'location': forms.TextInput(attrs={'class': 'form-control'}),
-        }
+# class VacancyForm(forms.ModelForm):
+#     class Meta:
+#         model = Vacancy
+#         fields = ['title', 'description', 'skills', 'eligibility', 'salary_range', 'location']
+#         widgets = {
+#             'title': forms.TextInput(attrs={'class': 'form-control'}),
+#             'description': forms.TextInput(attrs={'class': 'form-control'}),
+#             'skills': forms.TextInput(attrs={'class': 'form-control'}),
+#             'eligibility': forms.TextInput(attrs={'class': 'form-control'}),
+#             'salary_range': forms.TextInput(attrs={'class': 'form-control'}),
+#             'location': forms.TextInput(attrs={'class': 'form-control'}),
+#         }
     
 # class VacancyApplicationForm(forms.ModelForm):
     
