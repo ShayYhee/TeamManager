@@ -10,7 +10,7 @@
             <div class="card-header d-flex justify-content-between align-items-center">
                 <h4 class="card-title mb-0">
                     <i class="fas fa-folder-open me-2 text-primary" aria-hidden="true"></i>
-                    Generated Documents
+                    Generated Documents ({{page_obj|obj_count}})
                 </h4>
                 <div>
                     {% if user.tenant.slug == "raadaa" or user.tenant.slug == "transnet-cloud" %}
@@ -206,17 +206,41 @@
                             <ul class="pagination justify-content-center mt-3">
                                 {% if page_obj.has_previous %}
                                     <li class="page-item">
-                                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% for key, value in filter_params.items %}&{{ key }}={{ value }}{% endfor %}">Previous</a>
+                                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% for key, value in filter_params.items %}&{{ key }}={{ value }}{% endfor %}" aria-label="Previous">
+                                            <span aria-hidden="true">«</span>
+                                        </a>
                                     </li>
                                 {% endif %}
-                                {% for num in page_obj.paginator.page_range %}
-                                    <li class="page-item {% if page_obj.number == num %}active{% endif %}">
-                                        <a class="page-link" href="?page={{ num }}{% for key, value in filter_params.items %}&{{ key }}={{ value }}{% endfor %}">{{ num }}</a>
+                                <!--First page-->
+                                <li class="page-item {% if page_obj.number == 1 %}active{% endif %}">
+                                    <a class="page-link" href="?page=1">1</a>
+                                </li>
+                                {% if page_obj.number != 1 and page_obj.number != 2 %}
+                                    <li class="page-item disabled">
+                                        <span class="page-link">...</span>
                                     </li>
-                                {% endfor %}
+                                {% endif %}
+                                {% if page_obj.number != 1 %}
+                                    <li class="page-item {% if page_obj.number %}active{% endif %}">
+                                        <a class="page-link" href="?page={{ page_obj.number }}{% for key, value in filter_params.items %}&{{ key }}={{ value }}{% endfor %}">{{ page_obj.number }}</a>
+                                    </li>
+                                {% endif %}
+                                {% if page_obj.number != page_obj.paginator.num_pages and page_obj.number != page_obj.paginator.num_pages|add:-1 %}
+                                    <li class="page-item disabled">
+                                        <span class="page-link">...</span>
+                                    </li>
+                                {% endif %}
+                                <!-- Last page (only if not already shown) -->
+                                {% if page_obj.number != page_obj.paginator.num_pages %}
+                                    <li class="page-item {% if page_obj.number == page_obj.paginator.num_pages %}active{% endif %}">
+                                        <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{% for key, value in filter_params.items %}&{{ key }}={{ value }}{% endfor %}">{{ page_obj.paginator.num_pages }}</a>
+                                    </li>
+                                {% endif %}
                                 {% if page_obj.has_next %}
                                     <li class="page-item">
-                                        <a class="page-link" href="?page={{ page_obj.next_page_number }}{% for key, value in filter_params.items %}&{{ key }}={{ value }}{% endfor %}">Next</a>
+                                        <a class="page-link" href="?page={{ page_obj.next_page_number }}{% for key, value in filter_params.items %}&{{ key }}={{ value }}{% endfor %}" aria-label="Next">
+                                            <span aria-hidden="true">»</span>
+                                        </a>
                                     </li>
                                 {% endif %}
                             </ul>

@@ -1,6 +1,7 @@
 .vercel
 *.pyc
 documents/migrations/
+tenants/migrations/
 media/
 db.sqlite3
 terminal.txt

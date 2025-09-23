@@ -322,7 +322,7 @@ class ReassignTaskForm(forms.ModelForm):
         model = Task
         fields = ['assigned_to', 'due_date']
         widgets = {
-            'assigned_to': forms.Select(attrs={'class': 'form-control'}),
+            'assigned_to': forms.SelectMultiple(attrs={'class': 'form-control'}),
             'due_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'},)
         }
     def __init__(self, *args, **kwargs):

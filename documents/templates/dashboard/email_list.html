@@ -70,23 +70,43 @@
                             <!-- Pagination -->
                             {% if email_list.has_other_pages %}
                                 <nav aria-label="Page navigation">
-                                    <ul class="pagination justify-content-center mt-4">
+                                    <ul class="pagination justify-content-center mt-3">
                                         {% if email_list.has_previous %}
                                             <li class="page-item">
                                                 <a class="page-link" href="?page={{ email_list.previous_page_number }}" aria-label="Previous">
-                                                    <span aria-hidden="true">&laquo;</span>
+                                                    <span aria-hidden="true">«</span>
                                                 </a>
                                             </li>
                                         {% endif %}
-                                        {% for num in email_list.paginator.page_range %}
-                                            <li class="page-item {% if email_list.number == num %}active{% endif %}">
-                                                <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+                                        <!--First page-->
+                                        <li class="page-item {% if email_list.number == 1 %}active{% endif %}">
+                                            <a class="page-link" href="?page=1">1</a>
+                                        </li>
+                                        {% if email_list.number != 1 and email_list.number != 2 %}
+                                            <li class="page-item disabled">
+                                                <span class="page-link">...</span>
                                             </li>
-                                        {% endfor %}
+                                        {% endif %}
+                                        {% if email_list.number != 1 %}
+                                            <li class="page-item {% if email_list.number %}active{% endif %}">
+                                                <a class="page-link" href="?page={{ email_list.number }}">{{ email_list.number }}</a>
+                                            </li>
+                                        {% endif %}
+                                        {% if email_list.number != email_list.paginator.num_pages and email_list.number != email_list.paginator.num_pages|add:-1 %}
+                                            <li class="page-item disabled">
+                                                <span class="page-link">...</span>
+                                            </li>
+                                        {% endif %}
+                                        <!-- Last page (only if not already shown) -->
+                                        {% if email_list.number != email_list.paginator.num_pages %}
+                                            <li class="page-item {% if email_list.number == email_list.paginator.num_pages %}active{% endif %}">
+                                                <a class="page-link" href="?page={{ email_list.paginator.num_pages }}">{{ email_list.paginator.num_pages }}</a>
+                                            </li>
+                                        {% endif %}
                                         {% if email_list.has_next %}
                                             <li class="page-item">
                                                 <a class="page-link" href="?page={{ email_list.next_page_number }}" aria-label="Next">
-                                                    <span aria-hidden="true">&raquo;</span>
+                                                    <span aria-hidden="true">»</span>
                                                 </a>
                                             </li>
                                         {% endif %}
@@ -134,23 +154,43 @@
                             <!-- Pagination -->
                             {% if email_list_draft.has_other_pages %}
                                 <nav aria-label="Page navigation">
-                                    <ul class="pagination justify-content-center mt-4">
+                                    <ul class="pagination justify-content-center mt-3">
                                         {% if email_list_draft.has_previous %}
                                             <li class="page-item">
                                                 <a class="page-link" href="?page={{ email_list_draft.previous_page_number }}" aria-label="Previous">
-                                                    <span aria-hidden="true">&laquo;</span>
+                                                    <span aria-hidden="true">«</span>
                                                 </a>
                                             </li>
                                         {% endif %}
-                                        {% for num in email_list_draft.paginator.page_range %}
-                                            <li class="page-item {% if email_list_draft.number == num %}active{% endif %}">
-                                                <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+                                        <!--First page-->
+                                        <li class="page-item {% if email_list_draft.number == 1 %}active{% endif %}">
+                                            <a class="page-link" href="?page=1">1</a>
+                                        </li>
+                                        {% if email_list_draft.number != 1 and email_list_draft.number != 2 %}
+                                            <li class="page-item disabled">
+                                                <span class="page-link">...</span>
                                             </li>
-                                        {% endfor %}
+                                        {% endif %}
+                                        {% if email_list_draft.number != 1 %}
+                                            <li class="page-item {% if email_list_draft.number %}active{% endif %}">
+                                                <a class="page-link" href="?page={{ email_list_draft.number }}">{{ email_list_draft.number }}</a>
+                                            </li>
+                                        {% endif %}
+                                        {% if email_list_draft.number != email_list_draft.paginator.num_pages and email_list_draft.number != email_list_draft.paginator.num_pages|add:-1 %}
+                                            <li class="page-item disabled">
+                                                <span class="page-link">...</span>
+                                            </li>
+                                        {% endif %}
+                                        <!-- Last page (only if not already shown) -->
+                                        {% if email_list_draft.number != email_list_draft.paginator.num_pages %}
+                                            <li class="page-item {% if email_list_draft.number == email_list_draft.paginator.num_pages %}active{% endif %}">
+                                                <a class="page-link" href="?page={{ email_list_draft.paginator.num_pages }}">{{ email_list_draft.paginator.num_pages }}</a>
+                                            </li>
+                                        {% endif %}
                                         {% if email_list_draft.has_next %}
                                             <li class="page-item">
                                                 <a class="page-link" href="?page={{ email_list_draft.next_page_number }}" aria-label="Next">
-                                                    <span aria-hidden="true">&raquo;</span>
+                                                    <span aria-hidden="true">»</span>
                                                 </a>
                                             </li>
                                         {% endif %}
@@ -195,23 +235,43 @@
                             <!-- Pagination -->
                             {% if email_list_sent.has_other_pages %}
                                 <nav aria-label="Page navigation">
-                                    <ul class="pagination justify-content-center mt-4">
+                                    <ul class="pagination justify-content-center mt-3">
                                         {% if email_list_sent.has_previous %}
                                             <li class="page-item">
                                                 <a class="page-link" href="?page={{ email_list_sent.previous_page_number }}" aria-label="Previous">
-                                                    <span aria-hidden="true">&laquo;</span>
+                                                    <span aria-hidden="true">«</span>
                                                 </a>
                                             </li>
                                         {% endif %}
-                                        {% for num in email_list_sent.paginator.page_range %}
-                                            <li class="page-item {% if email_list_sent.number == num %}active{% endif %}">
-                                                <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+                                        <!--First page-->
+                                        <li class="page-item {% if email_list_sent.number == 1 %}active{% endif %}">
+                                            <a class="page-link" href="?page=1">1</a>
+                                        </li>
+                                        {% if email_list_sent.number != 1 and email_list_sent.number != 2 %}
+                                            <li class="page-item disabled">
+                                                <span class="page-link">...</span>
                                             </li>
-                                        {% endfor %}
+                                        {% endif %}
+                                        {% if email_list_sent.number != 1 %}
+                                            <li class="page-item {% if email_list_sent.number %}active{% endif %}">
+                                                <a class="page-link" href="?page={{ email_list_sent.number }}">{{ email_list_sent.number }}</a>
+                                            </li>
+                                        {% endif %}
+                                        {% if email_list_sent.number != email_list_sent.paginator.num_pages and email_list_sent.number != email_list_sent.paginator.num_pages|add:-1 %}
+                                            <li class="page-item disabled">
+                                                <span class="page-link">...</span>
+                                            </li>
+                                        {% endif %}
+                                        <!-- Last page (only if not already shown) -->
+                                        {% if email_list_sent.number != email_list_sent.paginator.num_pages %}
+                                            <li class="page-item {% if email_list_sent.number == email_list_sent.paginator.num_pages %}active{% endif %}">
+                                                <a class="page-link" href="?page={{ email_list_sent.paginator.num_pages }}">{{ email_list_sent.paginator.num_pages }}</a>
+                                            </li>
+                                        {% endif %}
                                         {% if email_list_sent.has_next %}
                                             <li class="page-item">
                                                 <a class="page-link" href="?page={{ email_list_sent.next_page_number }}" aria-label="Next">
-                                                    <span aria-hidden="true">&raquo;</span>
+                                                    <span aria-hidden="true">»</span>
                                                 </a>
                                             </li>
                                         {% endif %}

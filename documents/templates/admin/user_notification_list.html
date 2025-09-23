@@ -1,12 +1,13 @@
 {% extends 'base.html' %}
 {% block title %}User Notifications - Team Manager{% endblock %}
+{% load custom_filters %}
 {% block content %}
 <div class="user-notifications-page">
     <div class="card shadow-sm">
         <div class="card-header d-flex justify-content-between align-items-center">
             <h4 class="card-title mb-0">
                 <i class="fas fa-user-bell me-2 text-primary" aria-hidden="true"></i>
-                User Notifications ({{ user_notifications|length }})
+                User Notifications ({{ user_notifications|obj_count }})
             </h4>
             <div class="mb-3">
                 <a href="{% url 'create_user_notification' %}" class="btn btn-success">Add User Notification</a>
@@ -75,11 +76,31 @@
                                     </a>
                                 </li>
                             {% endif %}
-                            {% for num in user_notifications.paginator.page_range %}
-                                <li class="page-item {% if user_notifications.number == num %}active{% endif %}">
-                                    <a class="page-link" href="?page={{ num }}">{{ num }}</a>
+                            <!--First page-->
+                            <li class="page-item {% if user_notifications.number == 1 %}active{% endif %}">
+                                <a class="page-link" href="?page=1">1</a>
+                            </li>
+                            {% if user_notifications.number != 1 and user_notifications.number != 2 %}
+                                <li class="page-item disabled">
+                                    <span class="page-link">...</span>
                                 </li>
-                            {% endfor %}
+                            {% endif %}
+                            {% if user_notifications.number != 1 %}
+                                <li class="page-item {% if user_notifications.number %}active{% endif %}">
+                                    <a class="page-link" href="?page={{ user_notifications.number }}">{{ user_notifications.number }}</a>
+                                </li>
+                            {% endif %}
+                            {% if user_notifications.number != user_notifications.paginator.num_pages and user_notifications.number != user_notifications.paginator.num_pages|add:-1 %}
+                                <li class="page-item disabled">
+                                    <span class="page-link">...</span>
+                                </li>
+                            {% endif %}
+                            <!-- Last page (only if not already shown) -->
+                            {% if user_notifications.number != user_notifications.paginator.num_pages %}
+                                <li class="page-item {% if user_notifications.number == user_notifications.paginator.num_pages %}active{% endif %}">
+                                    <a class="page-link" href="?page={{ user_notifications.paginator.num_pages }}">{{ user_notifications.paginator.num_pages }}</a>
+                                </li>
+                            {% endif %}
                             {% if user_notifications.has_next %}
                                 <li class="page-item">
                                     <a class="page-link" href="?page={{ user_notifications.next_page_number }}" aria-label="Next">
