@@ -5,3 +5,6 @@ tenants/migrations/
 media/
 db.sqlite3
 terminal.txt
+.DS_Store
+documents/.DS_Store
+tenants/.DS_Store
