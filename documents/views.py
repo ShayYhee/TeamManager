@@ -3871,6 +3871,19 @@ def edit_vacancy(request, vacancy_id):
 
 @login_required
 @user_passes_test(is_hr)
+def vacancy_details(request, vacancy_id):
+    if hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+        print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
+        return render(request, 'tenant_error.html', {'error_code': '401','message': 'You are not authorized for this company.'})
+    for role in request.user.roles.all():
+        if role.name != "HR":
+            return render(request, "error.html", {"message":"You are not authorized to view this page"})
+    vacancy = get_object_or_404(Vacancy, id=vacancy_id, tenant=request.tenant)
+    
+    return render(request, 'dashboard/vacancy_detail.html', {'vacancy': vacancy})
+
+@login_required
+@user_passes_test(is_hr)
 def delete_vacancy(request, vacancy_id):
     if hasattr(request, 'tenant') or request.user.tenant != request.tenant:
         print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
