@@ -16,7 +16,7 @@ from django.db import transaction
 from django.db.models import Q, F
 from django.dispatch import receiver
 from django.forms import formset_factory
-from django.http import HttpResponse, HttpResponseForbidden, JsonResponse, HttpResponseRedirect
+from django.http import HttpResponse, HttpResponseForbidden, JsonResponse, HttpResponseRedirect, HttpResponseNotFound
 from django.urls import reverse
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode
@@ -3805,36 +3805,29 @@ def contact_support(request):
 @user_passes_test(is_hr)
 @login_required
 def vacancy_list(request):
-    if hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+    if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
         print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
         return render(request, 'tenant_error.html', {'error_code': '401','message': 'You are not authorized for this company.'})
     
-    for role in request.user.roles.all():
-        if role.name != "HR":
-            return render(request, "error.html", {"message": "You are not authorized to view this page."})
-        
-    # Generate shareable links for vacancy posts
-    for post in vacancies:
-        post.shareable_link = request.build_absolute_uri(post.get_shareable_link()) if post.is_shared else None
-    
-    vacancies = Vacancy.objects.filter(tenant=request.tenant)
-    # Pagination
+    vacancies = Vacancy.objects.filter(tenant=request.tenant).select_related('created_by', 'updated_by', 'shared_by')
+    for vacancy in vacancies:
+        if vacancy.is_shared and vacancy.share_time <= timezone.now() <= vacancy.share_time_end:
+            vacancy.shareable_link = request.build_absolute_uri(vacancy.get_shareable_link())
+        else:
+            vacancy.shareable_link = None
+
     paginator = Paginator(vacancies, 10)  # 10 vacancies per page
     page = request.GET.get('page')
     page_obj = paginator.get_page(page)
     
-    return render(request, 'dashboard/vacancy_list.html', {'vacancies': page_obj})
+    return render(request, 'hr/vacancy_list.html', {'vacancies': page_obj})
 
 @user_passes_test(is_hr)
 @login_required
 def create_vacancy(request):
-    if hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+    if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
         print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
         return render(request, 'tenant_error.html', {'error_code': '401','message': 'You are not authorized for this company.'})
-    
-    for role in request.user.roles.all():
-        if role.name != "HR":
-            return render(request, "error.html", {"message": "You are not authorized to view this page."})
     
     if request.method == 'POST':
         form = VacancyForm(request.POST)
@@ -3846,39 +3839,34 @@ def create_vacancy(request):
             return redirect('vacancy_list')
     else:
         form = VacancyForm()
-    return render(request, 'dashboard/create_vacancy.html', {'form': form}) 
+    return render(request, 'hr/create_vacancy.html', {'form': form}) 
 
 @login_required
 @user_passes_test(is_hr)
 def edit_vacancy(request, vacancy_id):
-    if hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+    if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
         print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
         return render(request, 'tenant_error.html', {'error_code': '401','message': 'You are not authorized for this company.'})
-    
-    for role in request.user.roles.all():
-        if role.name != "HR":
-            return render(request, "error.html", {"message": "You are not authorized to view this page."})
     
     vacancy = get_object_or_404(Vacancy, id=vacancy_id, tenant=request.tenant)
     if request.method == 'POST':
         form = VacancyForm(request.POST, instance=vacancy)
         if form.is_valid():
+            form.save(commit=False)
+            form.updated_by = request.user
+            form.updated_at = timezone.now()
             form.save()
             return redirect('vacancy_list')
     else:
         form = VacancyForm(instance=vacancy)
-    return render(request, 'dashboard/edit_vacancy.html', {'form': form})
+    return render(request, 'hr/edit_vacancy.html', {'form': form})
 
 @login_required
 @user_passes_test(is_hr)
 def delete_vacancy(request, vacancy_id):
-    if hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+    if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
         print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
         return render(request, 'tenant_error.html', {'error_code': '401','message': 'You are not authorized for this company.'})
-    
-    for role in request.user.roles.all():
-        if role.name != "HR":
-            return render(request, "error.html", {"message": "You are not authorized to view this page."})
     
     vacancy = get_object_or_404(Vacancy, id=vacancy_id, tenant=request.tenant)
     vacancy.delete()
@@ -3886,27 +3874,54 @@ def delete_vacancy(request, vacancy_id):
 
 @login_required
 @user_passes_test(is_hr)
-def post_vacancy(request, vacancy_id):
-    if hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+def share_vacancy(request, vacancy_id):
+    if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
         print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
         return render(request, 'tenant_error.html', {'error_code': '401','message': 'You are not authorized for this company.'})
     
-    for role in request.user.roles.all():
-        if role.name != "HR":
-            return render(request, "error.html", {"message": "You are not authorized to view this page."})
-    
     vacancy = get_object_or_404(Vacancy, id=vacancy_id, tenant=request.tenant)
-    vacancy.is_shared = True
-    vacancy.shared_by = request.user
-    vacancy.save()
     if request.method == 'POST':
-        end_date = request.POST.get('end_date')  # Already handled; could be empty string or None
+        end_date = request.POST.get('end_date')
+        try:
+            share_time_end = timezone.datetime.strptime(end_date, '%Y-%m-%d') if end_date else None
+            if share_time_end:
+                share_time_end = timezone.make_aware(share_time_end)
+        except ValueError:
+            return JsonResponse({"success": False, "error": "Invalid date format. Use YYYY-MM-DD."}, status=400)
 
-        vacancy.is_shared = not vacancy.is_shared
-        vacancy.share_time = timezone.now()
-        vacancy.share_time_end = end_date if end_date else None
+        vacancy.is_shared = True
+        vacancy.status = 'active'
         vacancy.shared_by = request.user
-
+        vacancy.share_time = timezone.now()
+        vacancy.share_time_end = share_time_end
         vacancy.save()
-        
-    return JsonResponse({"success": True, "folder_id": vacancy.id})
+        vacancy.shareable_link = request.build_absolute_uri(vacancy.get_shareable_link())
+        return JsonResponse({"success": True, "vacancy": vacancy.id, "shareable_link": vacancy.shareable_link})
+    
+    return JsonResponse({"success": False, "error": "Method not allowed"}, status=405)
+
+@login_required
+@user_passes_test(is_hr)
+def withdraw_vacancy(request, vacancy_id):
+    if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+        print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
+        return render(request, 'tenant_error.html', {'error_code': '401','message': 'You are not authorized for this company.'})
+    vacancy = get_object_or_404(Vacancy, id=vacancy_id, tenant=request.tenant)
+    vacancy.is_shared = False
+    vacancy.shared_by = None
+    vacancy.share_time = None
+    vacancy.share_time_end = None
+    vacancy.save()
+    return JsonResponse({"success": True})
+
+def vacancy_post(request, token):
+    vacancy = get_object_or_404(Vacancy, share_token=token)
+    if not vacancy.is_shared or (vacancy.share_time_end and timezone.now() > vacancy.share_time_end) or vacancy.status in ['closed', 'withdrawn']:
+        message = "This vacancy is no longer available."
+        if vacancy.status == 'closed':
+            message = "This vacancy is closed."
+        elif vacancy.status == 'withdrawn':
+            message = "This vacancy is withdrawn."
+        return render(request, 'hr/vacancy_expired.html', {'message': message})
+    
+    return render(request, 'hr/vacancy_post.html', {'vacancy': vacancy})

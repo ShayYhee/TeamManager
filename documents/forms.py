@@ -12,6 +12,7 @@ from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode
 from django.core.exceptions import ValidationError
 from django.core.mail import send_mail, get_connection
+from django_countries.fields import CountryField
 from django.urls import reverse
 
 User = get_user_model()
@@ -738,16 +739,25 @@ from .models import Vacancy, VacancyApplication
 class VacancyForm(forms.ModelForm):
     class Meta:
         model = Vacancy
-        fields = ['title', 'description', 'skills', 'eligibility', 'salary_range', 'location', 'status']
+        fields = ['title', 'description', 'location', 'skills', 'eligibility', 'min_salary', 'max_salary', 'status']
         widgets = {
             'title': forms.TextInput(attrs={'class': 'form-control'}),
-            'description': forms.TextInput(attrs={'class': 'form-control'}),
-            'skills': forms.TextInput(attrs={'class': 'form-control'}),
-            'eligibility': forms.TextInput(attrs={'class': 'form-control'}),
-            'salary_range': forms.TextInput(attrs={'class': 'form-control'}),
-            'location': forms.TextInput(attrs={'class': 'form-control'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 5}),
+            'location': forms.Select(attrs={'class': 'form-control'}),
+            'skills': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'eligibility': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'min_salary': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'max_salary': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'status': forms.Select(attrs={'class': 'form-control'}),
         }
+
+    def clean(self):
+        cleaned_data = super().clean()
+        min_salary = cleaned_data.get('min_salary')
+        max_salary = cleaned_data.get('max_salary')
+        if min_salary and max_salary and min_salary > max_salary:
+            raise forms.ValidationError("Minimum salary cannot be greater than maximum salary.")
+        return cleaned_data
     
 class VacancyApplicationForm(forms.ModelForm):
     

@@ -2,6 +2,7 @@ from django.db import models
 from django.db.models import Q
 from django.contrib.auth.models import User
 from django.contrib.auth.models import Permission
+from django_countries.fields import CountryField
 from raadaa import settings
 from django.utils import timezone
 import os, json, uuid
@@ -655,15 +656,17 @@ class CompanyDocument(models.Model):
 class Vacancy(models.Model):
     VACANCY_STATUS = [
         ('active', 'Active'),
+        ('withdrawn', 'Withdrawn'),
         ('closed', 'Closed'),
     ]
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="vacancy")
     title = models.CharField(max_length=255, blank=False, null=False)
-    description = models.CharField(blank=True, null=True)
-    skills = models.CharField(max_length=1000, blank=False, null=False)
-    eligibility = models.CharField(max_length=1000, blank=False, null=False)
-    salary_range = models.CharField(max_length=255, blank=False, null=False)
-    location = models.CharField(max_length=255, blank=False, null=False)
+    description = models.TextField(blank=True, null=True)
+    skills = models.TextField(blank=False, null=False)
+    eligibility = models.TextField(blank=False, null=False)
+    min_salary = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    max_salary = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    location = CountryField(blank=False, null=False)
     created_at = models.DateTimeField(auto_now_add=True)
     created_by = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, blank=True, related_name='created_vacancies')
     updated_at = models.DateTimeField(auto_now=True)

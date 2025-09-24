@@ -120,6 +120,9 @@
             border-bottom: 1px solid #e2e8f0;
             text-align: center;
         }
+        .text-primary {
+            color: #319795 !important;
+        }
         body.dark-mode .notification-bar {
             background-color: #3b4a6b !important;
             border-bottom: 1px solid #4a5568;
@@ -433,6 +436,11 @@
                 {% endif %}
             {% endfor %}
             <a href="{% url 'email_config' %}" {% if request.path == '/dashboard/email-config/' %}class="active"{% endif %}><i class="fas fa-cog"></i> Settings</a>
+            {% for role in user.roles.all %}
+                {% if role.name == "HR" %}
+                    <a href="{% url 'vacancy_list' %}" {% if request.path == '/vacancy/' %}class="active"{% endif %}><i class="fas fa-briefcase"></i> Vacancy</a>
+                {% endif %}
+            {% endfor %}
             {% for role in user.roles.all %}
                 {% if role.name == "Admin" %}
                     {% comment %} <a href="{% url 'users_list' %}" {% if request.path == '/users/' %}class="active"{% endif %}><i class="fas fa-user-shield"></i> Users</a> {% endcomment %}
