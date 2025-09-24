@@ -652,48 +652,50 @@ class CompanyDocument(models.Model):
         return f"{self.document_type} - {self.company_profile.full_name} ({self.uploaded_at})"
 
 
-# class Vacancy(models.Model):
-#     VACANCY_STATUS = [
-#         ('active', 'Active'),
-#         ('closed', 'Closed'),
-#     ]
-#     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="vacancy")
-#     title = models.CharField(max_length=255, blank=False, null=False)
-#     description = models.CharField(blank=True, null=True)
-#     skills = models.CharField(max_length=1000, blank=False, null=False)
-#     eligibility = models.CharField(max_length=1000, blank=False, null=False)
-#     salary_range = models.CharField(max_length=255, blank=False, null=False)
-#     location = models.CharField(max_length=255, blank=False, null=False)
-#     created_at = models.DateTimeField(auto_now_add=True)
-#     updated_at = models.DateTimeField(auto_now=True)
-#     status = models.CharField(max_length=20, choices=VACANCY_STATUS, default='active')
-#     share_token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
-#     is_shared = models.BooleanField(default=False, help_text="Enable external sharing for this folders.")
-#     shared_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='shared_folders')
-#     share_time = models.DateTimeField(null=True, blank=True)
-#     share_time_end = models.DateTimeField(null=True, blank=True)
+class Vacancy(models.Model):
+    VACANCY_STATUS = [
+        ('active', 'Active'),
+        ('closed', 'Closed'),
+    ]
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="vacancy")
+    title = models.CharField(max_length=255, blank=False, null=False)
+    description = models.CharField(blank=True, null=True)
+    skills = models.CharField(max_length=1000, blank=False, null=False)
+    eligibility = models.CharField(max_length=1000, blank=False, null=False)
+    salary_range = models.CharField(max_length=255, blank=False, null=False)
+    location = models.CharField(max_length=255, blank=False, null=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    created_by = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, blank=True, related_name='created_vacancies')
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, blank=True, related_name='updated_vacancies')
+    status = models.CharField(max_length=20, choices=VACANCY_STATUS, default='active')
+    share_token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    is_shared = models.BooleanField(default=False, help_text="Share/Post this vacancy.")
+    shared_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='shared_vacancy')
+    share_time = models.DateTimeField(null=True, blank=True)
+    share_time_end = models.DateTimeField(null=True, blank=True)
 
-#     def get_shareable_link(self):
-#         from django.urls import reverse
-#         return reverse('vacancy_post', kwargs={'token': str(self.share_token)})
+    def get_shareable_link(self):
+        from django.urls import reverse
+        return reverse('vacancy_post', kwargs={'token': str(self.share_token)})
 
-#     def __str__(self):
-#         return f"Job post for position {self.title} by {self.tenant}"
+    def __str__(self):
+        return f"Job post for position {self.title} by {self.tenant}"
 
-# def upload_to_job_cvs(instance, filename):
-#     tenant_name = instance.tenant.name if instance.tenant else "unassigned"
-#     title = instance.job.title if instance.job else "N/A"
-#     return os.path.join('vacancy_cvs', tenant_name, title, filename)
+def upload_to_job_cvs(instance, filename):
+    tenant_name = instance.tenant.name if instance.tenant else "unassigned"
+    title = instance.job.title if instance.job else "N/A"
+    return os.path.join('vacancy_cvs', tenant_name, title, filename)
 
-# class VacancyApplication(models.Model):
-#     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="vacancy_application")
-#     first_name = models.CharField(max_length=255, blank=False, null=False)
-#     last_name = models.CharField(max_length=255, blank=False, null=False)
-#     middle_name = models.CharField(max_length=255, blank=True, null=True)
-#     phone = models.CharField(max_length=20, blank=False, null=False)
-#     email = models.EmailField(blank=False, null=False)
-#     vacancy = models.ForeignKey(Vacancy, on_delete=models.CASCADE, related_name="applications")
-#     cv = models.FileField(upload_to=upload_to_job_cvs)
-#     cover_letter = models.TextField(blank=True, null=True)
-#     created_at = models.DateTimeField(auto_now_add=True)
-#     updated_at = models.DateTimeField(auto_now=True)
+class VacancyApplication(models.Model):
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="vacancy_application")
+    first_name = models.CharField(max_length=255, blank=False, null=False)
+    last_name = models.CharField(max_length=255, blank=False, null=False)
+    middle_name = models.CharField(max_length=255, blank=True, null=True)
+    phone = models.CharField(max_length=20, blank=False, null=False)
+    email = models.EmailField(blank=False, null=False)
+    vacancy = models.ForeignKey(Vacancy, on_delete=models.CASCADE, related_name="applications")
+    cv = models.FileField(upload_to=upload_to_job_cvs)
+    cover_letter = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
