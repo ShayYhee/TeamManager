@@ -207,7 +207,7 @@
             border-radius: 4px;
             display: inline-block;
         }
-        @media (max-width: 768px) {
+        @media (max-width: 850px) {
             .sidebar {
                 {% comment %} width: 0;
                 padding: 0;
@@ -617,7 +617,7 @@
             var mainContent = document.getElementById("main-content");
             var navbar = document.getElementById("navbar");
             var tenant_name = document.getElementById("tenant-name");
-            if (window.innerWidth > 768){
+            if (window.innerWidth > 850){
                 sidebar.classList.toggle("closed");
                 mainContent.classList.toggle("expanded");
                 navbar.style.marginLeft = sidebar.classList.contains("closed") ? "30px" : "250px";
@@ -645,7 +645,7 @@
                 themeToggleBtn.innerHTML = isDarkMode ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
                 localStorage.setItem('theme', isDarkMode ? 'dark' : 'light');
             });
-            if (window.innerWidth < 768){
+            if (window.innerWidth < 850){
                 const tenantNameElement = document.getElementById('tenant-name');
                 let tenantName = tenantNameElement.textContent;
                 if (tenantName.length > 20 ){
