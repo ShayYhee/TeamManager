@@ -202,6 +202,10 @@
 <!-- CKEditor Scripts -->
 <script src="{% static 'ckeditor/ckeditor-init.js' %}"></script>
 <script src="{% static 'ckeditor/ckeditor/ckeditor.js' %}"></script>
+<script>
+    // Set CKEditor basePath before initialization
+    window.CKEDITOR_BASEPATH = '/static/ckeditor/ckeditor/';
+</script>
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
@@ -226,14 +230,19 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         } else {
             console.log('CKEditor loaded, version:', CKEDITOR.version);
+            // Force basePath for all instances
+            CKEDITOR.basePath = '/static/ckeditor/ckeditor/';
             // CKEditor is initialized by CKEditorUploadingWidget
             if (CKEDITOR.instances['{{ form.content.id_for_label }}']) {
                 console.log('CKEditor instance ready for content field');
+                // Ensure basePath is set for this instance
+                CKEDITOR.instances['{{ form.content.id_for_label }}'].basePath = '/static/ckeditor/ckeditor/';
             } else {
                 console.warn('CKEditor instance not found, waiting for initialization');
                 CKEDITOR.on('instanceReady', function(e) {
                     if (e.editor.name === '{{ form.content.id_for_label }}') {
                         console.log('CKEditor instance initialized:', e.editor.name);
+                        e.editor.basePath = '/static/ckeditor/ckeditor/';
                     }
                 });
             }

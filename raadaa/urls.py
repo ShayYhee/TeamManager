@@ -172,6 +172,11 @@ urlpatterns = [
     path('reset-password/<uidb64>/<token>/', views.reset_password, name='reset_password'),
     path('password-reset-success/', views.password_reset_success, name='password_reset_success'),
     path('password-reset-sent', views.password_reset_sent, name="password_reset_sent"),
+    # HR Vacancies
+    path('vacancies/', views.vacancy_list, name='vacancy_list'),
+    path('vacancies/create/', views.create_vacancy, name='create_vacancy'),
+    path('vacancies/edit/<int:vacancy_id>/', views.edit_vacancy, name='edit_vacancy'),
+    path('vacancies/delete/<int:vacancy_id>/', views.delete_vacancy, name='delete_vacancy'),
 
     path('.well-known/<path:path>', handle_well_known),  # Handle .well-known requests
 ]

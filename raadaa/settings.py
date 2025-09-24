@@ -21,6 +21,7 @@ load_dotenv(dotenv_path)
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'insecure-key-for-dev-only')
 # DEBUG = False
 DEBUG = os.getenv('DJANGO_DEBUG', 'True') == 'True'
+# DEBUG = False
 MAIN_DOMAIN = os.getenv('MAIN_DOMAIN', 'http://localhost:8000')
 # ALLOWED_HOSTS configuration
 # If DJANGO_ALLOWED_HOSTS is a comma-separated string in .env, split it into a list
@@ -223,6 +224,8 @@ else:
         }
     }
 
+# CKEditor base path
+CKEDITOR_BASEPATH = '/static/ckeditor/ckeditor/'
 # CKEditor upload path
 CKEDITOR_UPLOAD_PATH = "Uploads/"
 # CKEDITOR_IMAGE_BACKEND = "pillow"

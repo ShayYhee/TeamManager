@@ -2,7 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.models import User
 from django.contrib.admin.models import LogEntry, CHANGE, ADDITION, DELETION
-from django.contrib.auth import login, get_user_model
+from django.contrib.auth import login, get_user_model, logout
 from django.contrib.auth.signals import user_logged_in
 from django.contrib.auth.tokens import default_token_generator
 from django.contrib.auth.views import LoginView
@@ -25,8 +25,8 @@ from django.utils import timezone
 from django.utils.timezone import now
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
-from .forms import DocumentForm, SignUpForm, CreateDocumentForm, FileUploadForm, FolderForm, TaskForm, ReassignTaskForm, StaffProfileForm, StaffDocumentForm, EmailConfigForm, UserForm, DepartmentForm, TeamForm, EventForm, EventParticipantForm, NotificationForm, UserNotificationForm, CompanyProfileForm, ContactForm, EmailForm, EditUserForm, CompanyDocumentForm, SupportForm
-from .models import Document, CustomUser, Role, File, Folder, Task, StaffProfile, Notification, UserNotification, StaffDocument, Event, EventParticipant, Department, Team, CompanyProfile, Contact, Email, Attachment, CompanyDocument
+from .forms import DocumentForm, SignUpForm, CreateDocumentForm, FileUploadForm, FolderForm, TaskForm, ReassignTaskForm, StaffProfileForm, StaffDocumentForm, EmailConfigForm, UserForm, DepartmentForm, TeamForm, EventForm, EventParticipantForm, NotificationForm, UserNotificationForm, CompanyProfileForm, ContactForm, EmailForm, EditUserForm, CompanyDocumentForm, SupportForm, VacancyForm, VacancyApplicationForm
+from .models import Document, CustomUser, Role, File, Folder, Task, StaffProfile, Notification, UserNotification, StaffDocument, Event, EventParticipant, Department, Team, CompanyProfile, Contact, Email, Attachment, CompanyDocument, Vacancy, VacancyApplication
 from raadaa.settings import ALLOWED_HOSTS
 from .serializers import EventSerializer
 from .placeholders import replace_placeholders
@@ -55,7 +55,12 @@ def is_admin(user):
         if role.name == "Admin":
             return True
 
-    # return user.is_staff
+def is_hr(user):
+    # Check if the user is an admin
+
+    for role in user.roles.all():
+        if role.name == "HR":
+            return True
 
 def custom_404(request, exception):
     return render(request, '404.html', {'subdomain': request.get_host().split('.')[0], 'message': str(exception)}, status=404)
@@ -3796,3 +3801,112 @@ def contact_support(request):
     else:
         form = SupportForm()
     return render(request, 'dashboard/contact_support.html', {'form': form})
+
+@user_passes_test(is_hr)
+@login_required
+def vacancy_list(request):
+    if hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+        print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
+        return render(request, 'tenant_error.html', {'error_code': '401','message': 'You are not authorized for this company.'})
+    
+    for role in request.user.roles.all():
+        if role.name != "HR":
+            return render(request, "error.html", {"message": "You are not authorized to view this page."})
+        
+    # Generate shareable links for vacancy posts
+    for post in vacancies:
+        post.shareable_link = request.build_absolute_uri(post.get_shareable_link()) if post.is_shared else None
+    
+    vacancies = Vacancy.objects.filter(tenant=request.tenant)
+    # Pagination
+    paginator = Paginator(vacancies, 10)  # 10 vacancies per page
+    page = request.GET.get('page')
+    page_obj = paginator.get_page(page)
+    
+    return render(request, 'dashboard/vacancy_list.html', {'vacancies': page_obj})
+
+@user_passes_test(is_hr)
+@login_required
+def create_vacancy(request):
+    if hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+        print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
+        return render(request, 'tenant_error.html', {'error_code': '401','message': 'You are not authorized for this company.'})
+    
+    for role in request.user.roles.all():
+        if role.name != "HR":
+            return render(request, "error.html", {"message": "You are not authorized to view this page."})
+    
+    if request.method == 'POST':
+        form = VacancyForm(request.POST)
+        if form.is_valid():
+            vacancy = form.save(commit=False)
+            vacancy.tenant = request.tenant
+            vacancy.created_by = request.user
+            vacancy.save()
+            return redirect('vacancy_list')
+    else:
+        form = VacancyForm()
+    return render(request, 'dashboard/create_vacancy.html', {'form': form}) 
+
+@login_required
+@user_passes_test(is_hr)
+def edit_vacancy(request, vacancy_id):
+    if hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+        print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
+        return render(request, 'tenant_error.html', {'error_code': '401','message': 'You are not authorized for this company.'})
+    
+    for role in request.user.roles.all():
+        if role.name != "HR":
+            return render(request, "error.html", {"message": "You are not authorized to view this page."})
+    
+    vacancy = get_object_or_404(Vacancy, id=vacancy_id, tenant=request.tenant)
+    if request.method == 'POST':
+        form = VacancyForm(request.POST, instance=vacancy)
+        if form.is_valid():
+            form.save()
+            return redirect('vacancy_list')
+    else:
+        form = VacancyForm(instance=vacancy)
+    return render(request, 'dashboard/edit_vacancy.html', {'form': form})
+
+@login_required
+@user_passes_test(is_hr)
+def delete_vacancy(request, vacancy_id):
+    if hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+        print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
+        return render(request, 'tenant_error.html', {'error_code': '401','message': 'You are not authorized for this company.'})
+    
+    for role in request.user.roles.all():
+        if role.name != "HR":
+            return render(request, "error.html", {"message": "You are not authorized to view this page."})
+    
+    vacancy = get_object_or_404(Vacancy, id=vacancy_id, tenant=request.tenant)
+    vacancy.delete()
+    return redirect('vacancy_list')
+
+@login_required
+@user_passes_test(is_hr)
+def post_vacancy(request, vacancy_id):
+    if hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+        print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
+        return render(request, 'tenant_error.html', {'error_code': '401','message': 'You are not authorized for this company.'})
+    
+    for role in request.user.roles.all():
+        if role.name != "HR":
+            return render(request, "error.html", {"message": "You are not authorized to view this page."})
+    
+    vacancy = get_object_or_404(Vacancy, id=vacancy_id, tenant=request.tenant)
+    vacancy.is_shared = True
+    vacancy.shared_by = request.user
+    vacancy.save()
+    if request.method == 'POST':
+        end_date = request.POST.get('end_date')  # Already handled; could be empty string or None
+
+        vacancy.is_shared = not vacancy.is_shared
+        vacancy.share_time = timezone.now()
+        vacancy.share_time_end = end_date if end_date else None
+        vacancy.shared_by = request.user
+
+        vacancy.save()
+        
+    return JsonResponse({"success": True, "folder_id": vacancy.id})
