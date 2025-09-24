@@ -131,8 +131,7 @@ def union(list1, list2):
 
 @register.filter
 def obj_count(value):
-    num_pages = value.paginator.num_pages
-    obj_count = 0
-    for num in range(1,num_pages+1):
-        obj_count += value.paginator.page(num).object_list.count()
-    return obj_count
+    try:
+        return value.paginator.count
+    except AttributeError:
+        return 0  # Handle cases where value is not a Page object
