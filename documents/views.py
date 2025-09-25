@@ -3802,8 +3802,8 @@ def contact_support(request):
         form = SupportForm()
     return render(request, 'dashboard/contact_support.html', {'form': form})
 
-@user_passes_test(is_hr)
 @login_required
+@user_passes_test(is_hr)
 def vacancy_list(request):
     if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
         print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
@@ -3822,8 +3822,8 @@ def vacancy_list(request):
     
     return render(request, 'hr/vacancy_list.html', {'vacancies': page_obj})
 
-@user_passes_test(is_hr)
 @login_required
+@user_passes_test(is_hr)
 def create_vacancy(request):
     if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
         print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
@@ -3864,12 +3864,10 @@ def edit_vacancy(request, vacancy_id):
 @login_required
 @user_passes_test(is_hr)
 def vacancy_details(request, vacancy_id):
-    if hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+    if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
         print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
         return render(request, 'tenant_error.html', {'error_code': '401','message': 'You are not authorized for this company.'})
-    for role in request.user.roles.all():
-        if role.name != "HR":
-            return render(request, "error.html", {"message":"You are not authorized to view this page"})
+    
     vacancy = get_object_or_404(Vacancy, id=vacancy_id, tenant=request.tenant)
     
     return render(request, 'dashboard/vacancy_detail.html', {'vacancy': vacancy})
@@ -3938,3 +3936,190 @@ def vacancy_post(request, token):
         return render(request, 'hr/vacancy_expired.html', {'message': message})
     
     return render(request, 'hr/vacancy_post.html', {'vacancy': vacancy})
+
+def create_vacancy_application(request):
+    if request.method == 'POST':
+        form = VacancyApplicationForm(request.POST)
+        if form.is_valid():
+            vacancy_application = form.save(commit=False)
+            vacancy_application.tenant = request.tenant
+            vacancy_application.save()
+            return render(request, 'hr/vacancy_application_success.html', {'name':vacancy_application.first_name})
+    else:
+        form = VacancyApplicationForm()
+    return render(request, 'hr/create_vacancy_application.html', {'form': form}) 
+
+@login_required
+@user_passes_test(is_hr)
+def vacancy_application_details(request, vacancy_id, application_id):
+    if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+        print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
+        return render(request, 'tenant_error.html', {'error_code': '401','message': 'You are not authorized for this company.'})
+    for role in request.user.roles.all():
+        if role.name != "HR":
+            return render(request, "error.html", {"message":"You are not authorized to view this page"})
+    vacancy = get_object_or_404(Vacancy, id=vacancy_id)
+    vacancy_application = get_object_or_404(VacancyApplication, id=application_id, tenant=request.tenant, vacancy=vacancy)
+    
+    return render(request, 'hr/vacancy_application_details.html', {'vacancy_application': vacancy_application})
+
+@login_required
+@user_passes_test(is_hr)
+def delete_vacancy_application(request, vacancy_id, application_id):
+    if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+        print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
+        return render(request, 'tenant_error.html', {'error_code': '401','message': 'You are not authorized for this company.'})
+    
+    vacancy = get_object_or_404(Vacancy, id=vacancy_id)
+    vacancy_application = get_object_or_404(VacancyApplication, id=application_id, tenant=request.tenant, vacancy=vacancy)
+    vacancy_application.delete()
+    return redirect('hr/list_vacancy_applications.html')
+
+
+@login_required
+@user_passes_test(is_hr)
+def list_vacancy_applications(request):
+    if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+        print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
+        return render(request, 'tenant_error.html', {'error_code': '401','message': 'You are not authorized for this company.'})
+    
+    vacancy_applications = VacancyApplication.objects.filter(tenant=request.tenant)
+    paginator = Paginator(vacancy_applications, 10)  # 10 applications per page
+    page = request.GET.get('page')
+    page_obj = paginator.get_page(page)
+    
+    return render(request, 'hr/list_vacancy_applications.html', {'vacancy_applications': page_obj})
+
+def send_vacancy_accepted_mail(request, application_id):
+    vacancy_application = VacancyApplication.objects.filter(id = application_id)
+    vacancy = vacancy_application.vacancy
+    hr = request.user
+    if not is_hr(hr):
+        print(f"Unauthorized access by user {request.user.username}. Only HRs can perform this action")
+        return render(request, 'tenant_error.html', {'error_code': '403','message': 'Only HRs can perform this action.'})
+    sender_provider = hr.email_provider
+    sender_email = hr.email_address
+    sender_password = hr.email_password
+    candidate_name = vacancy_application.first_name
+    company = vacancy_application.tenant
+
+
+    if not sender_email or not sender_password:
+        return HttpResponseForbidden("Your email credentials are missing. Contact admin.")
+
+    connection, error_message = get_email_smtp_connection(sender_provider, sender_email, sender_password)
+
+    subject = f"You're Moving Forward! Next Steps for the {vacancy.title} Role"
+    message = f"""
+    Dear {candidate_name},
+
+    Congratulations! Thank you for your application for the {vacancy.title} position at {company}. We were thoroughly impressed with your background, and we are excited to inform you that you have been selected to move forward in our hiring process!
+
+    Your next step is to stay tuned. Our team is currently coordinating the next phase, and you will be receiving a follow-up email from us shortly with detailed instructions.
+
+    Please be sure to keep a close eye on your email inbox (including your spam or promotions folder) so you don't miss our message.
+
+    We are very much looking forward to connecting with you soon and learning more about how you could contribute to our team at {company}.
+
+    If you have any immediate questions, please feel free to reply to this email.
+
+    Best regards,
+
+    Human Resouces Team, 
+    {company}
+    """
+
+    print("Sending mail...")
+
+    # Create email with attachment
+    email = EmailMessage(subject, message, sender_email, [vacancy_application.email], connection=connection)
+    email.send()
+    
+    print("Mail Sent")
+
+
+def send_vacancy_rejected_mail(request, application_id):
+    vacancy_application = VacancyApplication.objects.filter(id = application_id)
+    vacancy = vacancy_application.vacancy
+    hr = request.user
+    if not is_hr(hr):
+        print(f"Unauthorized access by user {request.user.username}. Only HRs can perform this action")
+        return render(request, 'tenant_error.html', {'error_code': '403','message': 'Only HRs can perform this action.'})
+    sender_provider = hr.email_provider
+    sender_email = hr.email_address
+    sender_password = hr.email_password
+    candidate_name = vacancy_application.first_name.capitalize()
+    company = vacancy_application.tenant.name
+
+
+    if not sender_email or not sender_password:
+        return HttpResponseForbidden("Your email credentials are missing. Contact admin.")
+
+    connection, error_message = get_email_smtp_connection(sender_provider, sender_email, sender_password)
+
+    subject = f"An Update on Your Application for {vacancy.title} Role"
+    message = f"""
+    Dear {candidate_name},
+
+    Thank you for taking the time to apply for the {vacancy.title} position at {company} and for your interest in joining our team.
+
+    We appreciate the opportunity to learn about your skills and accomplishments. After careful review, we have decided to move forward with candidates whose experience more closely aligns with the specific requirements of this role.
+
+    This was a difficult decision due to the high volume of qualified applicants we received.
+
+    We encourage you to keep an eye on our careers page for future opportunities that may be a better fit for your background
+
+    We wish you the very best in your job search and future endeavors.
+
+    Sincerely,
+
+    Human Resouces Team, 
+    {company}
+    """
+
+    print("Sending mail...")
+
+    # Create email with attachment
+    email = EmailMessage(subject, message, sender_email, [vacancy_application.email], connection=connection)
+    email.send()
+    
+    print("Mail Sent")
+
+@login_required
+@user_passes_test(is_hr)
+def accept_vacancy_application(request, vacancy_id, application_id):
+    if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+        print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
+        return render(request, 'tenant_error.html', {'error_code': '401','message': 'You are not authorized for this company.'})
+    
+    vacancy = get_object_or_404(Vacancy, id=vacancy_id)
+    vacancy_application = get_object_or_404(VacancyApplication, id=application_id, tenant=request.tenant, vacancy=vacancy)
+    if request.method == 'POST':
+        status = request.POST.get('accepted')
+        if status == 'accepted':
+            vacancy_application.status = status
+            vacancy_application.save()
+            send_vacancy_accepted_mail(request, application_id)
+            return JsonResponse({"success": True, "vacancy_id": vacancy_application.id})
+    
+    return JsonResponse({"success": False, "error": "Method not allowed"}, status=405)
+
+@login_required
+@user_passes_test(is_hr)
+def reject_vacancy_application(request, vacancy_id, application_id):
+    if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+        print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
+        return render(request, 'tenant_error.html', {'error_code': '401','message': 'You are not authorized for this company.'})
+    
+    vacancy = get_object_or_404(Vacancy, id=vacancy_id)
+    vacancy_application = get_object_or_404(VacancyApplication, id=application_id, tenant=request.tenant, vacancy=vacancy)
+    if request.method == 'POST':
+        status = request.POST.get('rejected')
+        if status == 'rejected':
+            vacancy_application.status = status
+            vacancy_application.save()
+            send_vacancy_rejected_mail(request, application_id)
+            return JsonResponse({"success": True, "vacancy_id": vacancy_application.id})
+    
+    return JsonResponse({"success": False, "error": "Method not allowed"}, status=405)
+    

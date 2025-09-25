@@ -691,6 +691,10 @@ def upload_to_job_cvs(instance, filename):
     return os.path.join('vacancy_cvs', tenant_name, title, filename)
 
 class VacancyApplication(models.Model):
+    VACANCY_APPLICATION_STATUS = [
+        ('accepted', 'Accepted'),
+        ('rejected', 'Rejected'),
+    ]
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="vacancy_application")
     first_name = models.CharField(max_length=255, blank=False, null=False)
     last_name = models.CharField(max_length=255, blank=False, null=False)
@@ -700,5 +704,6 @@ class VacancyApplication(models.Model):
     vacancy = models.ForeignKey(Vacancy, on_delete=models.CASCADE, related_name="applications")
     cv = models.FileField(upload_to=upload_to_job_cvs)
     cover_letter = models.TextField(blank=True, null=True)
+    status = models.CharField(max_length=20, choices=VACANCY_APPLICATION_STATUS, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
