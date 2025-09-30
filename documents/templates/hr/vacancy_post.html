@@ -42,6 +42,6 @@
         <a href="{{ vacancy.shareable_link }}" id="shareable-link">{{ vacancy.shareable_link }}</a>
         <button class="btn btn-sm btn-info" onclick="navigator.clipboard.writeText(document.getElementById('shareable-link').href).then(() => alert('Link copied to clipboard!'));"><i class="fas fa-copy"></i> Copy Link</button>
     </p>
-    {% comment %} <a href="{% url 'vacancy_list' %}" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Back to Vacancies</a> {% endcomment %}
+    <a href="{% url 'apply_vacancy' vacancy.id %}" class="btn btn-primary">Apply <i class="fas fa-arrow-right"></i></a>
 </div>
 {% endblock %}

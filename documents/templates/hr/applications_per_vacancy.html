@@ -7,106 +7,99 @@
         <div class="card-header d-flex justify-content-between align-items-center">
             <h4 class="card-title mb-0">
                 <i class="fas fa-briefcase me-2 text-primary" aria-hidden="true"></i>
-                Vacancies ({{ vacancies|obj_count }})
+                Applications For {{vacancy.title}} ({{ vacancy_applications|obj_count }})
             </h4>
-            <div class="mb-3">
-                <a href="{% url 'create_vacancy' %}" class="btn btn-primary"><i class="fas fa-plus"></i> Create Vacancy</a>
-            </div>
             <div class="input-group w-50 w-md-25">
                 <span class="input-group-text bg-transparent border-end-0">
                     <i class="fas fa-search text-muted"></i>
                 </span>
-                <input type="text" class="form-control border-start-0" id="searchVacancies" placeholder="Search vacancies..." aria-label="Search vacancies">
+                <input type="text" class="form-control border-start-0" id="searchVacancies" placeholder="Search vacancy applications..." aria-label="Search vacancies">
             </div>
+            <a href="{% url 'vacancy_application_list' %}" class="btn btn-outline-secondary btn-sm" title="Back to General Vacancy Applications">
+                <i class="fas fa-arrow-left me-1"></i> Back
+            </a>
         </div>
         <div class="card-body">
             <div class="table-responsive">
-                {% if vacancies %}
+                {% if vacancy_applications %}
                     <table class="table table-hover table-bordered align-middle">
                         <thead class="table-light">
                             <tr>
                                 <th>ID</th>
-                                <th>Title</th>
+                                <th>Name</th>
+                                <th>Phone</th>
+                                <th>Email</th>
                                 <th>Location</th>
                                 <th>Status</th>
-                                <th>Created By</th>
-                                <th>Share Link</th>
+                                <th>Created At</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody id="vacancyTableBody">
-                            {% for vacancy in vacancies %}
+                            {% for vacancy_app in vacancy_applications %}
                                 <tr>
-                                    <td>{{ vacancy.id }}</td>
-                                    <td><a href="{%url 'vacancy_detail' vacancy.id %}">{{ vacancy.title }}</a></td>
-                                    <td>{% if vacancy.city %}
-                                            {{ vacancy.city }},
+                                    <td>{{ vacancy_app.id }}</td>
+                                    <td><a href="{%url 'vacancy_application_detail' vacancy.id vacancy_app.id %}">
+                                            {{ vacancy_app.first_name }} {%if vacancy_app.middle_name%}{{vacancy_app.middle_name}}{%endif%} {{ vacancy_app.last_name}}
+                                        </a>
+                                    </td>
+                                    <td>{{ vacancy_app.phone }}</td>
+                                    <td>{{ vacancy_app.email }}</td>
+                                    <td>{% if vacancy_app.city %}
+                                            {{ vacancy_app.city }},
                                         {% endif %}
-                                        {% if vacancy.country %}
-                                            {{ vacancy.country.name }}
+                                        {% if vacancy_app.country %}
+                                            {{ vacancy_app.country.name }}
                                         {% endif %}
                                     </td>
-                                    <td>{{ vacancy.get_status_display }}</td>
-                                    <td>{{ vacancy.created_by.username|default:"N/A" }}</td>
+                                    <td>{{ vacancy_app.get_status_display }}</td>
+                                    <td>{{ vacancy_app.created_at }}</td>
                                     <td>
-                                        {% if vacancy.is_shared and vacancy.shareable_link %}
-                                            <a href="{{ vacancy.shareable_link }}" class="btn btn-sm btn-info copy-link" data-link="{{ vacancy.shareable_link }}"><i class="fas fa-link"></i> Copy Link</a>
-                                        {% else %}
-                                            <span>-</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        <a href="{% url 'edit_vacancy' vacancy.id %}" class="btn btn-sm btn-warning"><i class="fas fa-edit"></i> Edit</a>
-                                        <a href="{% url 'delete_vacancy' vacancy.id %}" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this vacancy?');"><i class="fas fa-trash"></i> Delete</a>
-                                        {% if vacancy.is_shared and vacancy.shareable_link %}
-                                            <a href="{% url 'withdraw_vacancy' vacancy.id %}" class="btn btn-sm btn-secondary withdraw-vacancy" data-vacancy-id="{{ vacancy.id }}"><i class="fas fa-ban"></i> Withdraw</a>
-                                            <a href="{{ vacancy.shareable_link }}" class="btn btn-sm btn-info"><i class="fas fa-eye"></i> View Shared</a>
-                                        {% else %}
-                                            <button class="btn btn-sm btn-success share-vacancy" data-vacancy-id="{{ vacancy.id }}" data-bs-toggle="modal" data-bs-target="#shareVacancyModal"><i class="fas fa-share-alt"></i> Share</button>
-                                        {% endif %}
+                                        <a href="{% url 'vacancy_application_detail' vacancy.id vacancy_app.id %}" class="btn btn-sm btn-warning"><i class="fas fa-eye"></i> View</a>
+                                        <a href="{% url 'delete_vacancy_app' vacancy.id vacancy_app.id %}" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this application?');"><i class="fas fa-trash"></i> Delete</a>
                                     </td>
                                 </tr>
                             {% endfor %}
                         </tbody>
                     </table>
-                    {% if vacancies.has_other_pages %}
+                    {% if vacancy_applications.has_other_pages %}
                         <nav aria-label="Page navigation">
                             <ul class="pagination justify-content-center mt-3">
-                                {% if vacancies.has_previous %}
+                                {% if vacancy_applications.has_previous %}
                                     <li class="page-item">
-                                        <a class="page-link" href="?page={{ vacancies.previous_page_number }}" aria-label="Previous">
+                                        <a class="page-link" href="?page={{ vacancy_applications.previous_page_number }}" aria-label="Previous">
                                             <span aria-hidden="true">«</span>
                                         </a>
                                     </li>
                                 {% endif %}
                                 <!--First page-->
-                                <li class="page-item {% if vacancies.number == 1 %}active{% endif %}">
+                                <li class="page-item {% if vacancy_applications.number == 1 %}active{% endif %}">
                                     <a class="page-link" href="?page=1">1</a>
                                 </li>
-                                {% if vacancies.number != 1 and vacancies.number != 2 %}
+                                {% if vacancy_applications.number != 1 and vacancy_applications.number != 2 %}
                                     <li class="page-item disabled">
                                         <span class="page-link">...</span>
                                     </li>
                                 {% endif %}
-                                {% if vacancies.number != 1 %}
-                                    <li class="page-item {% if vacancies.number %}active{% endif %}">
-                                        <a class="page-link" href="?page={{ vacancies.number }}">{{ vacancies.number }}</a>
+                                {% if vacancy_applications.number != 1 %}
+                                    <li class="page-item {% if vacancy_applications.number %}active{% endif %}">
+                                        <a class="page-link" href="?page={{ vacancy_applications.number }}">{{ vacancy_applications.number }}</a>
                                     </li>
                                 {% endif %}
-                                {% if vacancies.number != vacancies.paginator.num_pages and vacancies.number != vacancies.paginator.num_pages|add:-1 %}
+                                {% if vacancy_applications.number != vacancy_applications.paginator.num_pages and vacancy_applications.number != vacancy_applications.paginator.num_pages|add:-1 %}
                                     <li class="page-item disabled">
                                         <span class="page-link">...</span>
                                     </li>
                                 {% endif %}
                                 <!-- Last page (only if not already shown) -->
-                                {% if vacancies.number != vacancies.paginator.num_pages %}
-                                    <li class="page-item {% if vacancies.number == vacancies.paginator.num_pages %}active{% endif %}">
-                                        <a class="page-link" href="?page={{ vacancies.paginator.num_pages }}">{{ vacancies.paginator.num_pages }}</a>
+                                {% if vacancy_applications.number != vacancy_applications.paginator.num_pages %}
+                                    <li class="page-item {% if vacancy_applications.number == vacancy_applications.paginator.num_pages %}active{% endif %}">
+                                        <a class="page-link" href="?page={{ vacancy_applications.paginator.num_pages }}">{{ vacancy_applications.paginator.num_pages }}</a>
                                     </li>
                                 {% endif %}
-                                {% if vacancies.has_next %}
+                                {% if vacancy_applications.has_next %}
                                     <li class="page-item">
-                                        <a class="page-link" href="?page={{ vacancies.next_page_number }}" aria-label="Next">
+                                        <a class="page-link" href="?page={{ vacancy_applications.next_page_number }}" aria-label="Next">
                                             <span aria-hidden="true">»</span>
                                         </a>
                                     </li>
@@ -115,7 +108,7 @@
                         </nav>
                     {% endif %}
                 {% else %}
-                    <p>No vacancies found.</p>
+                    <p>No vacancy applications found.</p>
                 {% endif %}
             </div>
         </div>

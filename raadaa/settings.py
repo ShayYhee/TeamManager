@@ -21,7 +21,6 @@ load_dotenv(dotenv_path)
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'insecure-key-for-dev-only')
 # DEBUG = False
 DEBUG = os.getenv('DJANGO_DEBUG', 'True') == 'True'
-# DEBUG = False
 MAIN_DOMAIN = os.getenv('MAIN_DOMAIN', 'http://localhost:8000')
 # ALLOWED_HOSTS configuration
 # If DJANGO_ALLOWED_HOSTS is a comma-separated string in .env, split it into a list
@@ -78,8 +77,23 @@ SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-MEDIA_URL = "/media/"
-MEDIA_ROOT = os.path.join(BASE_DIR, "media")
+# MEDIA_URL = "/media/"
+# MEDIA_ROOT = os.path.join(BASE_DIR, "media")
+
+if DEBUG:
+    # Local storage
+    MEDIA_URL = "/media/"
+    MEDIA_ROOT = os.path.join(BASE_DIR, "media")
+else:
+    # S3 storage
+    AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID")
+    AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY")
+    AWS_STORAGE_BUCKET_NAME = os.getenv("AWS_STORAGE_BUCKET_NAME")
+    AWS_S3_REGION_NAME = os.getenv("AWS_S3_REGION_NAME")  # e.g. "us-east-1"
+    AWS_QUERYSTRING_AUTH = False  # False = public URLs
+
+    DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"
+    MEDIA_URL = f"https://{AWS_STORAGE_BUCKET_NAME}.s3.{AWS_S3_REGION_NAME}.amazonaws.com/media/"
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
@@ -151,6 +165,8 @@ INSTALLED_APPS = [
     'ckeditor',
     'ckeditor_uploader',
     'django_cron',
+    'storages',
+    'django_countries',
 ]
 
 REST_FRAMEWORK = {

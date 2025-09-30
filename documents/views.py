@@ -1283,34 +1283,37 @@ def folder_view(request, public_folder_id=None, personal_folder_id=None):
 def create_folder(request):
     if request.method == 'POST':
         form = FolderForm(request.POST)
-        active_tab = request.GET.get('tab', 'public')
+        active_tab = request.POST.get('tab')  # Changed from request.GET to request.POST
         if form.is_valid():
             folder = form.save(commit=False)
             folder.created_by = request.user
             folder.tenant = request.tenant
+            
             if active_tab == 'public':
                 folder.is_public = True
+            else:
+                folder.is_public = False
+                
             # Validate that the user belongs to the same tenant
             if folder.created_by.tenant != request.tenant:
-                return HttpResponse("Unauthorized: User does not belong to this company.", status=403)
-            # parent_id = request.POST.get('public_parent' if active_tab == 'public' else 'personal_parent')
-            if active_tab == 'public':
-                parent_id = request.GET.get('public_parent')
-                print("Public parent ID:", parent_id)
-            elif active_tab == 'personal':
-                parent_id = request.GET.get('personal_parent')
-                print("Personal parent ID:", parent_id)
-            else:
-                parent_id = None
+                return JsonResponse({'success': False, 'errors': 'Unauthorized: User does not belong to this company.'}, status=403)
+            
+            # Get parent ID from POST data, not GET
+            parent_id = request.POST.get('parent')
             print(f"Parent ID: {parent_id}, Active tab: {active_tab}")
-            if parent_id:
-                folder.parent = Folder.objects.get(id=parent_id, tenant=request.tenant)
+            
+            if parent_id and parent_id != 'None' and parent_id != '':
+                try:
+                    folder.parent = Folder.objects.get(id=parent_id, tenant=request.tenant)
+                except Folder.DoesNotExist:
+                    return JsonResponse({'success': False, 'errors': 'Parent folder not found.'}, status=400)
+            
             folder.save()
-            public_folder_id = request.GET.get('public_folder_id')
-            personal_folder_id = request.GET.get('personal_folder_id')
-            return JsonResponse({'success': True})
-    return JsonResponse({'success': False, 'errors': form.errors}, status=400)
-    # raise BadRequest("Invalid request")
+            return JsonResponse({'success': True, 'redirect_url': f'/folders/?tab={active_tab}'})
+        else:
+            return JsonResponse({'success': False, 'errors': form.errors}, status=400)
+    
+    return JsonResponse({'success': False, 'errors': 'Invalid request method.'}, status=400)
 
 @login_required
 def delete_folder(request, folder_id):
@@ -1325,57 +1328,34 @@ def delete_folder(request, folder_id):
 
 @login_required
 def upload_file(request, public_folder_id=None, personal_folder_id=None):
-    # Check tenant authorization first
     if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
-        return HttpResponseForbidden("You are not authorized for this company.")
+        return JsonResponse({"success": False, "errors": "You are not authorized for this company."}, status=403)
 
-    active_tab = request.GET.get('tab', 'public')
-    parent_folder = None
-    if active_tab == 'public' and public_folder_id:
-        parent_folder = Folder.objects.get(
-            id=public_folder_id, 
-            created_by=request.user, 
-            tenant=request.tenant, 
-            is_public=True
-        )
-    elif active_tab == 'personal' and personal_folder_id:
-        parent_folder = Folder.objects.get(
-            id=personal_folder_id, 
-            created_by=request.user, 
-            tenant=request.tenant, 
-            is_public=False
-        )
-
+    active_tab = request.POST.get('tab')  # Changed from request.GET to request.POST
+    
     if request.method == 'POST':
         form = FileUploadForm(request.POST, request.FILES)
         if form.is_valid():
             uploaded_file = form.save(commit=False)
             uploaded_file.uploaded_by = request.user
-            print("uploaded by", uploaded_file.uploaded_by.username)
             uploaded_file.tenant = request.tenant
             uploaded_file.original_name = request.FILES['file'].name
-            uploaded_file.folder = parent_folder  # Assign to the current folder
-            if uploaded_file.folder.is_public:
-                uploaded_file.is_public = True
-            uploaded_file.save()
             
-            return JsonResponse({"success": True, "file_id": uploaded_file.id})
+            # Get folder from POST data or URL parameters
+            folder_id = request.POST.get('folder')
+            if folder_id and folder_id != 'None' and folder_id != '':
+                try:
+                    uploaded_file.folder = Folder.objects.get(id=folder_id, tenant=request.tenant)
+                    uploaded_file.is_public = uploaded_file.folder.is_public
+                except Folder.DoesNotExist:
+                    return JsonResponse({"success": False, "errors": "Folder not found."}, status=400)
+            
+            uploaded_file.save()
+            return JsonResponse({"success": True, "redirect_url": f'/folders/?tab={active_tab}'})
         else:
-            # If form is invalid, re-render the form with errors
-            # Re-render the form with errors (adjust context as needed)
-            return render(request, 'folder/folders.html', {
-                'file_form': form,
-                'active_tab': active_tab,
-                'public_parent': parent_folder if active_tab == 'public' else None,
-                'personal_parent': parent_folder if active_tab == 'personal' else None,
-                'public_folders': Folder.objects.filter(created_by=request.user, parent=parent_folder if active_tab == 'public' else None, tenant=request.tenant, is_public=True),
-                'public_files': File.objects.filter(folder=parent_folder if active_tab == 'public' else None, uploaded_by=request.user, tenant=request.tenant),
-                'personal_folders': Folder.objects.filter(created_by=request.user, parent=parent_folder if active_tab == 'personal' else None, tenant=request.tenant, is_public=False),
-                'personal_files': File.objects.filter(folder=parent_folder if active_tab == 'personal' else None, uploaded_by=request.user, tenant=request.tenant),
-                'folder_form': FolderForm(initial={'parent': parent_folder}),
-            })
-    else:
-        return JsonResponse({"success": False, "errors": form.errors})
+            return JsonResponse({"success": False, "errors": form.errors}, status=400)
+    
+    return JsonResponse({"success": False, "errors": "Invalid request method."}, status=400)
 
 from documents.forms import FileUploadAnonForm
 def upload_file_anon(request, public_folder_id=None, personal_folder_id=None):
@@ -1656,6 +1636,9 @@ def move_folder(request, folder_id):
         return HttpResponseForbidden("You are not authorized for this company.")
     folder = get_object_or_404(Folder, id=folder_id, created_by=request.user, tenant=request.tenant)
     if request.method == 'POST':
+        active_tab = request.POST.get('tab')
+        if folder.is_public != (active_tab == 'public'):
+            return JsonResponse({'success': False, 'errors': {'general': 'Invalid tab context'}})
         new_parent_id = request.POST.get('new_parent_id')
         if new_parent_id:
             folder.parent = Folder.objects.get(id=new_parent_id, tenant=request.tenant)
@@ -1670,6 +1653,9 @@ def move_file(request, file_id):
         return HttpResponseForbidden("You are not authorized for this company.")
     file = get_object_or_404(File, id=file_id, uploaded_by=request.user, tenant=request.tenant)
     if request.method == 'POST':
+        active_tab = request.POST.get('tab')
+        if file.is_public != (active_tab == 'public'):
+            return JsonResponse({'success': False, 'errors': {'general': 'Invalid tab context'}})
         new_folder_id = request.POST.get('new_folder_id')
         if new_folder_id:
             file.folder = Folder.objects.get(id=new_folder_id, tenant=request.tenant)
@@ -3811,8 +3797,11 @@ def vacancy_list(request):
     
     vacancies = Vacancy.objects.filter(tenant=request.tenant).select_related('created_by', 'updated_by', 'shared_by')
     for vacancy in vacancies:
-        if vacancy.is_shared and vacancy.share_time <= timezone.now() <= vacancy.share_time_end:
-            vacancy.shareable_link = request.build_absolute_uri(vacancy.get_shareable_link())
+        if vacancy.share_time_end:
+            if vacancy.is_shared and vacancy.share_time <= timezone.now() <= vacancy.share_time_end:
+                vacancy.shareable_link = request.build_absolute_uri(vacancy.get_shareable_link())
+        if vacancy.is_shared and vacancy.share_time <= timezone.now():
+            vacancy.shareable_link = request.build_absolute_uri(vacancy.get_shareable_link()) 
         else:
             vacancy.shareable_link = None
 
@@ -3863,14 +3852,14 @@ def edit_vacancy(request, vacancy_id):
 
 @login_required
 @user_passes_test(is_hr)
-def vacancy_details(request, vacancy_id):
+def vacancy_detail(request, vacancy_id):
     if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
         print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
         return render(request, 'tenant_error.html', {'error_code': '401','message': 'You are not authorized for this company.'})
     
     vacancy = get_object_or_404(Vacancy, id=vacancy_id, tenant=request.tenant)
     
-    return render(request, 'dashboard/vacancy_detail.html', {'vacancy': vacancy})
+    return render(request, 'hr/vacancy_detail.html', {'vacancy': vacancy})
 
 @login_required
 @user_passes_test(is_hr)
@@ -3937,27 +3926,27 @@ def vacancy_post(request, token):
     
     return render(request, 'hr/vacancy_post.html', {'vacancy': vacancy})
 
-def create_vacancy_application(request):
+def create_vacancy_application(request, vacancy_id):
+    vacancy = get_object_or_404(Vacancy, id=vacancy_id)
     if request.method == 'POST':
-        form = VacancyApplicationForm(request.POST)
+        form = VacancyApplicationForm(request.POST, request.FILES)
         if form.is_valid():
             vacancy_application = form.save(commit=False)
+            vacancy_application.vacancy = vacancy
             vacancy_application.tenant = request.tenant
             vacancy_application.save()
-            return render(request, 'hr/vacancy_application_success.html', {'name':vacancy_application.first_name})
+            return render(request, 'hr/vacancy_application_success.html', {'name':vacancy_application.first_name, 'vacancy': vacancy})
     else:
         form = VacancyApplicationForm()
-    return render(request, 'hr/create_vacancy_application.html', {'form': form}) 
+    return render(request, 'hr/create_vacancy_application.html', {'form': form, 'vacancy': vacancy}) 
 
 @login_required
 @user_passes_test(is_hr)
-def vacancy_application_details(request, vacancy_id, application_id):
+def vacancy_application_detail(request, vacancy_id, application_id):
     if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
         print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
         return render(request, 'tenant_error.html', {'error_code': '401','message': 'You are not authorized for this company.'})
-    for role in request.user.roles.all():
-        if role.name != "HR":
-            return render(request, "error.html", {"message":"You are not authorized to view this page"})
+    
     vacancy = get_object_or_404(Vacancy, id=vacancy_id)
     vacancy_application = get_object_or_404(VacancyApplication, id=application_id, tenant=request.tenant, vacancy=vacancy)
     
@@ -3973,22 +3962,38 @@ def delete_vacancy_application(request, vacancy_id, application_id):
     vacancy = get_object_or_404(Vacancy, id=vacancy_id)
     vacancy_application = get_object_or_404(VacancyApplication, id=application_id, tenant=request.tenant, vacancy=vacancy)
     vacancy_application.delete()
-    return redirect('hr/list_vacancy_applications.html')
+    return redirect('applications_per_vacancy', vacancy_id=vacancy_id)
 
 
 @login_required
 @user_passes_test(is_hr)
-def list_vacancy_applications(request):
+def vacancy_application_list(request):
     if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
         print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
         return render(request, 'tenant_error.html', {'error_code': '401','message': 'You are not authorized for this company.'})
     
-    vacancy_applications = VacancyApplication.objects.filter(tenant=request.tenant)
+    vacancy = Vacancy.objects.filter(tenant=request.tenant)
+    paginator = Paginator(vacancy, 10)  # 10 applications per page
+    page = request.GET.get('page')
+    page_obj = paginator.get_page(page)
+    
+    return render(request, 'hr/vacancy_application_list.html', {'vacancies': page_obj})
+
+
+@login_required
+@user_passes_test(is_hr)
+def applications_per_vacancy(request, vacancy_id):
+    if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+        print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
+        return render(request, 'tenant_error.html', {'error_code': '401','message': 'You are not authorized for this company.'})
+    
+    vacancy = get_object_or_404(Vacancy, id=vacancy_id, tenant=request.tenant)
+    vacancy_applications = VacancyApplication.objects.filter(tenant=request.tenant, vacancy=vacancy)
     paginator = Paginator(vacancy_applications, 10)  # 10 applications per page
     page = request.GET.get('page')
     page_obj = paginator.get_page(page)
     
-    return render(request, 'hr/list_vacancy_applications.html', {'vacancy_applications': page_obj})
+    return render(request, 'hr/applications_per_vacancy.html', {'vacancy_applications': page_obj, 'vacancy': vacancy})
 
 def send_vacancy_accepted_mail(request, application_id):
     vacancy_application = VacancyApplication.objects.filter(id = application_id)

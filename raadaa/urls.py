@@ -94,13 +94,13 @@ urlpatterns = [
     path('files/<int:file_id>/share/', enable_file_sharing, name='enable_file_sharing'),
     path('folders/create/', create_folder, name='create_folder'),
     # Updated upload_file patterns
-    path('upload/', upload_file, name='upload_file'),  # Root-level upload
-    path('upload/public/<int:public_folder_id>/', upload_file, name='upload_file_public'),  # Public folder upload
-    path('upload/personal/<int:personal_folder_id>/', upload_file, name='upload_file_personal'),  # Personal folder upload
-    path('upload/both/<int:public_folder_id>/<int:personal_folder_id>/', upload_file, name='upload_file_both'),  # Both folders
-    path('upload/shared/<int:folder_id>/', upload_file_anon, name='upload_file_public_anon'),  # Shared folder upload
-    path('upload/public/shared/<int:public_folder_id>/', upload_file_anon, name='upload_file_public_anon'),  # Shared folder public upload
-    path('upload/personal/shared/<int:personal_folder_id>/', upload_file_anon, name='upload_file_personal_anon'),  # Shared folder personal upload
+    path('folders/upload/', upload_file, name='upload_file'),  # Root-level upload
+    path('folders/upload/public/<int:public_folder_id>/', upload_file, name='upload_file_public'),  # Public folder upload
+    path('folders/upload/personal/<int:personal_folder_id>/', upload_file, name='upload_file_personal'),  # Personal folder upload
+    path('folders/upload/both/<int:public_folder_id>/<int:personal_folder_id>/', upload_file, name='upload_file_both'),  # Both folders
+    path('folders/upload/shared/<int:folder_id>/', upload_file_anon, name='upload_file_public_anon'),  # Shared folder upload
+    path('folders/upload/public/shared/<int:public_folder_id>/', upload_file_anon, name='upload_file_public_anon'),  # Shared folder public upload
+    path('folders/upload/personal/shared/<int:personal_folder_id>/', upload_file_anon, name='upload_file_personal_anon'),  # Shared folder personal upload
     path('folders/<int:folder_id>/delete/', delete_folder, name='delete_folder'),
     path('folders/files/<int:file_id>/delete/', delete_file, name='delete_file'),
     path('folders/<int:folder_id>/rename/', rename_folder, name='rename_folder'),
@@ -175,11 +175,18 @@ urlpatterns = [
     # HR Vacancies
     path('vacancy/', views.vacancy_list, name='vacancy_list'),
     path('vacancy/create/', views.create_vacancy, name='create_vacancy'),
+    path('vacancy/<int:vacancy_id>/', views.vacancy_detail, name='vacancy_detail'),
     path('vacancy/edit/<int:vacancy_id>/', views.edit_vacancy, name='edit_vacancy'),
     path('vacancy/delete/<int:vacancy_id>/', views.delete_vacancy, name='delete_vacancy'),
     path('vacancy/share/<int:vacancy_id>/', views.share_vacancy, name='share_vacancy'),
     path('vacancy/withdraw/<int:vacancy_id>/', views.withdraw_vacancy, name='withdraw_vacancy'),
     path('vacancy/post/<uuid:token>/', views.vacancy_post, name='vacancy_post'),
+    # Vacancy Applications
+    path('vacancy/apply/<int:vacancy_id>/', views.create_vacancy_application, name='apply_vacancy'),
+    path('vacancy/applications/', views.vacancy_application_list, name='vacancy_application_list'),
+    path('vacancy/applications/<int:vacancy_id>/', views.applications_per_vacancy, name='applications_per_vacancy'),
+    path('vacancy/applications/<int:vacancy_id>/<int:application_id>/', views.vacancy_application_detail, name='vacancy_application_detail'),
+    path('vacancy/applications/<int:vacancy_id>/<int:application_id>/delete/', views.delete_vacancy_application, name='delete_vacancy_app'),
 
     path('.well-known/<path:path>', handle_well_known),  # Handle .well-known requests
 ]

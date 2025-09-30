@@ -659,14 +659,21 @@ class Vacancy(models.Model):
         ('withdrawn', 'Withdrawn'),
         ('closed', 'Closed'),
     ]
+    WORK_MODE = [
+        ('remote', 'Remote'),
+        ('onsite', 'On-Site'),
+        ('hybrid', 'Hybrid'),
+    ]
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="vacancy")
     title = models.CharField(max_length=255, blank=False, null=False)
     description = models.TextField(blank=True, null=True)
-    skills = models.TextField(blank=False, null=False)
-    eligibility = models.TextField(blank=False, null=False)
+    skills = models.TextField(blank=True, null=True)
+    eligibility = models.TextField(blank=True, null=True)
     min_salary = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     max_salary = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
-    location = CountryField(blank=False, null=False)
+    country = CountryField(blank=True, null=True)
+    city = models.CharField(max_length=255, blank=True, null=True)
+    work_mode = models.CharField(max_length=20, choices=WORK_MODE, null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     created_by = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, blank=True, related_name='created_vacancies')
     updated_at = models.DateTimeField(auto_now=True)
@@ -687,7 +694,7 @@ class Vacancy(models.Model):
 
 def upload_to_job_cvs(instance, filename):
     tenant_name = instance.tenant.name if instance.tenant else "unassigned"
-    title = instance.job.title if instance.job else "N/A"
+    title = instance.vacancy.title if instance.vacancy else "N/A"
     return os.path.join('vacancy_cvs', tenant_name, title, filename)
 
 class VacancyApplication(models.Model):
@@ -696,12 +703,14 @@ class VacancyApplication(models.Model):
         ('rejected', 'Rejected'),
     ]
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="vacancy_application")
+    vacancy = models.ForeignKey(Vacancy, on_delete=models.CASCADE, related_name="applications")
     first_name = models.CharField(max_length=255, blank=False, null=False)
     last_name = models.CharField(max_length=255, blank=False, null=False)
     middle_name = models.CharField(max_length=255, blank=True, null=True)
     phone = models.CharField(max_length=20, blank=False, null=False)
     email = models.EmailField(blank=False, null=False)
-    vacancy = models.ForeignKey(Vacancy, on_delete=models.CASCADE, related_name="applications")
+    country = CountryField(blank=True, null=True)
+    city = models.CharField(max_length=255, blank=True, null=True)
     cv = models.FileField(upload_to=upload_to_job_cvs)
     cover_letter = models.TextField(blank=True, null=True)
     status = models.CharField(max_length=20, choices=VACANCY_APPLICATION_STATUS, blank=True, null=True)

@@ -11,16 +11,19 @@
                     <!-- Tab Navigation -->
                     <ul class="nav nav-tabs mb-4" id="folderTabs" role="tablist">
                         <li class="nav-item" role="presentation">
-                            <a class="nav-link {% if active_tab == 'public' %}active{% endif %}" id="public-tab" data-bs-toggle="tab" href="#public" role="tab" aria-controls="public" aria-selected="{% if active_tab == 'public' %}true{% else %}false{% endif %}">
+                            <a class="nav-link {% if active_tab == 'public' %}active{% endif %}" id="public-tab" data-bs-toggle="tab" href="#public" role="tab" aria-controls="public" aria-selected="{% if active_tab == 'public' %}true{% else %}false{% endif %}" onclick="setActiveTab('public')">
                                 Public
                             </a>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <a class="nav-link {% if active_tab == 'personal' %}active{% endif %}" id="personal-tab" data-bs-toggle="tab" href="#personal" role="tab" aria-controls="personal" aria-selected="{% if active_tab == 'personal' %}true{% else %}false{% endif %}">
+                            <a class="nav-link {% if active_tab == 'personal' %}active{% endif %}" id="personal-tab" data-bs-toggle="tab" href="#personal" role="tab" aria-controls="personal" aria-selected="{% if active_tab == 'personal' %}true{% else %}false{% endif %}" onclick="setActiveTab('personal')">
                                 Private
                             </a>
                         </li>
                     </ul>
+
+                    <!-- Hidden Input for Active Tab -->
+                    <input type="hidden" id="activeTabInput" value="{{ active_tab }}">
 
                     <!-- Tab Content -->
                     <div class="tab-content">
@@ -34,126 +37,11 @@
                                             <i class="fas fa-ellipsis-v"></i>
                                         </button>
                                         <ul class="dropdown-menu">
-                                            <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#renameFolderModal{{ public_parent.id }}">Rename</a></li>
-                                            <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#moveFolderModal{{ public_parent.id }}">Move</a></li>
-                                            <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#shareFolderModal{{ public_parent.id }}">Share</a></li>
+                                            <li><a class="dropdown-item" href="#" onclick="openRenameFolderModal({{ public_parent.id }}, '{{ public_parent.name|escapejs }}')">Rename</a></li>
+                                            <li><a class="dropdown-item" href="#" onclick="openMoveFolderModal({{ public_parent.id }})">Move</a></li>
+                                            <li><a class="dropdown-item" href="#" onclick="openShareFolderModal({{ public_parent.id }}, '{{ public_parent.shareable_link|escapejs }}', {{ public_parent.is_shared|lower }}, {{ public_parent.share_subfolders|lower }}, {{ public_parent.share_files|lower }}, {{ public_parent.share_time_end }}, '{{ public_parent.share_time_end|date:'c'|default_if_none:''|escapejs }}')">Share</a></li>
                                             <li><a class="dropdown-item text-danger" href="#" onclick="deleteFolder({{ public_parent.id }})">Delete</a></li>
                                         </ul>
-                                    </div>
-                                    <!-- Rename Folder Modal -->
-                                    <div class="modal fade" id="renameFolderModal{{ public_parent.id }}" tabindex="-1" aria-labelledby="renameFolderModalLabel{{ public_parent.id }}" aria-hidden="true">
-                                        <div class="modal-dialog modal-dialog-centered">
-                                            <div class="modal-content">
-                                                <div class="modal-header">
-                                                    <h5 class="modal-title" id="renameFolderModalLabel{{ public_parent.id }}">Rename Folder</h5>
-                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                                </div>
-                                                <div class="modal-body">
-                                                    <form id="renameForm{{ public_parent.id }}">
-                                                        {% csrf_token %}
-                                                        <div class="mb-3">
-                                                            <label for="renameFolderInput{{ public_parent.id }}" class="form-label fw-medium">Folder Name <span class="text-danger">*</span></label>
-                                                            <input type="text" name="name" class="form-control" id="renameFolderInput{{ public_parent.id }}" value="{{ public_parent.name }}" required>
-                                                            <div id="renameFolderError{{ public_parent.id }}" class="text-danger small mt-1"></div>
-                                                        </div>
-                                                    </form>
-                                                </div>
-                                                <div class="modal-footer">
-                                                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                                                    <button type="button" class="btn btn-primary" onclick="ajaxRenameFolder({{ public_parent.id }})">
-                                                        <i class="fas fa-save me-1"></i> Rename
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <!-- Move Folder Modal -->
-                                    <div class="modal fade" id="moveFolderModal{{ public_parent.id }}" tabindex="-1" aria-labelledby="moveFolderModalLabel{{ public_parent.id }}" aria-hidden="true">
-                                        <div class="modal-dialog modal-dialog-centered">
-                                            <div class="modal-content">
-                                                <div class="modal-header">
-                                                    <h5 class="modal-title" id="moveFolderModalLabel{{ public_parent.id }}">Move Folder</h5>
-                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                                </div>
-                                                <div class="modal-body">
-                                                    <form id="moveForm{{ public_parent.id }}">
-                                                        {% csrf_token %}
-                                                        <div class="mb-3">
-                                                            <label for="moveFolderSelect{{ public_parent.id }}" class="form-label fw-medium">Destination Folder <span class="text-danger">*</span></label>
-                                                            <select name="new_parent_id" class="form-select" id="moveFolderSelect{{ public_parent.id }}" required>
-                                                                <option value="">-- Select Destination --</option>
-                                                                {% for f in public_folders %}
-                                                                    {% if f.id != public_parent.id %}
-                                                                        <option value="{{ f.id }}">{{ f.name }}</option>
-                                                                    {% endif %}
-                                                                {% endfor %}
-                                                            </select>
-                                                            <div id="moveFolderError{{ public_parent.id }}" class="text-danger small mt-1"></div>
-                                                        </div>
-                                                    </form>
-                                                </div>
-                                                <div class="modal-footer">
-                                                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                                                    <button type="button" class="btn btn-primary" onclick="ajaxMoveFolder({{ public_parent.id }})">
-                                                        <i class="fas fa-arrow-right me-1"></i> Move
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <!-- Share Folder Modal -->
-                                    <div class="modal fade" id="shareFolderModal{{ public_parent.id }}" tabindex="-1" aria-labelledby="shareFolderModalLabel{{ public_parent.id }}" aria-hidden="true">
-                                        <div class="modal-dialog modal-dialog-centered">
-                                            <div class="modal-content">
-                                                <div class="modal-header">
-                                                    <h5 class="modal-title" id="shareFolderModalLabel{{ public_parent.id }}">Share Folder</h5>
-                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                                </div>
-                                                <div class="modal-body">
-                                                    <p>
-                                                        Shareable Link: 
-                                                        <span id="shareLink-{{ public_parent.id }}">{{ public_parent.shareable_link|truncatechars:20 }}</span>
-                                                        <input type="hidden" id="fullShareLink-{{ public_parent.id }}" value="{{ public_parent.shareable_link }}">
-                                                        <button type="button" class="btn btn-outline-primary btn-sm ms-2" onclick="copyShareLink('{{ public_parent.id }}')">
-                                                            <i class="fas fa-copy"></i> Copy Link
-                                                        </button>
-                                                    </p>
-                                                    {% comment %} {% if not folder.is_shared %} {% endcomment %}
-                                                    <form id="shareForm{{ public_parent.id }}">
-                                                        {% csrf_token %}
-                                                        <div class="mb-3">
-                                                            <label for="shareFolderEndDate{{ public_parent.id }}" class="form-label fw-medium">Set share end date and time <span class="text-secondary">(not required)</span>:</label>
-                                                            <input type="datetime-local" id="shareFolderEndDate{{ public_parent.id }}" name="end_date" class="form-control" required>
-                                                            <!-- Share subfolders checkbox -->
-                                                            <div class="form-check mb-2">
-                                                                <input type="checkbox" id="shareFolderFolders{{ public_parent.id }}" name="share_folders" class="form-check-input" {% if public_parent.share_subfolders %}checked{% endif %}>
-                                                                <label for="shareFolderFolders{{ public_parent.id }}" class="form-check-label fw-medium">Share folders within this Folder?</label>
-                                                            </div>
-                                                            
-                                                            <!-- Share files checkbox -->
-                                                            <div class="form-check mb-2">
-                                                                <input type="checkbox" id="shareFolderFiles{{ public_parent.id }}" name="share_files" class="form-check-input" {% if public_parent.share_files %}checked{% endif %}>
-                                                                <label for="shareFolderFiles{{ public_parent.id }}" class="form-check-label fw-medium">Share files within this Folder?</label>
-                                                            </div>
-                                                            <div id="shareFolderError{{ public_parent.id }}" class="text-danger small mt-1"></div>
-                                                        </div>
-                                                    </form>
-                                                    {% comment %} {% endif %} {% endcomment %}
-                                                </div>
-                                                <div class="modal-footer">
-                                                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                                                    {% if public_parent.is_shared %}
-                                                        <button type="button" class="btn btn-danger" onclick="ajaxShareFolder({{ public_parent.id }})">
-                                                            <i class="fas fa-share me-1"></i> Disable Share
-                                                        </button>
-                                                    {% else %}
-                                                        <button type="button" class="btn btn-primary" onclick="ajaxShareFolder({{ public_parent.id }})">
-                                                            <i class="fas fa-share me-1"></i> Enable Share
-                                                        </button>
-                                                    {% endif %}
-                                                </div>
-                                            </div>
-                                        </div>
                                     </div>
                                 {% endif %}
                                 {% if public_parent.parent %}
@@ -161,7 +49,7 @@
                                         <i class="fas fa-arrow-left me-1"></i> Back
                                     </a>
                                 {% elif public_parent %}
-                                    <a href="{% url 'folder_view' %}" class="btn btn-outline-secondary btn-sm" title="Back to Root">
+                                    <a href="{% url 'folder_view' %}?tab=public" class="btn btn-outline-secondary btn-sm" title="Back to Root">
                                         <i class="fas fa-arrow-left me-1"></i> Back
                                     </a>
                                 {% endif %}
@@ -195,7 +83,7 @@
                                                         </a>
                                                         {% if folder.is_shared %}
                                                             <p>
-                                                                <button type="button" class="btn btn-outline-primary btn-sm ms-2" onclick="copyShareLink('{{ folder.id }}')">
+                                                                <button type="button" class="btn btn-outline-primary btn-sm ms-2" onclick="copyShareLink('{{ folder.id }}', '{{ folder.shareable_link|escapejs }}')">
                                                                     <i class="fas fa-copy"></i> Copy Share Link
                                                                 </button>
                                                             </p>
@@ -206,128 +94,13 @@
                                                                     <i class="fas fa-ellipsis-v"></i>
                                                                 </button>
                                                                 <ul class="dropdown-menu">
-                                                                    <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#renameFolderModal{{ folder.id }}">Rename</a></li>
-                                                                    <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#moveFolderModal{{ folder.id }}">Move</a></li>
-                                                                    <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#shareFolderModal{{ folder.id }}">Share</a></li>
+                                                                    <li><a class="dropdown-item" href="#" onclick="openRenameFolderModal({{ folder.id }}, '{{ folder.name|escapejs }}')">Rename</a></li>
+                                                                    <li><a class="dropdown-item" href="#" onclick="openMoveFolderModal({{ folder.id }})">Move</a></li>
+                                                                    <li><a class="dropdown-item" href="#" onclick="openShareFolderModal({{ folder.id }}, '{{ folder.shareable_link|escapejs }}', {{ folder.is_shared|lower }}, {{ folder.share_subfolders|lower }}, {{ folder.share_files|lower }}), '{{ folder.share_time_end|date:'c'|default_if_none:''|escapejs }}'">Share</a></li>
                                                                     <li><a class="dropdown-item text-danger" href="#" onclick="deleteFolder({{ folder.id }})">Delete</a></li>
                                                                 </ul>
                                                             </div>
                                                         {% endif %}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <!-- Rename Folder Modal -->
-                                            <div class="modal fade" id="renameFolderModal{{ folder.id }}" tabindex="-1" aria-labelledby="renameFolderModalLabel{{ folder.id }}" aria-hidden="true">
-                                                <div class="modal-dialog modal-dialog-centered">
-                                                    <div class="modal-content">
-                                                        <div class="modal-header">
-                                                            <h5 class="modal-title" id="renameFolderModalLabel{{ folder.id }}">Rename Folder</h5>
-                                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                                        </div>
-                                                        <div class="modal-body">
-                                                            <form id="renameForm{{ folder.id }}">
-                                                                {% csrf_token %}
-                                                                <div class="mb-3">
-                                                                    <label for="renameFolderInput{{ folder.id }}" class="form-label fw-medium">Folder Name <span class="text-danger">*</span></label>
-                                                                    <input type="text" name="name" class="form-control" id="renameFolderInput{{ folder.id }}" value="{{ folder.name }}" required>
-                                                                    <div id="renameFolderError{{ folder.id }}" class="text-danger small mt-1"></div>
-                                                                </div>
-                                                            </form>
-                                                        </div>
-                                                        <div class="modal-footer">
-                                                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                                                            <button type="button" class="btn btn-primary" onclick="ajaxRenameFolder({{ folder.id }})">
-                                                                <i class="fas fa-save me-1"></i> Rename
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <!-- Move Folder Modal -->
-                                            <div class="modal fade" id="moveFolderModal{{ folder.id }}" tabindex="-1" aria-labelledby="moveFolderModalLabel{{ folder.id }}" aria-hidden="true">
-                                                <div class="modal-dialog modal-dialog-centered">
-                                                    <div class="modal-content">
-                                                        <div class="modal-header">
-                                                            <h5 class="modal-title" id="moveFolderModalLabel{{ folder.id }}">Move Folder</h5>
-                                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                                        </div>
-                                                        <div class="modal-body">
-                                                            <form id="moveForm{{ folder.id }}">
-                                                                {% csrf_token %}
-                                                                <div class="mb-3">
-                                                                    <label for="moveFolderSelect{{ folder.id }}" class="form-label fw-medium">Destination Folder <span class="text-danger">*</span></label>
-                                                                    <select name="new_parent_id" class="form-select" id="moveFolderSelect{{ folder.id }}" required>
-                                                                        <option value="">-- Select Destination --</option>
-                                                                        {% for f in public_folders %}
-                                                                            {% if f.id != folder.id %}
-                                                                                <option value="{{ f.id }}">{{ f.name }}</option>
-                                                                            {% endif %}
-                                                                        {% endfor %}
-                                                                    </select>
-                                                                    <div id="moveFolderError{{ folder.id }}" class="text-danger small mt-1"></div>
-                                                                </div>
-                                                            </form>
-                                                        </div>
-                                                        <div class="modal-footer">
-                                                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                                                            <button type="button" class="btn btn-primary" onclick="ajaxMoveFolder({{ folder.id }})">
-                                                                <i class="fas fa-arrow-right me-1"></i> Move
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <!-- Share Folder Modal -->
-                                            <div class="modal fade" id="shareFolderModal{{ folder.id }}" tabindex="-1" aria-labelledby="shareFolderModalLabel{{ folder.id }}" aria-hidden="true">
-                                                <div class="modal-dialog modal-dialog-centered">
-                                                    <div class="modal-content">
-                                                        <div class="modal-header">
-                                                            <h5 class="modal-title" id="shareFolderModalLabel{{ folder.id }}">Share Folder</h5>
-                                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                                        </div>
-                                                        <div class="modal-body">
-                                                            <p>
-                                                                Shareable Link: 
-                                                                <span id="shareLink-{{ folder.id }}">{{ folder.shareable_link|truncatechars:20 }}</span>
-                                                                <input type="hidden" id="fullShareLink-{{ folder.id }}" value="{{ folder.shareable_link }}">
-                                                                <button type="button" class="btn btn-outline-primary btn-sm ms-2" onclick="copyShareLink('{{ folder.id }}')">
-                                                                    <i class="fas fa-copy"></i> Copy Link
-                                                                </button>
-                                                            </p>
-                                                            {% comment %} {% if not folder.is_shared %} {% endcomment %}
-                                                            <form id="shareForm{{ folder.id }}">
-                                                                {% csrf_token %}
-                                                                <div class="mb-3">
-                                                                    <label for="shareFolderEndDate{{ folder.id }}" class="form-label fw-medium">Set share end date and time <span class="text-secondary">(not required)</span>:</label>
-                                                                    <input type="datetime-local" id="shareFolderEndDate{{ folder.id }}" name="end_date" class="form-control" required>
-                                                                    <!-- Share subfolders checkbox -->
-                                                                    <div class="form-check mb-2">
-                                                                        <input type="checkbox" id="shareFolderFolders{{ public_parent.id }}" name="share_folders" class="form-check-input" {% if public_parent.share_subfolders %}checked{% endif %}>
-                                                                        <label for="shareFolderFolders{{ public_parent.id }}" class="form-check-label fw-medium">Share folders within this Folder?</label>
-                                                                    </div>
-                                                                    
-                                                                    <!-- Share files checkbox -->
-                                                                    <div class="form-check mb-2">
-                                                                        <input type="checkbox" id="shareFolderFiles{{ public_parent.id }}" name="share_files" class="form-check-input" {% if public_parent.share_files %}checked{% endif %}>
-                                                                        <label for="shareFolderFiles{{ public_parent.id }}" class="form-check-label fw-medium">Share files within this Folder?</label>
-                                                                    </div>
-                                                                    <div id="shareFolderError{{ folder.id }}" class="text-danger small mt-1"></div>
-                                                                </div>
-                                                            </form>
-                                                            {% comment %} {% endif %} {% endcomment %}
-                                                        </div>
-                                                        <div class="modal-footer">
-                                                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                                                            {% if folder.is_shared %}
-                                                               <button type="button" class="btn btn-danger" onclick="ajaxShareFolder({{ folder.id }})">
-                                                                    <i class="fas fa-share me-1"></i> Disable Share
-                                                                </button>
-                                                            {% else %}
-                                                                <button type="button" class="btn btn-primary" onclick="ajaxShareFolder({{ folder.id }})">
-                                                                    <i class="fas fa-share me-1"></i> Enable Share
-                                                                </button>
-                                                            {% endif %}
-                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -358,12 +131,12 @@
                                                             {% endif %}
                                                             <h6 class="card-title">{{ file.original_name|truncatechars:20 }}</h6>
                                                             {% if file.anon_name %}
-                                                                <span class="text-muted">Uploaded By: {{ file.anon_name }}</span
+                                                                <span class="text-muted">Uploaded By: {{ file.anon_name }}</span>
                                                             {% endif %}
                                                         </a>
                                                         {% if file.is_shared %}
                                                             <p>
-                                                                <button type="button" class="btn btn-outline-primary btn-sm ms-2" onclick="copyShareLink('{{ file.id }}')">
+                                                                <button type="button" class="btn btn-outline-primary btn-sm ms-2" onclick="copyShareLink('{{ file.id }}', '{{ file.shareable_link|escapejs }}')">
                                                                     <i class="fas fa-copy"></i> Copy Share Link
                                                                 </button>
                                                             </p>
@@ -374,117 +147,13 @@
                                                                     <i class="fas fa-ellipsis-v"></i>
                                                                 </button>
                                                                 <ul class="dropdown-menu">
-                                                                    <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#renameFileModal{{ file.id }}">Rename</a></li>
-                                                                    <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#moveFileModal{{ file.id }}">Move</a></li>
-                                                                    <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#shareFileModal{{ file.id }}">Share</a></li>
+                                                                    <li><a class="dropdown-item" href="#" onclick="openRenameFileModal({{ file.id }}, '{{ file.original_name|escapejs }}')">Rename</a></li>
+                                                                    <li><a class="dropdown-item" href="#" onclick="openMoveFileModal({{ file.id }})">Move</a></li>
+                                                                    <li><a class="dropdown-item" href="#" onclick="openShareFileModal({{ file.id }}, '{{ file.shareable_link|escapejs }}', {{ file.is_shared|lower }}, '{{ file.share_time_end|date:'c'|default_if_none:''|escapejs }}')">Share</a></li>
                                                                     <li><a class="dropdown-item text-danger" href="#" onclick="deleteFile({{ file.id }})">Delete</a></li>
                                                                 </ul>
                                                             </div>
                                                         {% endif %}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <!-- Rename File Modal -->
-                                            <div class="modal fade" id="renameFileModal{{ file.id }}" tabindex="-1" aria-labelledby="renameFileModalLabel{{ file.id }}" aria-hidden="true">
-                                                <div class="modal-dialog modal-dialog-centered">
-                                                    <div class="modal-content">
-                                                        <div class="modal-header">
-                                                            <h5 class="modal-title" id="renameFileModalLabel{{ file.id }}">Rename File</h5>
-                                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                                        </div>
-                                                        <div class="modal-body">
-                                                            <form id="renameFileForm{{ file.id }}">
-                                                                {% csrf_token %}
-                                                                <div class="mb-3">
-                                                                    <label for="renameFileInput{{ file.id }}" class="form-label fw-medium">File Name <span class="text-danger">*</span></label>
-                                                                    <input type="text" name="name" class="form-control" id="renameFileInput{{ file.id }}" value="{{ file.original_name }}" required>
-                                                                    <div id="renameFileError{{ file.id }}" class="text-danger small mt-1"></div>
-                                                                </div>
-                                                            </form>
-                                                        </div>
-                                                        <div class="modal-footer">
-                                                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                                                            <button type="button" class="btn btn-primary" onclick="ajaxRenameFile({{ file.id }})">
-                                                                <i class="fas fa-save me-1"></i> Rename
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <!-- Move File Modal -->
-                                            <div class="modal fade" id="moveFileModal{{ file.id }}" tabindex="-1" aria-labelledby="moveFileModalLabel{{ file.id }}" aria-hidden="true">
-                                                <div class="modal-dialog modal-dialog-centered">
-                                                    <div class="modal-content">
-                                                        <div class="modal-header">
-                                                            <h5 class="modal-title" id="moveFileModalLabel{{ file.id }}">Move File</h5>
-                                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                                        </div>
-                                                        <div class="modal-body">
-                                                            <form id="moveFileForm{{ file.id }}">
-                                                                {% csrf_token %}
-                                                                <div class="mb-3">
-                                                                    <label for="moveFileSelect{{ file.id }}" class="form-label fw-medium">Destination Folder <span class="text-danger">*</span></label>
-                                                                    <select name="new_folder_id" class="form-select" id="moveFileSelect{{ file.id }}" required>
-                                                                        <option value="">-- Select Destination Folder --</option>
-                                                                        {% for f in public_folders %}
-                                                                            {% if f.id != file.folder.id %}
-                                                                                <option value="{{ f.id }}">{{ f.name }}</option>
-                                                                            {% endif %}
-                                                                        {% endfor %}
-                                                                    </select>
-                                                                    <div id="moveFileError{{ file.id }}" class="text-danger small mt-1"></div>
-                                                                </div>
-                                                            </form>
-                                                        </div>
-                                                        <div class="modal-footer">
-                                                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                                                            <button type="button" class="btn btn-primary" onclick="ajaxMoveFile({{ file.id }})">
-                                                                <i class="fas fa-arrow-right me-1"></i> Move
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <!-- Share File Modal -->
-                                            <div class="modal fade" id="shareFileModal{{ file.id }}" tabindex="-1" aria-labelledby="shareFileModalLabel{{ file.id }}" aria-hidden="true">
-                                                <div class="modal-dialog modal-dialog-centered">
-                                                    <div class="modal-content">
-                                                        <div class="modal-header">
-                                                            <h5 class="modal-title" id="shareFileModalLabel{{ file.id }}">Share File</h5>
-                                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                                        </div>
-                                                        <div class="modal-body">
-                                                            <p>
-                                                                Shareable Link: 
-                                                                <span id="shareLink-{{ file.id }}">{{ file.shareable_link|truncatechars:20 }}</span>
-                                                                <input type="hidden" id="fullShareLink-{{ file.id }}" value="{{ file.shareable_link }}">
-                                                                <button type="button" class="btn btn-outline-primary btn-sm ms-2" onclick="copyShareLink('{{ file.id }}')">
-                                                                    <i class="fas fa-copy"></i> Copy Link
-                                                                </button>
-                                                            </p>
-                                                            {% comment %} {% if not file.is_shared %} {% endcomment %}
-                                                            <form id="shareForm{{ file.id }}">
-                                                                {% csrf_token %}
-                                                                <div class="mb-3">
-                                                                    <label for="shareFileEndDate{{ file.id }}" class="form-label fw-medium">Set share end date and time <span class="text-secondary">(not required)</span>:</label>
-                                                                    <input type="datetime-local" id="shareFileEndDate{{ file.id }}" name="end_date" class="form-control" required>
-                                                                    <div id="shareFileError{{ file.id }}" class="text-danger small mt-1"></div>
-                                                                </div>
-                                                            </form>
-                                                            {% comment %} {% endif %} {% endcomment %}
-                                                        </div>
-                                                        <div class="modal-footer">
-                                                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                                                            {% if file.is_shared %}
-                                                               <button type="button" class="btn btn-danger" onclick="ajaxShareFile({{ file.id }})">
-                                                                    <i class="fas fa-share me-1"></i> Disable Share
-                                                                </button>
-                                                            {% else %}
-                                                                <button type="button" class="btn btn-primary" onclick="ajaxShareFile({{ file.id }})">
-                                                                    <i class="fas fa-share me-1"></i> Enable Share
-                                                                </button>
-                                                            {% endif %}
-                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -509,126 +178,11 @@
                                             <i class="fas fa-ellipsis-v"></i>
                                         </button>
                                         <ul class="dropdown-menu">
-                                            <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#renameFolderModal{{ personal_parent.id }}">Rename</a></li>
-                                            <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#moveFolderModal{{ personal_parent.id }}">Move</a></li>
-                                            <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#shareFolderModal{{ personal_parent.id }}">Share</a></li>
+                                            <li><a class="dropdown-item" href="#" onclick="openRenameFolderModal({{ personal_parent.id }}, '{{ personal_parent.name|escapejs }}')">Rename</a></li>
+                                            <li><a class="dropdown-item" href="#" onclick="openMoveFolderModal({{ personal_parent.id }})">Move</a></li>
+                                            <li><a class="dropdown-item" href="#" onclick="openShareFolderModal({{ personal_parent.id }}, '{{ personal_parent.shareable_link|escapejs }}', {{ personal_parent.is_shared|lower }}, {{ personal_parent.share_subfolders|lower }}, {{ personal_parent.share_files|lower }}, '{{ personal_parent.share_time_end|date:'c'|default_if_none:''|escapejs }}')">Share</a></li>
                                             <li><a class="dropdown-item text-danger" href="#" onclick="deleteFolder({{ personal_parent.id }})">Delete</a></li>
                                         </ul>
-                                    </div>
-                                    <!-- Rename Folder Modal -->
-                                    <div class="modal fade" id="renameFolderModal{{ personal_parent.id }}" tabindex="-1" aria-labelledby="renameFolderModalLabel{{ personal_parent.id }}" aria-hidden="true">
-                                        <div class="modal-dialog modal-dialog-centered">
-                                            <div class="modal-content">
-                                                <div class="modal-header">
-                                                    <h5 class="modal-title" id="renameFolderModalLabel{{ personal_parent.id }}">Rename Folder</h5>
-                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                                </div>
-                                                <div class="modal-body">
-                                                    <form id="renameForm{{ personal_parent.id }}">
-                                                        {% csrf_token %}
-                                                        <div class="mb-3">
-                                                            <label for="renameFolderInput{{ personal_parent.id }}" class="form-label fw-medium">Folder Name <span class="text-danger">*</span></label>
-                                                            <input type="text" name="name" class="form-control" id="renameFolderInput{{ personal_parent.id }}" value="{{ personal_parent.name }}" required>
-                                                            <div id="renameFolderError{{ personal_parent.id }}" class="text-danger small mt-1"></div>
-                                                        </div>
-                                                    </form>
-                                                </div>
-                                                <div class="modal-footer">
-                                                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                                                    <button type="button" class="btn btn-primary" onclick="ajaxRenameFolder({{ personal_parent.id }})">
-                                                        <i class="fas fa-save me-1"></i> Rename
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <!-- Move Folder Modal -->
-                                    <div class="modal fade" id="moveFolderModal{{ personal_parent.id }}" tabindex="-1" aria-labelledby="moveFolderModalLabel{{ personal_parent.id }}" aria-hidden="true">
-                                        <div class="modal-dialog modal-dialog-centered">
-                                            <div class="modal-content">
-                                                <div class="modal-header">
-                                                    <h5 class="modal-title" id="moveFolderModalLabel{{ personal_parent.id }}">Move Folder</h5>
-                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                                </div>
-                                                <div class="modal-body">
-                                                    <form id="moveForm{{ personal_parent.id }}">
-                                                        {% csrf_token %}
-                                                        <div class="mb-3">
-                                                            <label for="moveFolderSelect{{ personal_parent.id }}" class="form-label fw-medium">Destination Folder <span class="text-danger">*</span></label>
-                                                            <select name="new_parent_id" class="form-select" id="moveFolderSelect{{ personal_parent.id }}" required>
-                                                                <option value="">-- Select Destination --</option>
-                                                                {% for f in personal_folders %}
-                                                                    {% if f.id != personal_parent.id %}
-                                                                        <option value="{{ f.id }}">{{ f.name }}</option>
-                                                                    {% endif %}
-                                                                {% endfor %}
-                                                            </select>
-                                                            <div id="moveFolderError{{ personal_parent.id }}" class="text-danger small mt-1"></div>
-                                                        </div>
-                                                    </form>
-                                                </div>
-                                                <div class="modal-footer">
-                                                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                                                    <button type="button" class="btn btn-primary" onclick="ajaxMoveFolder({{ personal_parent.id }})">
-                                                        <i class="fas fa-arrow-right me-1"></i> Move
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <!-- Share Folder Modal -->
-                                    <div class="modal fade" id="shareFolderModal{{ personal_parent.id }}" tabindex="-1" aria-labelledby="shareFolderModalLabel{{ personal_parent.id }}" aria-hidden="true">
-                                        <div class="modal-dialog modal-dialog-centered">
-                                            <div class="modal-content">
-                                                <div class="modal-header">
-                                                    <h5 class="modal-title" id="shareFolderModalLabel{{ personal_parent.id }}">Share Folder</h5>
-                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                                </div>
-                                                <div class="modal-body">
-                                                    <p>
-                                                        Shareable Link: 
-                                                        <span id="shareLink-{{ personal_parent.id }}">{{ personal_parent.shareable_link|truncatechars:20 }}</span>
-                                                        <input type="hidden" id="fullShareLink-{{ personal_parent.id }}" value="{{ personal_parent.shareable_link }}">
-                                                        <button type="button" class="btn btn-outline-primary btn-sm ms-2" onclick="copyShareLink('{{ personal_parent.id }}')">
-                                                            <i class="fas fa-copy"></i> Copy Link
-                                                        </button>
-                                                    </p>
-                                                    {% comment %} {% if not folder.is_shared %} {% endcomment %}
-                                                    <form id="shareForm{{ personal_parent.id }}">
-                                                        {% csrf_token %}
-                                                        <div class="mb-3">
-                                                            <label for="shareFolderEndDate{{ personal_parent.id }}" class="form-label fw-medium">Set share end date and time <span class="text-secondary">(not required)</span>:</label>
-                                                            <input type="datetime-local" id="shareFolderEndDate{{ personal_parent.id }}" name="end_date" class="form-control" required>
-                                                            <!-- Share subfolders checkbox -->
-                                                            <div class="form-check mb-2">
-                                                                <input type="checkbox" id="shareFolderFolders{{ public_parent.id }}" name="share_folders" class="form-check-input" {% if public_parent.share_subfolders %}checked{% endif %}>
-                                                                <label for="shareFolderFolders{{ public_parent.id }}" class="form-check-label fw-medium">Share folders within this Folder?</label>
-                                                            </div>
-                                                            
-                                                            <!-- Share files checkbox -->
-                                                            <div class="form-check mb-2">
-                                                                <input type="checkbox" id="shareFolderFiles{{ public_parent.id }}" name="share_files" class="form-check-input" {% if public_parent.share_files %}checked{% endif %}>
-                                                                <label for="shareFolderFiles{{ public_parent.id }}" class="form-check-label fw-medium">Share files within this Folder?</label>
-                                                            </div>
-                                                            <div id="shareFolderError{{ personal_parent.id }}" class="text-danger small mt-1"></div>
-                                                        </div>
-                                                    </form>
-                                                    {% comment %} {% endif %} {% endcomment %}
-                                                </div>
-                                                <div class="modal-footer">
-                                                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                                                    {% if personal_parent.is_shared %}
-                                                        <button type="button" class="btn btn-danger" onclick="ajaxShareFolder({{ personal_parent.id }})">
-                                                            <i class="fas fa-share me-1"></i> Disable Share
-                                                        </button>
-                                                    {% else %}
-                                                        <button type="button" class="btn btn-primary" onclick="ajaxShareFolder({{ personal_parent.id }})">
-                                                            <i class="fas fa-share me-1"></i> Enable Share
-                                                        </button>
-                                                    {% endif %}
-                                                </div>
-                                            </div>
-                                        </div>
                                     </div>
                                 {% endif %}
                                 {% if personal_parent.parent %}
@@ -636,12 +190,12 @@
                                         <i class="fas fa-arrow-left me-1"></i> Back
                                     </a>
                                 {% elif personal_parent %}
-                                    <a href="{% url 'folder_view' %}" class="btn btn-outline-secondary btn-sm" title="Back to Root">
+                                    <a href="{% url 'folder_view' %}?tab=personal" class="btn btn-outline-secondary btn-sm" title="Back to Root">
                                         <i class="fas fa-arrow-left me-1"></i> Back
                                     </a>
                                 {% endif %}
                             </div>
-                           <div class="card-body">
+                            <div class="card-body">
                                 {% if personal_parent.description %}
                                 <div class="description-bar mb-2">
                                     <span class="text-primary"><strong>Folder Info:</strong> {{ personal_parent.description }}</span>
@@ -670,137 +224,24 @@
                                                         </a>
                                                         {% if folder.is_shared %}
                                                             <p>
-                                                                <button type="button" class="btn btn-outline-primary btn-sm ms-2" onclick="copyShareLink('{{ folder.id }}')">
+                                                                <button type="button" class="btn btn-outline-primary btn-sm ms-2" onclick="copyShareLink('{{ folder.id }}', '{{ folder.shareable_link|escapejs }}')">
                                                                     <i class="fas fa-copy"></i> Copy Share Link
                                                                 </button>
                                                             </p>
                                                         {% endif %}
-                                                        <div class="dropdown position-absolute top-0 end-0 p-2">
-                                                            <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Folder Options">
-                                                                <i class="fas fa-ellipsis-v"></i>
-                                                            </button>
-                                                            <ul class="dropdown-menu">
-                                                                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#renameFolderModal{{ folder.id }}">Rename</a></li>
-                                                                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#moveFolderModal{{ folder.id }}">Move</a></li>
-                                                                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#shareFolderModal{{ folder.id }}">Share</a></li>
-                                                                <li><a class="dropdown-item text-danger" href="#" onclick="deleteFolder({{ folder.id }})">Delete</a></li>
-                                                            </ul>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <!-- Rename Folder Modal -->
-                                            <div class="modal fade" id="renameFolderModal{{ folder.id }}" tabindex="-1" aria-labelledby="renameFolderModalLabel{{ folder.id }}" aria-hidden="true">
-                                                <div class="modal-dialog modal-dialog-centered">
-                                                    <div class="modal-content">
-                                                        <div class="modal-header">
-                                                            <h5 class="modal-title" id="renameFolderModalLabel{{ folder.id }}">Rename Folder</h5>
-                                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                                        </div>
-                                                        <div class="modal-body">
-                                                            <form id="renameForm{{ folder.id }}">
-                                                                {% csrf_token %}
-                                                                <div class="mb-3">
-                                                                    <label for="renameFolderInput{{ folder.id }}" class="form-label fw-medium">Folder Name <span class="text-danger">*</span></label>
-                                                                    <input type="text" name="name" class="form-control" id="renameFolderInput{{ folder.id }}" value="{{ folder.name }}" required>
-                                                                    <div id="renameFolderError{{ folder.id }}" class="text-danger small mt-1"></div>
-                                                                </div>
-                                                            </form>
-                                                        </div>
-                                                        <div class="modal-footer">
-                                                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                                                            <button type="button" class="btn btn-primary" onclick="ajaxRenameFolder({{ folder.id }})">
-                                                                <i class="fas fa-save me-1"></i> Rename
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <!-- Move Folder Modal -->
-                                            <div class="modal fade" id="moveFolderModal{{ folder.id }}" tabindex="-1" aria-labelledby="moveFolderModalLabel{{ folder.id }}" aria-hidden="true">
-                                                <div class="modal-dialog modal-dialog-centered">
-                                                    <div class="modal-content">
-                                                        <div class="modal-header">
-                                                            <h5 class="modal-title" id="moveFolderModalLabel{{ folder.id }}">Move Folder</h5>
-                                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                                        </div>
-                                                        <div class="modal-body">
-                                                            <form id="moveForm{{ folder.id }}">
-                                                                {% csrf_token %}
-                                                                <div class="mb-3">
-                                                                    <label for="moveFolderSelect{{ folder.id }}" class="form-label fw-medium">Destination Folder <span class="text-danger">*</span></label>
-                                                                    <select name="new_parent_id" class="form-select" id="moveFolderSelect{{ folder.id }}" required>
-                                                                        <option value="">-- Select Destination --</option>
-                                                                        {% for f in public_folders %}
-                                                                            {% if f.id != folder.id %}
-                                                                                <option value="{{ f.id }}">{{ f.name }}</option>
-                                                                            {% endif %}
-                                                                        {% endfor %}
-                                                                    </select>
-                                                                    <div id="moveFolderError{{ folder.id }}" class="text-danger small mt-1"></div>
-                                                                </div>
-                                                            </form>
-                                                        </div>
-                                                        <div class="modal-footer">
-                                                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                                                            <button type="button" class="btn btn-primary" onclick="ajaxMoveFolder({{ folder.id }})">
-                                                                <i class="fas fa-arrow-right me-1"></i> Move
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <!-- Share Folder Modal -->
-                                            <div class="modal fade" id="shareFolderModal{{ folder.id }}" tabindex="-1" aria-labelledby="shareFolderModalLabel{{ folder.id }}" aria-hidden="true">
-                                                <div class="modal-dialog modal-dialog-centered">
-                                                    <div class="modal-content">
-                                                        <div class="modal-header">
-                                                            <h5 class="modal-title" id="shareFolderModalLabel{{ folder.id }}">Share Folder</h5>
-                                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                                        </div>
-                                                        <div class="modal-body">
-                                                            <p>
-                                                                Shareable Link: 
-                                                                <span id="shareLink-{{ folder.id }}">{{ folder.shareable_link|truncatechars:20 }}</span>
-                                                                <input type="hidden" id="fullShareLink-{{ folder.id }}" value="{{ folder.shareable_link }}">
-                                                                <button type="button" class="btn btn-outline-primary btn-sm ms-2" onclick="copyShareLink('{{ folder.id }}')">
-                                                                    <i class="fas fa-copy"></i> Copy Link
+                                                        {% if folder.created_by == request.user %}
+                                                            <div class="dropdown position-absolute top-0 end-0 p-2">
+                                                                <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Folder Options">
+                                                                    <i class="fas fa-ellipsis-v"></i>
                                                                 </button>
-                                                            </p>
-                                                            {% comment %} {% if not folder.is_shared %} {% endcomment %}
-                                                            <form id="shareForm{{ folder.id }}">
-                                                                {% csrf_token %}
-                                                                <div class="mb-3">
-                                                                    <label for="shareFolderEndDate{{ folder.id }}" class="form-label fw-medium">Set share end date and time <span class="text-secondary">(not required)</span>:</label>
-                                                                    <input type="datetime-local" id="shareFolderEndDate{{ folder.id }}" name="end_date" class="form-control" required>
-                                                                    <!-- Share subfolders checkbox -->
-                                                                    <div class="form-check mb-2">
-                                                                        <input type="checkbox" id="shareFolderFolders{{ public_parent.id }}" name="share_folders" class="form-check-input" {% if public_parent.share_subfolders %}checked{% endif %}>
-                                                                        <label for="shareFolderFolders{{ public_parent.id }}" class="form-check-label fw-medium">Share folders within this Folder?</label>
-                                                                    </div>
-                                                                    
-                                                                    <!-- Share files checkbox -->
-                                                                    <div class="form-check mb-2">
-                                                                        <input type="checkbox" id="shareFolderFiles{{ public_parent.id }}" name="share_files" class="form-check-input" {% if public_parent.share_files %}checked{% endif %}>
-                                                                        <label for="shareFolderFiles{{ public_parent.id }}" class="form-check-label fw-medium">Share files within this Folder?</label>
-                                                                    </div>
-                                                                    <div id="shareFolderError{{ folder.id }}" class="text-danger small mt-1"></div>
-                                                                </div>
-                                                            </form>
-                                                            {% comment %} {% endif %} {% endcomment %}
-                                                        </div>
-                                                        <div class="modal-footer">
-                                                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                                                            {% if folder.is_shared %}
-                                                               <button type="button" class="btn btn-danger" onclick="ajaxShareFolder({{ folder.id }})">
-                                                                    <i class="fas fa-share me-1"></i> Disable Share
-                                                                </button>
-                                                            {% else %}
-                                                                <button type="button" class="btn btn-primary" onclick="ajaxShareFolder({{ folder.id }})">
-                                                                    <i class="fas fa-share me-1"></i> Enable Share
-                                                                </button>
-                                                            {% endif %}
-                                                        </div>
+                                                                <ul class="dropdown-menu">
+                                                                    <li><a class="dropdown-item" href="#" onclick="openRenameFolderModal({{ folder.id }}, '{{ folder.name|escapejs }}')">Rename</a></li>
+                                                                    <li><a class="dropdown-item" href="#" onclick="openMoveFolderModal({{ folder.id }})">Move</a></li>
+                                                                    <li><a class="dropdown-item" href="#" onclick="openShareFolderModal({{ folder.id }}, '{{ folder.shareable_link|escapejs }}', {{ folder.is_shared|lower }}, {{ folder.share_subfolders|lower }}, {{ folder.share_files|lower }}, '{{ folder.share_time_end|date:'c'|default_if_none:''|escapejs }}')">Share</a></li>
+                                                                    <li><a class="dropdown-item text-danger" href="#" onclick="deleteFolder({{ folder.id }})">Delete</a></li>
+                                                                </ul>
+                                                            </div>
+                                                        {% endif %}
                                                     </div>
                                                 </div>
                                             </div>
@@ -831,133 +272,29 @@
                                                             {% endif %}
                                                             <h6 class="card-title">{{ file.original_name|truncatechars:20 }}</h6>
                                                             {% if file.anon_name %}
-                                                                <span class="text-muted">Uploaded By: {{ file.anon_name }}</span
+                                                                <span class="text-muted">Uploaded By: {{ file.anon_name }}</span>
                                                             {% endif %}
                                                         </a>
                                                         {% if file.is_shared %}
                                                             <p>
-                                                                <button type="button" class="btn btn-outline-primary btn-sm ms-2" onclick="copyShareLink('{{ file.id }}')">
+                                                                <button type="button" class="btn btn-outline-primary btn-sm ms-2" onclick="copyShareLink('{{ file.id }}', '{{ file.shareable_link|escapejs }}')">
                                                                     <i class="fas fa-copy"></i> Copy Share Link
                                                                 </button>
                                                             </p>
                                                         {% endif %}
                                                         {% if file.uploaded_by == request.user %}
-                                                        <div class="dropdown position-absolute top-0 end-0 p-2">
-                                                            <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="File Options">
-                                                                <i class="fas fa-ellipsis-v"></i>
-                                                            </button>
-                                                            <ul class="dropdown-menu">
-                                                                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#renameFileModal{{ file.id }}">Rename</a></li>
-                                                                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#moveFileModal{{ file.id }}">Move</a></li>
-                                                                <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#shareFileModal{{ file.id }}">Share</a></li>
-                                                                <li><a class="dropdown-item text-danger" href="#" onclick="deleteFile({{ file.id }})">Delete</a></li>
-                                                            </ul>
-                                                        </div>
+                                                            <div class="dropdown position-absolute top-0 end-0 p-2">
+                                                                <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="File Options">
+                                                                    <i class="fas fa-ellipsis-v"></i>
+                                                                </button>
+                                                                <ul class="dropdown-menu">
+                                                                    <li><a class="dropdown-item" href="#" onclick="openRenameFileModal({{ file.id }}, '{{ file.original_name|escapejs }}')">Rename</a></li>
+                                                                    <li><a class="dropdown-item" href="#" onclick="openMoveFileModal({{ file.id }})">Move</a></li>
+                                                                    <li><a class="dropdown-item" href="#" onclick="openShareFileModal({{ file.id }}, '{{ file.shareable_link|escapejs }}', {{ file.is_shared|lower }}, '{{ file.share_time_end|date:'c'|default_if_none:''|escapejs }}')">Share</a></li>
+                                                                    <li><a class="dropdown-item text-danger" href="#" onclick="deleteFile({{ file.id }})">Delete</a></li>
+                                                                </ul>
+                                                            </div>
                                                         {% endif %}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <!-- Rename File Modal -->
-                                            <div class="modal fade" id="renameFileModal{{ file.id }}" tabindex="-1" aria-labelledby="renameFileModalLabel{{ file.id }}" aria-hidden="true">
-                                                <div class="modal-dialog modal-dialog-centered">
-                                                    <div class="modal-content">
-                                                        <div class="modal-header">
-                                                            <h5 class="modal-title" id="renameFileModalLabel{{ file.id }}">Rename File</h5>
-                                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                                        </div>
-                                                        <div class="modal-body">
-                                                            <form id="renameFileForm{{ file.id }}">
-                                                                {% csrf_token %}
-                                                                <div class="mb-3">
-                                                                    <label for="renameFileInput{{ file.id }}" class="form-label fw-medium">File Name <span class="text-danger">*</span></label>
-                                                                    <input type="text" name="name" class="form-control" id="renameFileInput{{ file.id }}" value="{{ file.original_name }}" required>
-                                                                    <div id="renameFileError{{ file.id }}" class="text-danger small mt-1"></div>
-                                                                </div>
-                                                            </form>
-                                                        </div>
-                                                        <div class="modal-footer">
-                                                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                                                            <button type="button" class="btn btn-primary" onclick="ajaxRenameFile({{ file.id }})">
-                                                                <i class="fas fa-save me-1"></i> Rename
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <!-- Move File Modal -->
-                                            <div class="modal fade" id="moveFileModal{{ file.id }}" tabindex="-1" aria-labelledby="moveFileModalLabel{{ file.id }}" aria-hidden="true">
-                                                <div class="modal-dialog modal-dialog-centered">
-                                                    <div class="modal-content">
-                                                        <div class="modal-header">
-                                                            <h5 class="modal-title" id="moveFileModalLabel{{ file.id }}">Move File</h5>
-                                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                                        </div>
-                                                        <div class="modal-body">
-                                                            <form id="moveFileForm{{ file.id }}">
-                                                                {% csrf_token %}
-                                                                <div class="mb-3">
-                                                                    <label for="moveFileSelect{{ file.id }}" class="form-label fw-medium">Destination Folder <span class="text-danger">*</span></label>
-                                                                    <select name="new_folder_id" class="form-select" id="moveFileSelect{{ file.id }}" required>
-                                                                        <option value="">-- Select Destination Folder --</option>
-                                                                        {% for f in personal_folders %}
-                                                                            {% if f.id != file.folder.id %}
-                                                                                <option value="{{ f.id }}">{{ f.name }}</option>
-                                                                            {% endif %}
-                                                                        {% endfor %}
-                                                                    </select>
-                                                                    <div id="moveFileError{{ file.id }}" class="text-danger small mt-1"></div>
-                                                                </div>
-                                                            </form>
-                                                        </div>
-                                                        <div class="modal-footer">
-                                                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                                                            <button type="button" class="btn btn-primary" onclick="ajaxMoveFile({{ file.id }})">
-                                                                <i class="fas fa-arrow-right me-1"></i> Move
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <!-- Share File Modal -->
-                                            <div class="modal fade" id="shareFileModal{{ file.id }}" tabindex="-1" aria-labelledby="shareFileModalLabel{{ file.id }}" aria-hidden="true">
-                                                <div class="modal-dialog modal-dialog-centered">
-                                                    <div class="modal-content">
-                                                        <div class="modal-header">
-                                                            <h5 class="modal-title" id="shareFileModalLabel{{ file.id }}">Share File</h5>
-                                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                                        </div>
-                                                        <div class="modal-body">
-                                                            <p>
-                                                                Shareable Link: 
-                                                                <span id="shareLink-{{ file.id }}">{{ file.shareable_link|truncatechars:20 }}</span>
-                                                                <input type="hidden" id="fullShareLink-{{ file.id }}" value="{{ file.shareable_link }}">
-                                                                <button type="button" class="btn btn-outline-primary btn-sm ms-2" onclick="copyShareLink('{{ file.id }}')">
-                                                                    <i class="fas fa-copy"></i> Copy Link
-                                                                </button>
-                                                            </p>
-                                                            {% comment %} {% if not file.is_shared %} {% endcomment %}
-                                                            <form id="shareForm{{ file.id }}">
-                                                                {% csrf_token %}
-                                                                <div class="mb-3">
-                                                                    <label for="shareFileEndDate{{ file.id }}" class="form-label fw-medium">Set share end date and time <span class="text-secondary">(not required)</span>:</label>
-                                                                    <input type="datetime-local" id="shareFileEndDate{{ file.id }}" name="end_date" class="form-control" required>
-                                                                    <div id="shareFileError{{ file.id }}" class="text-danger small mt-1"></div>
-                                                                </div>
-                                                            </form>
-                                                            {% comment %} {% endif %} {% endcomment %}
-                                                        </div>
-                                                        <div class="modal-footer">
-                                                            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
-                                                            {% if file.is_shared %}
-                                                               <button type="button" class="btn btn-danger" onclick="ajaxShareFile({{ file.id }})">
-                                                                    <i class="fas fa-share me-1"></i> Disable Share
-                                                                </button>
-                                                            {% else %}
-                                                                <button type="button" class="btn btn-primary" onclick="ajaxShareFile({{ file.id }})">
-                                                                    <i class="fas fa-share me-1"></i> Enable Share
-                                                                </button>
-                                                            {% endif %}
-                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
@@ -976,6 +313,7 @@
             </div>
         </div>
     </div>
+
     <!-- Create Folder Modal -->
     <div class="modal fade" id="createFolderModal" tabindex="-1" aria-labelledby="createFolderModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
@@ -985,16 +323,15 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <form id="createFolderForm" method="post" action="{% url 'create_folder' %}?tab={{ active_tab }}&public_parent={{ public_parent.id }}&personal_parent={{ personal_parent.id }}">
+                    <form id="createFolderForm" method="post" action="{% url 'create_folder' %}">
                         {% csrf_token %}
-                        <input type="hidden" name="parent" value="{{ parent.id|default:"" }}">
+                        <input type="hidden" name="parent" value="">
+                        <input type="hidden" name="tab" id="createFolderTab">
                         <div class="mb-3">
                             <label for="{{ folder_form.name.id_for_label }}" class="form-label fw-medium">Folder Name <span class="text-danger">*</span></label>
                             {{ folder_form.name }}
                             <label for="{{ folder_form.description.id_for_label }}" class="form-label fw-medium">Description <span class="text-muted">Not required</span></label>
                             {{ folder_form.description }}
-                            {% comment %} <label for="{{ folder_form.is_public.id_for_label }}" class="form-label fw-medium">Make it public?</label>
-                            {{ folder_form.is_public }} {% endcomment %}
                             <div id="createFolderError" class="text-danger small mt-1">
                                 {% if folder_form.name.errors %}
                                     {{ folder_form.name.errors }}
@@ -1022,9 +359,10 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <form id="uploadFileForm" method="post" action="{% if active_tab == 'public' and public_parent %}{% url 'upload_file_public' public_folder_id=public_parent.id %}{% elif active_tab == 'personal' and personal_parent %}{% url 'upload_file_personal' personal_folder_id=personal_parent.id %}{% else %}{% url 'upload_file' %}{% endif %}?tab={{ active_tab }}" enctype="multipart/form-data">
+                    <form id="uploadFileForm" method="post" action="{% if active_tab == 'public' and public_parent %}{% url 'upload_file_public' public_folder_id=public_parent.id %}{% elif active_tab == 'personal' and personal_parent %}{% url 'upload_file_personal' personal_folder_id=personal_parent.id %}{% else %}{% url 'upload_file' %}{% endif %}" enctype="multipart/form-data">
                         {% csrf_token %}
-                        <input type="hidden" name="folder" value="{{ parent.id|default:"" }}">
+                        <input type="hidden" name="folder" value="">
+                        <input type="hidden" name="tab" id="uploadFileTab">
                         <div class="mb-3">
                             <label for="{{ file_form.file.id_for_label }}" class="form-label fw-medium">Choose File <span class="text-danger">*</span></label>
                             {{ file_form.file }}
@@ -1033,8 +371,6 @@
                                 {% if file_form.file.errors %}
                                     {{ file_form.file.errors }}
                                 {% endif %}
-                                <!-- Hidden input for folder -->
-                                <input type="hidden" name="folder" value="{% if active_tab == 'public' and public_parent %}{{ public_parent.id }}{% elif active_tab == 'personal' and personal_parent %}{{ personal_parent.id }}{% endif %}">
                             </div>
                         </div>
                     </form>
@@ -1048,11 +384,218 @@
             </div>
         </div>
     </div>
+
+    <!-- Rename Folder Modal -->
+    <div class="modal fade" id="renameFolderModal" tabindex="-1" aria-labelledby="renameFolderModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="renameFolderModalLabel">Rename Folder</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="renameFolderForm">
+                        {% csrf_token %}
+                        <input type="hidden" id="renameFolderId" name="folder_id">
+                        <input type="hidden" name="tab" id="renameFolderTab">
+                        <div class="mb-3">
+                            <label for="renameFolderInput" class="form-label fw-medium">Folder Name <span class="text-danger">*</span></label>
+                            <input type="text" name="name" class="form-control" id="renameFolderInput" required>
+                            <div id="renameFolderError" class="text-danger small mt-1"></div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="ajaxRenameFolder()">
+                        <i class="fas fa-save me-1"></i> Rename
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Move Folder Modal -->
+    <div class="modal fade" id="moveFolderModal" tabindex="-1" aria-labelledby="moveFolderModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="moveFolderModalLabel">Move Folder</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="moveFolderForm">
+                        {% csrf_token %}
+                        <input type="hidden" id="moveFolderId" name="folder_id">
+                        <input type="hidden" name="tab" id="moveFolderTab">
+                        <div class="mb-3">
+                            <label for="moveFolderSelect" class="form-label fw-medium">Destination Folder <span class="text-danger">*</span></label>
+                            <select name="new_parent_id" class="form-select" id="moveFolderSelect" required>
+                                <option value="">-- Select Destination --</option>
+                            </select>
+                            <div id="moveFolderError" class="text-danger small mt-1"></div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="ajaxMoveFolder()">
+                        <i class="fas fa-arrow-right me-1"></i> Move
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Share Folder Modal -->
+    <div class="modal fade" id="shareFolderModal" tabindex="-1" aria-labelledby="shareFolderModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="shareFolderModalLabel">Share Folder</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>
+                        Shareable Link: 
+                        <span id="shareFolderLink"></span>
+                        <input type="hidden" id="fullShareFolderLink">
+                        <button type="button" class="btn btn-outline-primary btn-sm ms-2" onclick="copyShareLink()">
+                            <i class="fas fa-copy"></i> Copy Link
+                        </button>
+                    </p>
+                    <form id="shareFolderForm">
+                        {% csrf_token %}
+                        <input type="hidden" id="shareFolderId" name="folder_id">
+                        <input type="hidden" name="tab" id="shareFolderTab">
+                        <div class="mb-3">
+                            <label for="shareFolderEndDate" class="form-label fw-medium">Set share end date and time <span class="text-secondary">(not required)</span>:</label>
+                            <input type="datetime-local" id="shareFolderEndDate" name="end_date" class="form-control">
+                            <div class="form-check mb-2">
+                                <input type="checkbox" id="shareFolderFolders" name="share_folders" class="form-check-input">
+                                <label for="shareFolderFolders" class="form-check-label fw-medium">Share folders within this Folder?</label>
+                            </div>
+                            <div class="form-check mb-2">
+                                <input type="checkbox" id="shareFolderFiles" name="share_files" class="form-check-input">
+                                <label for="shareFolderFiles" class="form-check-label fw-medium">Share files within this Folder?</label>
+                            </div>
+                            <div id="shareFolderError" class="text-danger small mt-1"></div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" id="shareFolderButton" class="btn btn-primary" onclick="ajaxShareFolder()">
+                        <i class="fas fa-share me-1"></i> Enable Share
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Rename File Modal -->
+    <div class="modal fade" id="renameFileModal" tabindex="-1" aria-labelledby="renameFileModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="renameFileModalLabel">Rename File</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="renameFileForm">
+                        {% csrf_token %}
+                        <input type="hidden" id="renameFileId" name="file_id">
+                        <input type="hidden" name="tab" id="renameFileTab">
+                        <div class="mb-3">
+                            <label for="renameFileInput" class="form-label fw-medium">File Name <span class="text-danger">*</span></label>
+                            <input type="text" name="name" class="form-control" id="renameFileInput" required>
+                            <div id="renameFileError" class="text-danger small mt-1"></div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="ajaxRenameFile()">
+                        <i class="fas fa-save me-1"></i> Rename
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Move File Modal -->
+    <div class="modal fade" id="moveFileModal" tabindex="-1" aria-labelledby="moveFileModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="moveFileModalLabel">Move File</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="moveFileForm">
+                        {% csrf_token %}
+                        <input type="hidden" id="moveFileId" name="file_id">
+                        <input type="hidden" name="tab" id="moveFileTab">
+                        <div class="mb-3">
+                            <label for="moveFileSelect" class="form-label fw-medium">Destination Folder <span class="text-danger">*</span></label>
+                            <select name="new_folder_id" class="form-select" id="moveFileSelect" required>
+                                <option value="">-- Select Destination Folder --</option>
+                            </select>
+                            <div id="moveFileError" class="text-danger small mt-1"></div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="ajaxMoveFile()">
+                        <i class="fas fa-arrow-right me-1"></i> Move
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Share File Modal -->
+    <div class="modal fade" id="shareFileModal" tabindex="-1" aria-labelledby="shareFileModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="shareFileModalLabel">Share File</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>
+                        Shareable Link: 
+                        <span id="shareFileLink"></span>
+                        <input type="hidden" id="fullShareFileLink">
+                        <button type="button" class="btn btn-outline-primary btn-sm ms-2" onclick="copyShareLink()">
+                            <i class="fas fa-copy"></i> Copy Link
+                        </button>
+                    </p>
+                    <form id="shareFileForm">
+                        {% csrf_token %}
+                        <input type="hidden" id="shareFileId" name="file_id">
+                        <input type="hidden" name="tab" id="shareFileTab">
+                        <div class="mb-3">
+                            <label for="shareFileEndDate" class="form-label fw-medium">Set share end date and time <span class="text-secondary">(not required)</span>:</label>
+                            <input type="datetime-local" id="shareFileEndDate" name="end_date" class="form-control">
+                            <div id="shareFileError" class="text-danger small mt-1"></div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" id="shareFileButton" class="btn btn-primary" onclick="ajaxShareFile()">
+                        <i class="fas fa-share me-1"></i> Enable Share
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 <style>
     .card {
         border-radius: 12px;
-        {% comment %} transition: all 0.3s ease; {% endcomment %}
     }
     body.dark-mode .card {
         background: #2d3748;
@@ -1062,7 +605,6 @@
         padding: 1.5rem;
     }
     .card:hover {
-        {% comment %} transform: translateY(-4px); {% endcomment %}
         box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
     }
     body.dark-mode .card:hover {
@@ -1179,24 +721,85 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    // Restore active tab from localStorage or URL
+    // Get active tab from localStorage, URL, or default to 'public'
     const urlParams = new URLSearchParams(window.location.search);
     const urlTab = urlParams.get('tab');
-    const activeTab = urlTab || localStorage.getItem('activeTab') || 'public';
-    console.log("active tab: ", activeTab);
+    let activeTab = urlTab || localStorage.getItem('activeTab') || document.getElementById('activeTabInput').value || 'public';
+    
+    // Set initial active tab
     const tabElement = document.querySelector(`#${activeTab}-tab`);
     if (tabElement) {
         const tab = new bootstrap.Tab(tabElement);
         tab.show();
     }
 
-    // Save active tab on click
+    // Function to update all tab inputs and parent values in forms
+function updateTabInputs(tab) {
+    // Update all hidden tab inputs
+    document.querySelectorAll('input[name="tab"]').forEach(input => {
+        input.value = tab;
+    });
+    
+    // Get the actual parent IDs from Django template variables
+    const publicParentId = '{{ public_parent.id|default:"" }}';
+    const personalParentId = '{{ personal_parent.id|default:"" }}';
+    
+    console.log('Public Parent ID:', publicParentId, 'Personal Parent ID:', personalParentId);
+    
+    // Update the parent folder ID in create folder form based on current tab
+    const createFolderParentInput = document.querySelector('#createFolderForm input[name="parent"]');
+    const uploadFileFolderInput = document.querySelector('#uploadFileForm input[name="folder"]');
+    
+    if (tab === 'public') {
+        if (createFolderParentInput) createFolderParentInput.value = publicParentId;
+        if (uploadFileFolderInput) uploadFileFolderInput.value = publicParentId;
+        
+        // Update upload form action for public
+        const uploadForm = document.getElementById('uploadFileForm');
+        if (uploadForm && publicParentId) {
+            uploadForm.action = `/folders/upload/public/${publicParentId}/`;
+        } else {
+            uploadForm.action = '{% url "upload_file" %}';
+        }
+    } else { // personal tab
+        if (createFolderParentInput) createFolderParentInput.value = personalParentId;
+        if (uploadFileFolderInput) uploadFileFolderInput.value = personalParentId;
+        
+        // Update upload form action for personal
+        const uploadForm = document.getElementById('uploadFileForm');
+        if (uploadForm && personalParentId) {
+            uploadForm.action = `/folders/upload/personal/${personalParentId}/`;
+        } else {
+            uploadForm.action = '{% url "upload_file" %}';
+        }
+    }
+    
+    console.log('Tab updated to:', tab, 'Parent ID:', createFolderParentInput ? createFolderParentInput.value : 'N/A');
+}
+    // Update localStorage and form inputs when switching tabs
     document.querySelectorAll('.nav-link').forEach(tab => {
         tab.addEventListener('click', function () {
-            const tabId = this.getAttribute('id').replace('-tab', '');
-            localStorage.setItem('activeTab', tabId);
+            activeTab = this.getAttribute('id').replace('-tab', '');
+            localStorage.setItem('activeTab', activeTab);
+            updateTabInputs(activeTab);
         });
     });
+
+    // Initialize tab inputs with current activeTab
+    updateTabInputs(activeTab);
+
+    // Function to set active tab and update localStorage (for onclick handlers)
+    window.setActiveTab = function(tab) {
+        localStorage.setItem('activeTab', tab);
+        updateTabInputs(tab);
+        
+        // Ensure the tab is shown programmatically
+        const tabElement = document.querySelector(`#${tab}-tab`);
+        if (tabElement) {
+            const tabInstance = new bootstrap.Tab(tabElement);
+            tabInstance.show();
+        }
+    };
 
     // Initialize Select2 for move folder/file selects
     document.querySelectorAll('.form-select').forEach(select => {
@@ -1207,11 +810,20 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 
-    // AJAX Create Folder
+    // AJAX Create Folder - UPDATED to use current tab
     window.ajaxCreateFolder = function() {
         const form = document.getElementById('createFolderForm');
         const formData = new FormData(form);
         const errorDiv = document.getElementById('createFolderError');
+        const activeTab = localStorage.getItem('activeTab') || 'public';
+        
+        // Ensure we're using the current tab's parent ID
+        formData.set('tab', activeTab);
+        
+        // Double-check the parent value is correct
+        const parentInput = form.querySelector('input[name="parent"]');
+        console.log('Creating folder for tab:', activeTab, 'Parent ID:', parentInput.value);
+        
         fetch(form.action, {
             method: 'POST',
             body: formData,
@@ -1223,7 +835,7 @@ document.addEventListener('DOMContentLoaded', () => {
         .then(data => {
             if (data.success) {
                 $('#createFolderModal').modal('hide');
-                location.reload();
+                window.location.href = data.redirect_url || `{% url 'folder_view' %}?tab=${activeTab}`;
             } else {
                 errorDiv.textContent = data.errors.name ? data.errors.name.join(' ') : 'An error occurred.';
             }
@@ -1234,11 +846,20 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
-    // AJAX Upload File
+    // AJAX Upload File - UPDATED to use current tab
     window.ajaxUploadFile = function() {
         const form = document.getElementById('uploadFileForm');
         const formData = new FormData(form);
         const errorDiv = document.getElementById('uploadFileError');
+        const activeTab = localStorage.getItem('activeTab') || 'public';
+        
+        // Ensure we're using the current tab's folder ID
+        formData.set('tab', activeTab);
+        
+        // Double-check the folder value is correct
+        const folderInput = form.querySelector('input[name="folder"]');
+        console.log('Uploading file for tab:', activeTab, 'Folder ID:', folderInput.value);
+        
         fetch(form.action, {
             method: 'POST',
             body: formData,
@@ -1250,7 +871,7 @@ document.addEventListener('DOMContentLoaded', () => {
         .then(data => {
             if (data.success) {
                 $('#uploadFileModal').modal('hide');
-                location.reload();
+                window.location.href = data.redirect_url || `{% url 'folder_view' %}?tab=${activeTab}`;
             } else {
                 errorDiv.textContent = data.errors.file ? data.errors.file.join(' ') : 'An error occurred.';
             }
@@ -1261,24 +882,51 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
+    // Update modal forms when they are shown to ensure correct tab context
+    document.getElementById('createFolderModal').addEventListener('show.bs.modal', function () {
+        const activeTab = localStorage.getItem('activeTab') || 'public';
+        updateTabInputs(activeTab);
+    });
+
+    document.getElementById('uploadFileModal').addEventListener('show.bs.modal', function () {
+        const activeTab = localStorage.getItem('activeTab') || 'public';
+        updateTabInputs(activeTab);
+    });
+
+    // Rest of your existing functions remain the same (rename, move, share, delete operations)
+    // [Keep all your existing functions for openRenameFolderModal, ajaxRenameFolder, etc.]
+    // ... (all your existing functions remain unchanged)
+
+    // Open Rename Folder Modal
+    window.openRenameFolderModal = function(folderId, folderName) {
+        const modal = new bootstrap.Modal(document.getElementById('renameFolderModal'));
+        document.getElementById('renameFolderId').value = folderId;
+        document.getElementById('renameFolderInput').value = folderName;
+        document.getElementById('renameFolderError').textContent = '';
+        document.getElementById('renameFolderTab').value = localStorage.getItem('activeTab') || 'public';
+        modal.show();
+    };
+
     // AJAX Rename Folder
-    window.ajaxRenameFolder = function(folderId) {
-        const form = document.getElementById(`renameForm${folderId}`);
-        const input = form.querySelector('input[name="name"]');
-        const errorDiv = document.getElementById(`renameFolderError${folderId}`);
+    window.ajaxRenameFolder = function() {
+        const form = document.getElementById('renameFolderForm');
+        const folderId = document.getElementById('renameFolderId').value;
+        const input = document.getElementById('renameFolderInput');
+        const errorDiv = document.getElementById('renameFolderError');
+        const activeTab = localStorage.getItem('activeTab') || 'public';
         fetch(`/folders/${folderId}/rename/`, {
             method: 'POST',
             headers: {
                 'X-CSRFToken': form.querySelector('input[name="csrfmiddlewaretoken"]').value,
                 'Content-Type': 'application/x-www-form-urlencoded',
             },
-            body: `name=${encodeURIComponent(input.value)}`
+            body: `name=${encodeURIComponent(input.value)}&tab=${activeTab}`
         })
         .then(res => res.json())
         .then(data => {
             if (data.success) {
-                $(`#renameFolderModal${folderId}`).modal('hide');
-                location.reload();
+                $('#renameFolderModal').modal('hide');
+                window.location.href = data.redirect_url || `{% url 'folder_view' %}?tab=${activeTab}`;
             } else {
                 errorDiv.textContent = data.errors.name ? data.errors.name.join(' ') : 'An error occurred.';
             }
@@ -1289,24 +937,48 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
+    // Open Move Folder Modal
+    window.openMoveFolderModal = function(folderId) {
+        const modal = new bootstrap.Modal(document.getElementById('moveFolderModal'));
+        document.getElementById('moveFolderId').value = folderId;
+        document.getElementById('moveFolderError').textContent = '';
+        document.getElementById('moveFolderTab').value = localStorage.getItem('activeTab') || 'public';
+        const activeTab = localStorage.getItem('activeTab') || 'public';
+        const select = document.getElementById('moveFolderSelect');
+        select.innerHTML = '<option value="">-- Select Destination --</option>';
+        const folders = activeTab === 'public' ?
+            [{% for f in public_folders %}{id: {{ f.id }}, name: '{{ f.name|escapejs }}'}{% if not forloop.last %},{% endif %}{% endfor %}] :
+            [{% for f in personal_folders %}{id: {{ f.id }}, name: '{{ f.name|escapejs }}'}{% if not forloop.last %},{% endif %}{% endfor %}];
+        folders.forEach(f => {
+            if (f.id != folderId) {
+                const option = new Option(f.name, f.id);
+                select.appendChild(option);
+            }
+        });
+        $(select).select2({ dropdownParent: $('#moveFolderModal'), theme: 'bootstrap-5', width: '100%' });
+        modal.show();
+    };
+
     // AJAX Move Folder
-    window.ajaxMoveFolder = function(folderId) {
-        const form = document.getElementById(`moveForm${folderId}`);
-        const select = form.querySelector('select[name="new_parent_id"]');
-        const errorDiv = document.getElementById(`moveFolderError${folderId}`);
+    window.ajaxMoveFolder = function() {
+        const form = document.getElementById('moveFolderForm');
+        const folderId = document.getElementById('moveFolderId').value;
+        const select = document.getElementById('moveFolderSelect');
+        const errorDiv = document.getElementById('moveFolderError');
+        const activeTab = localStorage.getItem('activeTab') || 'public';
         fetch(`/folders/${folderId}/move/`, {
             method: 'POST',
             headers: {
                 'X-CSRFToken': form.querySelector('input[name="csrfmiddlewaretoken"]').value,
                 'Content-Type': 'application/x-www-form-urlencoded',
             },
-            body: `new_parent_id=${encodeURIComponent(select.value)}`
+            body: `new_parent_id=${encodeURIComponent(select.value)}&tab=${activeTab}`
         })
         .then(res => res.json())
         .then(data => {
             if (data.success) {
-                $(`#moveFolderModal${folderId}`).modal('hide');
-                location.reload();
+                $('#moveFolderModal').modal('hide');
+                window.location.href = data.redirect_url || `{% url 'folder_view' %}?tab=${activeTab}`;
             } else {
                 errorDiv.textContent = data.errors.new_parent_id ? data.errors.new_parent_id.join(' ') : 'An error occurred.';
             }
@@ -1317,11 +989,31 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
+    // Open Share Folder Modal
+    window.openShareFolderModal = function(folderId, shareLink, isShared, shareSubfolders, shareFiles, endDate) {
+        const modal = new bootstrap.Modal(document.getElementById('shareFolderModal'));
+        document.getElementById('shareFolderId').value = folderId;
+        document.getElementById('shareFolderLink').textContent = shareLink ? shareLink.substring(0, 20) + (shareLink.length > 20 ? '...' : '') : '';
+        document.getElementById('fullShareFolderLink').value = shareLink || '';
+        const endDateInput = document.getElementById('shareFolderEndDate');
+        // Set endDate only if it's a valid date string
+        endDateInput.value = endDate && !isNaN(new Date(endDate)) ? new Date(endDate).toISOString().slice(0, 16) : '';
+        document.getElementById('shareFolderFolders').checked = shareSubfolders;
+        document.getElementById('shareFolderFiles').checked = shareFiles;
+        document.getElementById('shareFolderError').textContent = '';
+        document.getElementById('shareFolderTab').value = localStorage.getItem('activeTab') || 'public';
+        const button = document.getElementById('shareFolderButton');
+        button.className = isShared ? 'btn btn-danger' : 'btn btn-primary';
+        button.innerHTML = `<i class="fas fa-share me-1"></i> ${isShared ? 'Disable Share' : 'Enable Share'}`;
+        modal.show();
+    };
+
     // AJAX Share Folder
-    window.ajaxShareFolder = function(folderId) {
-        const form = document.getElementById(`shareForm${folderId}`);
-        const errorDiv = document.getElementById(`shareFolderError${folderId}`);
-        
+    window.ajaxShareFolder = function() {
+        const form = document.getElementById('shareFolderForm');
+        const folderId = document.getElementById('shareFolderId').value;
+        const errorDiv = document.getElementById('shareFolderError');
+        const activeTab = localStorage.getItem('activeTab') || 'public';
         fetch(`/folders/${folderId}/share/`, {
             method: 'POST',
             headers: {
@@ -1333,8 +1025,9 @@ document.addEventListener('DOMContentLoaded', () => {
         .then(res => res.json())
         .then(data => {
             if (data.success) {
-                $(`#shareFolderModal${folderId}`).modal('hide');
-                location.reload();
+                $('#shareFolderModal').modal('hide');
+                //window.location.href = data.redirect_url || `{% url 'folder_view' %}?tab=${activeTab}`;
+                window.location.reload();
             } else {
                 errorDiv.textContent = data.errors?.end_date?.join(' ') || data.errors?.general || 'An error occurred.';
             }
@@ -1345,24 +1038,37 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
+    // Open Rename File Modal
+    window.openRenameFileModal = function(fileId, fileName) {
+        const modal = new bootstrap.Modal(document.getElementById('renameFileModal'));
+        document.getElementById('renameFileId').value = fileId;
+        document.getElementById('renameFileInput').value = fileName;
+        document.getElementById('renameFileError').textContent = '';
+        document.getElementById('renameFileTab').value = localStorage.getItem('activeTab') || 'public';
+        modal.show();
+    };
+
     // AJAX Rename File
-    window.ajaxRenameFile = function(fileId) {
-        const form = document.getElementById(`renameFileForm${fileId}`);
-        const input = form.querySelector('input[name="name"]');
-        const errorDiv = document.getElementById(`renameFileError${fileId}`);
+    window.ajaxRenameFile = function() {
+        const form = document.getElementById('renameFileForm');
+        const fileId = document.getElementById('renameFileId').value;
+        const input = document.getElementById('renameFileInput');
+        const errorDiv = document.getElementById('renameFileError');
+        const activeTab = localStorage.getItem('activeTab') || 'public';
         fetch(`/folders/files/${fileId}/rename/`, {
             method: 'POST',
             headers: {
                 'X-CSRFToken': form.querySelector('input[name="csrfmiddlewaretoken"]').value,
                 'Content-Type': 'application/x-www-form-urlencoded',
             },
-            body: `name=${encodeURIComponent(input.value)}`
+            body: `name=${encodeURIComponent(input.value)}&tab=${activeTab}`
         })
         .then(res => res.json())
         .then(data => {
             if (data.success) {
-                $(`#renameFileModal${fileId}`).modal('hide');
-                location.reload();
+                $('#renameFileModal').modal('hide');
+                //window.location.href = data.redirect_url || `{% url 'folder_view' %}?tab=${activeTab}`;
+                window.location.reload();
             } else {
                 errorDiv.textContent = data.errors.name ? data.errors.name.join(' ') : 'An error occurred.';
             }
@@ -1373,24 +1079,47 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
+    // Open Move File Modal
+    window.openMoveFileModal = function(fileId) {
+        const modal = new bootstrap.Modal(document.getElementById('moveFileModal'));
+        document.getElementById('moveFileId').value = fileId;
+        document.getElementById('moveFileError').textContent = '';
+        document.getElementById('moveFileTab').value = localStorage.getItem('activeTab') || 'public';
+        const activeTab = localStorage.getItem('activeTab') || 'public';
+        const select = document.getElementById('moveFileSelect');
+        select.innerHTML = '<option value="">-- Select Destination Folder --</option>';
+        const folders = activeTab === 'public' ?
+            [{% for f in public_folders %}{id: {{ f.id }}, name: '{{ f.name|escapejs }}'}{% if not forloop.last %},{% endif %}{% endfor %}] :
+            [{% for f in personal_folders %}{id: {{ f.id }}, name: '{{ f.name|escapejs }}'}{% if not forloop.last %},{% endif %}{% endfor %}];
+        folders.forEach(f => {
+            const option = new Option(f.name, f.id);
+            select.appendChild(option);
+        });
+        $(select).select2({ dropdownParent: $('#moveFileModal'), theme: 'bootstrap-5', width: '100%' });
+        modal.show();
+    };
+
     // AJAX Move File
-    window.ajaxMoveFile = function(fileId) {
-        const form = document.getElementById(`moveFileForm${fileId}`);
-        const select = form.querySelector('select[name="new_folder_id"]');
-        const errorDiv = document.getElementById(`moveFileError${fileId}`);
+    window.ajaxMoveFile = function() {
+        const form = document.getElementById('moveFileForm');
+        const fileId = document.getElementById('moveFileId').value;
+        const select = document.getElementById('moveFileSelect');
+        const errorDiv = document.getElementById('moveFileError');
+        const activeTab = localStorage.getItem('activeTab') || 'public';
         fetch(`/folders/files/${fileId}/move/`, {
             method: 'POST',
             headers: {
                 'X-CSRFToken': form.querySelector('input[name="csrfmiddlewaretoken"]').value,
                 'Content-Type': 'application/x-www-form-urlencoded',
             },
-            body: `new_folder_id=${encodeURIComponent(select.value)}`
+            body: `new_folder_id=${encodeURIComponent(select.value)}&tab=${activeTab}`
         })
         .then(res => res.json())
         .then(data => {
             if (data.success) {
-                $(`#moveFileModal${fileId}`).modal('hide');
-                location.reload();
+                $('#moveFileModal').modal('hide');
+                //window.location.href = data.redirect_url || `{% url 'folder_view' %}?tab=${activeTab}`;
+                window.location.reload();
             } else {
                 errorDiv.textContent = data.errors.new_folder_id ? data.errors.new_folder_id.join(' ') : 'An error occurred.';
             }
@@ -1401,25 +1130,44 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
+    // Open Share File Modal
+    window.openShareFileModal = function(fileId, shareLink, isShared, endDate) {
+        const modal = new bootstrap.Modal(document.getElementById('shareFileModal'));
+        document.getElementById('shareFileId').value = fileId;
+        document.getElementById('shareFileLink').textContent = shareLink ? shareLink.substring(0, 20) + (shareLink.length > 20 ? '...' : '') : '';
+        document.getElementById('fullShareFileLink').value = shareLink || '';
+        const endDateInput = document.getElementById('shareFileEndDate');
+        // Set endDate only if it's a valid date string
+        endDateInput.value = endDate && !isNaN(new Date(endDate)) ? new Date(endDate).toISOString().slice(0, 16) : '';
+        document.getElementById('shareFileError').textContent = '';
+        document.getElementById('shareFileTab').value = localStorage.getItem('activeTab') || 'public';
+        const button = document.getElementById('shareFileButton');
+        button.className = isShared ? 'btn btn-danger' : 'btn btn-primary';
+        button.innerHTML = `<i class="fas fa-share me-1"></i> ${isShared ? 'Disable Share' : 'Enable Share'}`;
+        modal.show();
+    };
+
     // AJAX Share File
-    window.ajaxShareFile = function(fileId) {
-        const form = document.getElementById(`shareForm${fileId}`);
-        const input = form.querySelector('input[name="end_date"]');
-        const errorDiv = document.getElementById(`shareFileError${fileId}`);
+    window.ajaxShareFile = function() {
+        const form = document.getElementById('shareFileForm');
+        const fileId = document.getElementById('shareFileId').value;
+        const input = document.getElementById('shareFileEndDate');
+        const errorDiv = document.getElementById('shareFileError');
+        const activeTab = localStorage.getItem('activeTab') || 'public';
         fetch(`/files/${fileId}/share/`, {
             method: 'POST',
             headers: {
                 'X-CSRFToken': form.querySelector('input[name="csrfmiddlewaretoken"]').value,
                 'Content-Type': 'application/x-www-form-urlencoded',
             },
-           body: `end_date=${encodeURIComponent(input.value)}`
-           // body: if (input) {`end_date=${encodeURIComponent(input.value)}`} else {`file_id=${fileId}`}
+            body: `end_date=${encodeURIComponent(input.value)}&tab=${activeTab}`
         })
         .then(res => res.json())
         .then(data => {
             if (data.success) {
-                $(`#shareFileModal${fileId}`).modal('hide');
-                location.reload();
+                $('#shareFileModal').modal('hide');
+                //window.location.href = data.redirect_url || `{% url 'folder_view' %}?tab=${activeTab}`;
+                window.location.reload();
             } else {
                 errorDiv.textContent = data.errors.end_date ? data.errors.end_date.join(' ') : 'An error occurred.';
             }
@@ -1432,8 +1180,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // AJAX Delete Folder
     window.deleteFolder = function(folderId) {
+        const activeTab = localStorage.getItem('activeTab') || 'public';
         if (confirm('Are you sure you want to delete this folder?')) {
-            fetch(`/folders/${folderId}/delete/`, {
+            fetch(`/folders/${folderId}/delete/?tab=${activeTab}`, {
                 method: 'POST',
                 headers: {
                     'X-CSRFToken': document.querySelector('input[name="csrfmiddlewaretoken"]').value,
@@ -1444,6 +1193,7 @@ document.addEventListener('DOMContentLoaded', () => {
             .then(data => {
                 if (data.success) {
                     document.querySelector(`[data-folder-id="${folderId}"]`).remove();
+                    window.location.href = data.redirect_url || `{% url 'folder_view' %}?tab=${activeTab}`;
                 } else {
                     alert('Failed to delete folder: ' + (data.error || 'Unknown error'));
                 }
@@ -1457,8 +1207,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // AJAX Delete File
     window.deleteFile = function(fileId) {
+        const activeTab = localStorage.getItem('activeTab') || 'public';
         if (confirm('Are you sure you want to delete this file?')) {
-            fetch(`/folders/files/${fileId}/delete/`, {
+            fetch(`/folders/files/${fileId}/delete/?tab=${activeTab}`, {
                 method: 'POST',
                 headers: {
                     'X-CSRFToken': document.querySelector('input[name="csrfmiddlewaretoken"]').value,
@@ -1469,6 +1220,8 @@ document.addEventListener('DOMContentLoaded', () => {
             .then(data => {
                 if (data.success) {
                     document.querySelector(`[data-file-id="${fileId}"]`).remove();
+                    //window.location.href = data.redirect_url || `{% url 'folder_view' %}?tab=${activeTab}`;
+                    window.location.reload();
                 } else {
                     alert('Failed to delete file: ' + (data.error || 'Unknown error'));
                 }
@@ -1480,6 +1233,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    // Copy Share Link
+    window.copyShareLink = function(id, shareLink) {
+        const fullLink = shareLink || document.getElementById(`fullShare${id ? 'Folder' : 'File'}Link`).value;
+        navigator.clipboard.writeText(fullLink).then(() => {
+            alert('Share link copied to clipboard!');
+        }).catch(err => {
+            alert('Failed to copy link: ' + err);
+        });
+    };
+
     // Initialize Sortable.js
     new Sortable(document.querySelector('#sortable-row'), {
         animation: 150,
@@ -1487,19 +1250,10 @@ document.addEventListener('DOMContentLoaded', () => {
         onEnd: function (evt) {
             const folderId = evt.item.dataset.folderId;
             if (folderId) {
-                // Replace prompt with modal-based move for better UX
-                $(`#moveFolderModal${folderId}`).modal('show');
+                openMoveFolderModal(folderId);
             }
         }
     });
 });
-function copyShareLink(fileId) {
-    const fullLink = document.getElementById(`fullShareLink-${fileId}`).value;
-    navigator.clipboard.writeText(fullLink).then(() => {
-        alert('Share link copied to clipboard!');
-    }).catch(err => {
-        alert('Failed to copy link: ' + err);
-    });
-}
 </script>
 {% endblock %}

@@ -739,11 +739,13 @@ from .models import Vacancy, VacancyApplication
 class VacancyForm(forms.ModelForm):
     class Meta:
         model = Vacancy
-        fields = ['title', 'description', 'location', 'skills', 'eligibility', 'min_salary', 'max_salary', 'status']
+        fields = ['title', 'description', 'country', 'city', 'work_mode', 'skills', 'eligibility', 'min_salary', 'max_salary', 'status']
         widgets = {
             'title': forms.TextInput(attrs={'class': 'form-control'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 5}),
-            'location': forms.Select(attrs={'class': 'form-control'}),
+            'country': forms.Select(attrs={'class': 'form-control'}),
+            'city': forms.TextInput(attrs={'class': 'form-control'}),
+            'work_mode': forms.Select(attrs={'class': 'form-control'}),
             'skills': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
             'eligibility': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
             'min_salary': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
@@ -763,22 +765,17 @@ class VacancyApplicationForm(forms.ModelForm):
     
     class Meta:
         model = VacancyApplication
-        fields = ['first_name', 'last_name', 'middle_name', 'phone', 'email', 'vacancy', 'cv', 'cover_letter']
+        fields = ['first_name', 'last_name', 'middle_name', 'phone', 'email', 'country', 'city', 'cv', 'cover_letter']
         widgets = {
             'first_name': forms.TextInput(attrs={'class': 'form-control'}),
             'last_name': forms.TextInput(attrs={'class': 'form-control'}),
             'middle_name': forms.TextInput(attrs={'class': 'form-control'}),
             'phone': forms.TextInput(attrs={'class': 'form-control'}),
             'email': forms.TextInput(attrs={'class': 'form-control'}),
-            'vacancy': forms.TextInput(attrs={'class': 'form-control'}),
-            'cv': forms.FileField(
-                widget=forms.FileInput(attrs={'class':'form-control'}),
-                required=True
-            ),
-            'cover_letter': forms.FileField(
-                widget=forms.FileInput(attrs={'class':'form-control'}),
-                required=False
-            ),
+            'country': forms.Select(attrs={'class': 'form-control'}),
+            'city': forms.TextInput(attrs={'class': 'form-control'}),
+            'cv': forms.FileInput(attrs={'class':'form-control'}),
+            'cover_letter': forms.Textarea(attrs={'class':'form-control'}),
         }
 
         def clean_attachments(self):
