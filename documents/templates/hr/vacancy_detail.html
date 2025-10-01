@@ -31,6 +31,6 @@
         <button class="btn btn-sm btn-info" onclick="navigator.clipboard.writeText(document.getElementById('shareable-link').href).then(() => alert('Link copied to clipboard!'));"><i class="fas fa-copy"></i> Copy Link</button>
     </p>
     <a href="{% url 'vacancy_list' %}" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Back to Vacancies</a>
-    <a href="{% url 'edit_vacancy' vacancy.id %}" class="btn btn-sm btn-warning"><i class="fas fa-edit"></i> Edit</a>
+    <a href="{% url 'edit_vacancy' vacancy.id %}" class="btn btn-sm btn-primary"><i class="fas fa-edit"></i> Edit</a>
 </div>
 {% endblock %}

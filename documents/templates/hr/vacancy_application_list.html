@@ -18,6 +18,9 @@
                 </span>
                 <input type="text" class="form-control border-start-0" id="searchVacancies" placeholder="Search vacancies..." aria-label="Search vacancies">
             </div>
+            <a href="{% url 'hr_dashboard' %}" class="btn btn-outline-secondary btn-sm" title="Back to HR Dashboard">
+                <i class="fas fa-arrow-left me-1"></i> Back
+            </a>
         </div>
         <div class="card-body">
             <div class="table-responsive">
@@ -25,10 +28,10 @@
                     <table class="table table-hover table-bordered align-middle">
                         <thead class="table-light">
                             <tr>
-                                <th>Title</th>
+                                <th>Vacancy</th>
                                 <th>Created By</th>
                                 <th>Created At</th>
-                                <th>Actions</th>
+                                <th>View Applications</th>
                             </tr>
                         </thead>
                         <tbody id="vacancyTableBody">
@@ -38,7 +41,7 @@
                                     <td>{{ vacancy.created_by.username|default:"N/A" }}</td>
                                     <td>{{ vacancy.created_at }}</td>
                                     <td>
-                                        <a href="{% url 'applications_per_vacancy' vacancy.id %}" class="btn btn-sm btn-warning"><i class="fas fa-eye"></i> View Applications for this</a>
+                                        <a href="{% url 'applications_per_vacancy' vacancy.id %}" class="btn btn-sm btn-primary"><i class="fas fa-eye"></i> View</a>
                                     </td>
                                 </tr>
                             {% endfor %}
@@ -92,29 +95,6 @@
                 {% else %}
                     <p>No vacancies found.</p>
                 {% endif %}
-            </div>
-        </div>
-    </div>
-    <!-- Share Vacancy Modal -->
-    <div class="modal fade" id="shareVacancyModal" tabindex="-1" aria-labelledby="shareVacancyModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="shareVacancyModalLabel"><i class="fas fa-share-alt"></i> Share Vacancy</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <form id="share-vacancy-form" method="POST">
-                        {% csrf_token %}
-                        <div class="form-group mb-3">
-                            <label for="end_date" class="form-label"><i class="fas fa-calendar-alt"></i> Share Until (optional)</label>
-                            <input type="date" name="end_date" id="end_date" class="form-control">
-                        </div>
-                        <input type="hidden" name="vacancy_id" id="vacancy_id">
-                        <button type="submit" class="btn btn-success"><i class="fas fa-share"></i> Share Vacancy</button>
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal"><i class="fas fa-times"></i> Cancel</button>
-                    </form>
-                </div>
             </div>
         </div>
     </div>
@@ -274,48 +254,12 @@ document.querySelectorAll('.share-vacancy').forEach(button => {
     });
 });
 
-document.getElementById('share-vacancy-form').addEventListener('submit', function(e) {
-    e.preventDefault();
-    const vacancyId = document.getElementById('vacancy_id').value;
-    fetch(`/vacancy/share/${vacancyId}/`, {
-        method: 'POST',
-        body: new FormData(this),
-        headers: { 'X-CSRFToken': '{{ csrf_token }}' }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            navigator.clipboard.writeText(data.shareable_link).then(() => {
-                alert('Vacancy shared! Link copied to clipboard: ' + data.shareable_link);
-                window.location.reload();
-            });
-        } else {
-            alert('Error: ' + (data.error || 'Failed to share vacancy.'));
-        }
-    });
-});
-
 document.querySelectorAll('.copy-link').forEach(button => {
     button.addEventListener('click', function(e) {
         e.preventDefault();
         navigator.clipboard.writeText(this.dataset.link).then(() => {
             alert('Link copied to clipboard!');
         });
-    });
-});
-
-document.querySelectorAll('.withdraw-vacancy').forEach(button => {
-    button.addEventListener('click', function(e) {
-        e.preventDefault();
-        fetch(this.href, { method: 'POST', headers: { 'X-CSRFToken': '{{ csrf_token }}' } })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    location.reload();
-                } else {
-                    alert('Failed to withdraw vacancy.');
-                }
-            });
     });
 });
 </script>

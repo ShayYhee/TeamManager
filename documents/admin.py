@@ -1,6 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
-from .models import CustomUser, Role, Department, Team, StaffProfile, Notification, UserNotification, StaffDocument, Event, EventParticipant, CompanyProfile, Contact, Email, Folder, File, Attachment, Vacancy
+from .models import CustomUser, Role, Department, Team, StaffProfile, Notification, UserNotification, StaffDocument, Event, EventParticipant, CompanyProfile, Contact, Email, Folder, File, Attachment, Vacancy, VacancyApplication
 
 class CustomUserAdmin(UserAdmin):
     model = CustomUser
@@ -35,6 +35,7 @@ admin.site.register(Folder)
 admin.site.register(File)
 admin.site.register(Attachment)
 admin.site.register(Vacancy)
+admin.site.register(VacancyApplication)
 @admin.register(Notification)
 class NotificationAdmin(admin.ModelAdmin):
     list_display = ('title', 'type', 'created_at', 'expires_at', 'is_active')

@@ -18,6 +18,9 @@
                 </span>
                 <input type="text" class="form-control border-start-0" id="searchVacancies" placeholder="Search vacancies..." aria-label="Search vacancies">
             </div>
+            <a href="{% url 'hr_dashboard' %}" class="btn btn-outline-secondary btn-sm" title="Back to HR Dashboard">
+                <i class="fas fa-arrow-left me-1"></i> Back
+            </a>
         </div>
         <div class="card-body">
             <div class="table-responsive">
@@ -56,7 +59,7 @@
                                         {% endif %}
                                     </td>
                                     <td>
-                                        <a href="{% url 'edit_vacancy' vacancy.id %}" class="btn btn-sm btn-warning"><i class="fas fa-edit"></i> Edit</a>
+                                        <a href="{% url 'edit_vacancy' vacancy.id %}" class="btn btn-sm btn-primary"><i class="fas fa-edit"></i> Edit</a>
                                         <a href="{% url 'delete_vacancy' vacancy.id %}" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure you want to delete this vacancy?');"><i class="fas fa-trash"></i> Delete</a>
                                         {% if vacancy.is_shared and vacancy.shareable_link %}
                                             <a href="{% url 'withdraw_vacancy' vacancy.id %}" class="btn btn-sm btn-secondary withdraw-vacancy" data-vacancy-id="{{ vacancy.id }}"><i class="fas fa-ban"></i> Withdraw</a>

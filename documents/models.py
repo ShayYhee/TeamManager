@@ -690,7 +690,7 @@ class Vacancy(models.Model):
         return reverse('vacancy_post', kwargs={'token': str(self.share_token)})
 
     def __str__(self):
-        return f"Job post for position {self.title} by {self.tenant}"
+        return f"Vacancy position {self.title} by {self.tenant}"
 
 def upload_to_job_cvs(instance, filename):
     tenant_name = instance.tenant.name if instance.tenant else "unassigned"

@@ -438,7 +438,7 @@
             <a href="{% url 'email_config' %}" {% if request.path == '/dashboard/email-config/' %}class="active"{% endif %}><i class="fas fa-cog"></i> Settings</a>
             {% for role in user.roles.all %}
                 {% if role.name == "HR" %}
-                    <a href="{% url 'vacancy_list' %}" {% if request.path == '/vacancy/' %}class="active"{% endif %}><i class="fas fa-briefcase"></i> Vacancy</a>
+                    <a href="{% url 'hr_dashboard' %}" {% if request.path == '/hr/' %}class="active"{% endif %}><i class="fas fa-briefcase"></i> HR Dashboard</a>
                 {% endif %}
             {% endfor %}
             {% for role in user.roles.all %}

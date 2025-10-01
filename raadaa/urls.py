@@ -173,6 +173,7 @@ urlpatterns = [
     path('password-reset-success/', views.password_reset_success, name='password_reset_success'),
     path('password-reset-sent', views.password_reset_sent, name="password_reset_sent"),
     # HR Vacancies
+    path('hr/', views.hr_dashboard, name='hr_dashboard'),
     path('vacancy/', views.vacancy_list, name='vacancy_list'),
     path('vacancy/create/', views.create_vacancy, name='create_vacancy'),
     path('vacancy/<int:vacancy_id>/', views.vacancy_detail, name='vacancy_detail'),
@@ -187,6 +188,8 @@ urlpatterns = [
     path('vacancy/applications/<int:vacancy_id>/', views.applications_per_vacancy, name='applications_per_vacancy'),
     path('vacancy/applications/<int:vacancy_id>/<int:application_id>/', views.vacancy_application_detail, name='vacancy_application_detail'),
     path('vacancy/applications/<int:vacancy_id>/<int:application_id>/delete/', views.delete_vacancy_application, name='delete_vacancy_app'),
+    path('vacancy/applications/<int:application_id>/accept/', views.accept_vac_app, name='accept_vac_app'),
+    path('vacancy/applications/<int:application_id>/reject/', views.reject_vac_app, name='reject_vac_app'),
 
     path('.well-known/<path:path>', handle_well_known),  # Handle .well-known requests
 ]
