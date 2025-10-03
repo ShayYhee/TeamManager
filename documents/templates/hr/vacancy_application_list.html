@@ -39,7 +39,7 @@
                             {% for vacancy in vacancies %}
                                 <tr>
                                     <td><a href="{%url 'vacancy_detail' vacancy.id %}">{{ vacancy.title }}</a></td>
-                                    <td>{{ vac_app.count }}</td>
+                                    <td>{{ vacancy.app_count }}</td>
                                     <td>{{ vacancy.created_by.username|default:"N/A" }}</td>
                                     <td>{{ vacancy.created_at }}</td>
                                     <td>

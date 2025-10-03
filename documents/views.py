@@ -13,7 +13,7 @@ from django.core.paginator import Paginator
 from django.core.exceptions import ValidationError, PermissionDenied, BadRequest
 from django.conf import settings
 from django.db import transaction
-from django.db.models import Q, F
+from django.db.models import Q, F, Count
 from django.dispatch import receiver
 from django.forms import formset_factory
 from django.http import HttpResponse, HttpResponseForbidden, JsonResponse, HttpResponseRedirect, HttpResponseNotFound
@@ -4010,6 +4010,7 @@ def withdraw_vacancy(request, vacancy_id):
     vacancy.shared_by = None
     vacancy.share_time = None
     vacancy.share_time_end = None
+    vacancy.status = 'withdrawn'
     vacancy.save()
     return JsonResponse({"success": True})
 
@@ -4034,15 +4035,12 @@ def vacancy_application_list(request):
         print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
         return render(request, 'tenant_error.html', {'error_code': '401','message': 'You are not authorized for this company.'})
     
-    vacancy = Vacancy.objects.filter(tenant=request.tenant)
-    for vac in vacancy:
-        vac_app = VacancyApplication.objects.filter(tenant=request.tenant, vacancy=vac)
-        vac_app.count = vac_app.count()
-    paginator = Paginator(vacancy, 10)  # 10 applications per page
+    vacancies = Vacancy.objects.filter(tenant=request.tenant).annotate(app_count=Count('applications'))
+    paginator = Paginator(vacancies, 10)  # 10 applications per page
     page = request.GET.get('page')
     page_obj = paginator.get_page(page)
     
-    return render(request, 'hr/vacancy_application_list.html', {'vacancies': page_obj, 'vac_app': vac_app})
+    return render(request, 'hr/vacancy_application_list.html', {'vacancies': page_obj})
 
 
 def send_vacancy_aapplication_received(request, application_id):
