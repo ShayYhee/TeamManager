@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
+from django.contrib.sessions.models import Session
 from .models import CustomUser, Role, Department, Team, StaffProfile, Notification, UserNotification, StaffDocument, Event, EventParticipant, CompanyProfile, Contact, Email, Folder, File, Attachment, Vacancy, VacancyApplication
 
 class CustomUserAdmin(UserAdmin):
@@ -13,6 +14,15 @@ class CustomUserAdmin(UserAdmin):
     list_display = ("tenant","username", "email", "phone_number", "is_staff", "is_active", "email_address")
     list_filter = ("tenant", "roles", "is_staff", "is_active")
 
+class SessionAdmin(admin.ModelAdmin):
+        def _session_data(self, obj):
+            return obj.get_decoded()
+
+        list_display = ['session_key', '_session_data', 'expire_date']
+        list_filter = ['expire_date']
+        readonly_fields = ['_session_data']
+        exclude = ['session_data'] # Exclude the raw session_data field
+
 class StaffDocumentInline(admin.TabularInline):
     model = StaffDocument
     extra = 1
@@ -20,6 +30,7 @@ class StaffDocumentInline(admin.TabularInline):
 class StaffProfileAdmin(admin.ModelAdmin):
     inlines = [StaffDocumentInline]
 
+admin.site.register(Session, SessionAdmin)
 admin.site.register(CustomUser, CustomUserAdmin)
 admin.site.register(Role)
 admin.site.register(Department)

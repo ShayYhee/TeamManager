@@ -7,7 +7,7 @@
         <div class="card-header d-flex justify-content-between align-items-center">
             <h4 class="card-title mb-0">
                 <i class="fas fa-briefcase me-2 text-primary" aria-hidden="true"></i>
-                Vacancies ({{ vacancies|obj_count }})
+                Vacancies ({{ vacancies|page_obj_count }})
             </h4>
             <div class="mb-3">
                 <a href="{% url 'create_vacancy' %}" class="btn btn-primary"><i class="fas fa-plus"></i> Create Vacancy</a>
@@ -29,6 +29,7 @@
                         <thead class="table-light">
                             <tr>
                                 <th>Vacancy</th>
+                                <th>No. of Applications</th>
                                 <th>Created By</th>
                                 <th>Created At</th>
                                 <th>View Applications</th>
@@ -38,6 +39,7 @@
                             {% for vacancy in vacancies %}
                                 <tr>
                                     <td><a href="{%url 'vacancy_detail' vacancy.id %}">{{ vacancy.title }}</a></td>
+                                    <td>{{ vac_app.count }}</td>
                                     <td>{{ vacancy.created_by.username|default:"N/A" }}</td>
                                     <td>{{ vacancy.created_at }}</td>
                                     <td>

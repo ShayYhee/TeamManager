@@ -7,7 +7,7 @@
         <div class="card-header d-flex justify-content-between align-items-center">
             <h4 class="card-title mb-0">
                 <i class="fas fa-briefcase me-2 text-primary" aria-hidden="true"></i>
-                Applications For {{vacancy.title}} ({{ vacancy_applications|obj_count }})
+                Applications For {{vacancy.title}} ({{ vacancy_applications|page_obj_count }})
             </h4>
             <div class="input-group w-50 w-md-25">
                 <span class="input-group-text bg-transparent border-end-0">
@@ -52,7 +52,13 @@
                                             {{ vacancy_app.country.name }}
                                         {% endif %}
                                     </td>
-                                    <td>{{ vacancy_app.get_status_display }}</td>
+                                    <td>
+                                        {% if vacancy_app.status %}
+                                            <span class="badge {% if vacancy_app.status == 'accepted' %}bg-success{% elif vacancy_app.status == 'rejected' %}bg-danger{% endif %}" style="font-size: 1rem;">{{ vacancy_app.status|capfirst }}</span>
+                                        {% else %}
+                                            <span class="badge bg-warning text-dark" style="font-size: 1rem;">Pending</span>
+                                        {% endif %}
+                                    </td>
                                     <td>{{ vacancy_app.created_at }}</td>
                                     <td>
                                         <a href="{% url 'vacancy_application_detail' vacancy.id vacancy_app.id %}" class="btn btn-sm btn-primary"><i class="fas fa-eye"></i> View</a>

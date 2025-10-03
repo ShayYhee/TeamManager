@@ -119,7 +119,8 @@ def get_email_smtp_connection(sender_provider, sender_email, sender_password):
         "icloud": ("smtp.mail.me.com", 587, True, False),
     }
     
-    sender_provider = sender_provider.lower()
+    if sender_provider:
+        sender_provider = sender_provider.lower()
     if sender_provider not in smtp_settings:
         print(f"Unsupported email provider: {sender_provider}")
         return None, f"Unsupported email provider: {sender_provider}"
@@ -365,8 +366,12 @@ def create_document(request):
                     document.save()
 
                     creation_method = form.cleaned_data['creation_method']
-                    word_dir = os.path.join(settings.MEDIA_ROOT, upload_to_documents_word(document))
-                    pdf_dir = os.path.join(settings.MEDIA_ROOT, upload_to_documents_pdf(document))
+                    if settings.DEBUG:
+                        word_dir = os.path.join(settings.MEDIA_ROOT, upload_to_documents_word(document))
+                        pdf_dir = os.path.join(settings.MEDIA_ROOT, upload_to_documents_pdf(document))
+                    else:
+                        word_dir = f"{settings.MEDIA_URL}{upload_to_documents_word(document).rstrip('/')}/"
+                        pdf_dir = f"{settings.MEDIA_URL}{upload_to_documents_pdf(document).rstrip('/')}/"
                     os.makedirs(word_dir, exist_ok=True)
                     os.makedirs(pdf_dir, exist_ok=True)
 
@@ -458,8 +463,15 @@ def create_document(request):
                             continue
 
                     pdf_filename = f"{base_filename}.pdf"
-                    relative_pdf_path = os.path.join(upload_to_documents_pdf(document), pdf_filename)
-                    absolute_pdf_path = os.path.join(settings.MEDIA_ROOT, relative_pdf_path)
+                    if settings.DEBUG:
+                        relative_pdf_path = os.path.join(upload_to_documents_pdf(document), pdf_filename)
+                    else:
+                        relative_pdf_path = f"{settings.MEDIA_URL}{upload_to_documents_pdf(document).rstrip('/')}/{pdf_filename}"
+                    
+                    if settings.DEBUG:
+                        absolute_pdf_path = os.path.join(settings.MEDIA_ROOT, relative_pdf_path)
+                    else:
+                        absolute_pdf_path = f"{settings.MEDIA_URL}{relative_pdf_path.rstrip('/')}/"
 
                     # Choose the right LibreOffice path
                     if platform.system() == "Windows":
@@ -952,15 +964,33 @@ def add_formatted_content(doc, soup, word_dir):
                                     print(f"Failed to download image: {img_src} (Status: {response.status_code})")
                                     current_paragraph = doc.add_paragraph(f"[Image failed to load: {img_src}]")
                             else:
-                                # Handle local images (e.g., /media/Uploads/image.jpg)
+                                # Handle images from CKEditor uploads
                                 clean_src = img_src.replace(settings.MEDIA_URL, '').lstrip('/')
-                                img_path = os.path.normpath(os.path.join(settings.MEDIA_ROOT, clean_src))
-                                print(f"Attempting to add local image: {img_path}")
-                                if os.path.exists(img_path):
-                                    doc.add_picture(img_path, width=Inches(4.0))
+
+                                if settings.DEBUG:
+                                    # Local dev: images exist on disk
+                                    img_path = os.path.normpath(os.path.join(settings.MEDIA_ROOT, clean_src))
+                                    print(f"Attempting to add local image: {img_path}")
+                                    if os.path.exists(img_path):
+                                        doc.add_picture(img_path, width=Inches(4.0))
+                                    else:
+                                        print(f"Local image not found: {img_path}")
+                                        doc.add_paragraph(f"[Image not found: {img_path}]")
                                 else:
-                                    print(f"Local image not found: {img_path}")
-                                    current_paragraph = doc.add_paragraph(f"[Image not found: {img_path}]")
+                                    # Production: files are on S3 (remote)
+                                    file_url = settings.MEDIA_URL + clean_src
+                                    print(f"Attempting to fetch image from: {file_url}")
+                                    try:
+                                        response = requests.get(file_url)
+                                        if response.status_code == 200:
+                                            image_stream = io.BytesIO(response.content)
+                                            doc.add_picture(image_stream, width=Inches(4.0))
+                                        else:
+                                            print(f"Image not accessible at: {file_url}")
+                                            doc.add_paragraph(f"[Image not found: {file_url}]")
+                                    except Exception as e:
+                                        print(f"Error fetching image: {e}")
+                                        doc.add_paragraph(f"[Error loading image: {file_url}]")
                         except Exception as e:
                             print(f"Error adding image {img_src}: {e}")
                             current_paragraph = doc.add_paragraph(f"[Error loading image: {img_src}]")
@@ -1023,8 +1053,13 @@ def create_from_editor(request):
             soup = BeautifulSoup(content, 'html.parser')
 
             # Define file paths
-            word_dir = os.path.join(settings.MEDIA_ROOT, documents_word_upload(request))
-            pdf_dir = os.path.join(settings.MEDIA_ROOT, documents_pdf_upload(request))
+            if settings.DEBUG:
+                word_dir = os.path.join(settings.MEDIA_ROOT, documents_word_upload(request))
+                pdf_dir = os.path.join(settings.MEDIA_ROOT, documents_pdf_upload(request))
+            else:
+                word_dir = f"{settings.MEDIA_URL}{documents_word_upload(request).rstrip('/')}/"
+                pdf_dir = f"{settings.MEDIA_URL}{documents_pdf_upload(request).rstrip('/')}/"
+
             os.makedirs(word_dir, exist_ok=True)
             os.makedirs(pdf_dir, exist_ok=True)
 
@@ -1078,8 +1113,15 @@ def create_from_editor(request):
 
             # Generate and save the .pdf file using LibreOffice
             pdf_filename = f"{slugify(title)}_{request.user.id}_{template_folder.id}.pdf"
-            relative_pdf_path = os.path.join(documents_pdf_upload(request), pdf_filename)
-            absolute_pdf_path = os.path.join(settings.MEDIA_ROOT, relative_pdf_path)
+            if settings.DEBUG:
+                relative_pdf_path = os.path.join(documents_pdf_upload(request), pdf_filename)
+            else:
+                relative_pdf_path = f"{settings.MEDIA_URL}{documents_pdf_upload(request).rstrip('/')}/{pdf_filename}"
+            
+            if settings.DEBUG:
+                absolute_pdf_path = os.path.join(settings.MEDIA_ROOT, relative_pdf_path)
+            else:
+                absolute_pdf_path = f"{settings.MEDIA_URL}{relative_pdf_path.rstrip('/')}/"
 
             # Choose the right LibreOffice path
             if platform.system() == "Windows":
@@ -1685,6 +1727,29 @@ def create_task(request):
             task.tenant = request.user.tenant
             task.save()
             form.save_m2m()
+            # Create notification for the task
+            expires_at_value = None
+            if task.due_date:
+                # Combine date with midnight time
+                naive_datetime = datetime.combine(task.due_date, datetime.min.time())
+                # Make it timezone-aware if your project uses USE_TZ=True
+                expires_at_value = timezone.make_aware(naive_datetime)  # Or use timezone.localtime(naive_datetime) if needed
+
+            notif = Notification.objects.create(
+                tenant=request.tenant,
+                title=task.title,
+                message=task.description or "A new task has been assigned to you.",
+                type=Notification.NotificationType.ALERT,
+                expires_at=expires_at_value,  # Use the converted value
+                is_active=True
+            )
+
+            for assignee in task.assigned_to.all():
+                UserNotification.objects.create(
+                    tenant=request.tenant,
+                    user=assignee,
+                    notification=notif
+                )
             return redirect('task_list')
     else:
         form = TaskForm(user=request.user)
@@ -1820,6 +1885,30 @@ def reassign_task(request, task_id):
             # Update many-to-many relationship for assigned users
             task.assigned_to.clear()  # Clear existing assignments
             task.assigned_to.add(*assigned_users)  # Add new assignments
+            # Create notification for the task
+            expires_at_value = None
+            if task.due_date:
+                # Combine date with midnight time
+                naive_datetime = datetime.combine(task.due_date, datetime.min.time())
+                # Make it timezone-aware if your project uses USE_TZ=True
+                expires_at_value = timezone.make_aware(naive_datetime)  # Or use timezone.localtime(naive_datetime) if needed
+
+            notif = Notification.objects.create(
+                tenant=request.tenant,
+                title=task.title,
+                message=task.description or "A new task has been assigned to you.",
+                type=Notification.NotificationType.ALERT,
+                expires_at=expires_at_value,  # Use the converted value
+                is_active=True
+            )
+
+            for assignee in task.assigned_to.all():
+                UserNotification.objects.create(
+                    tenant=request.tenant,
+                    user=assignee,
+                    notification=notif
+                )
+            return redirect('task_list')
 
             return JsonResponse({'success': True, 'message': 'Task reassigned successfully.'})
         except ValidationError as e:
@@ -2264,28 +2353,18 @@ def notifications_view(request):
         logger.error(f"Unauthorized access by user {request.user.username}: tenant mismatch")
         return HttpResponseForbidden("You are not authorized for this company.")
 
-    # Filter notifications by tenant and active status
-    all_notifications = Notification.objects.filter(
+    # Fetch active UserNotifications for the current user (only those explicitly assigned)
+    active_notifications = UserNotification.objects.filter(
+        user=request.user,
         tenant=request.user.tenant,
-        is_active=True
-    )
+        notification__is_active=True,
+        dismissed=False
+    ).select_related('notification').order_by('-notification__created_at')
 
-    # Ensure UserNotification exists for each active notification
-    active_notifications = []
-    for notification in all_notifications:
-        user_notification, created = UserNotification.objects.get_or_create(
-            user=request.user,
-            tenant=request.user.tenant,
-            notification=notification,
-            defaults={'seen_at': timezone.now(), 'dismissed': False}
-        )
-        if not user_notification.dismissed:
-            active_notifications.append(user_notification)
-
-    # Get dismissed notifications for the user and tenant
+    # Fetch dismissed UserNotifications for the current user
     dismissed_notifications = UserNotification.objects.filter(
         user=request.user,
-        notification__tenant=request.user.tenant,
+        tenant=request.user.tenant,
         dismissed=True
     ).select_related('notification').order_by('-seen_at')
 
@@ -3811,12 +3890,17 @@ def vacancy_list(request):
         return render(request, 'tenant_error.html', {'error_code': '401','message': 'You are not authorized for this company.'})
     
     vacancies = Vacancy.objects.filter(tenant=request.tenant).select_related('created_by', 'updated_by', 'shared_by')
+    now = timezone.now()  # Cache for efficiency
+
     for vacancy in vacancies:
-        if vacancy.share_time_end:
-            if vacancy.is_shared and vacancy.share_time <= timezone.now() <= vacancy.share_time_end:
+        if vacancy.is_shared and vacancy.share_time and vacancy.share_time <= now:
+            if vacancy.share_time_end:
+                if now <= vacancy.share_time_end:
+                    vacancy.shareable_link = request.build_absolute_uri(vacancy.get_shareable_link())
+                else:
+                    vacancy.shareable_link = None
+            else:
                 vacancy.shareable_link = request.build_absolute_uri(vacancy.get_shareable_link())
-        if vacancy.is_shared and vacancy.share_time <= timezone.now():
-            vacancy.shareable_link = request.build_absolute_uri(vacancy.get_shareable_link()) 
         else:
             vacancy.shareable_link = None
 
@@ -3951,11 +4035,61 @@ def vacancy_application_list(request):
         return render(request, 'tenant_error.html', {'error_code': '401','message': 'You are not authorized for this company.'})
     
     vacancy = Vacancy.objects.filter(tenant=request.tenant)
+    for vac in vacancy:
+        vac_app = VacancyApplication.objects.filter(tenant=request.tenant, vacancy=vac)
+        vac_app.count = vac_app.count()
     paginator = Paginator(vacancy, 10)  # 10 applications per page
     page = request.GET.get('page')
     page_obj = paginator.get_page(page)
     
-    return render(request, 'hr/vacancy_application_list.html', {'vacancies': page_obj})
+    return render(request, 'hr/vacancy_application_list.html', {'vacancies': page_obj, 'vac_app': vac_app})
+
+
+def send_vacancy_aapplication_received(request, application_id):
+    vacancy_application = get_object_or_404(VacancyApplication, id=application_id, tenant=request.tenant)
+    vacancy = vacancy_application.vacancy
+    users = CustomUser.objects.filter(tenant=request.tenant, is_active=True)
+    hrs=[]
+    for user in users:
+        if is_hr(user):
+            hrs.append(user)
+    hr = hrs[0]
+    sender_provider = hr.email_provider if hr.email_provider else SUPERUSER_EMAIL_PROVIDER
+    sender_email = hr.email_address if hr.email_address else SUPERUSER_EMAIL_ADDRESS
+    sender_password = hr.email_password if hr.email_password else SUPERUSER_EMAIL_PASSWORD
+    candidate_name = vacancy_application.first_name
+    company = vacancy_application.tenant.name
+
+
+    if not sender_email or not sender_password:
+        return HttpResponseForbidden("Your email credentials are missing. Contact admin.")
+
+    connection, error_message = get_email_smtp_connection(sender_provider, sender_email, sender_password)
+
+    subject = f"Application Received for {vacancy.title} Role"
+    message = f"""
+    Dear {candidate_name},
+
+    You have successfully applied for the {vacancy.title} position at {company}.
+
+    You will receive an email once the hiring manager reviews your application.
+
+    Please be sure to keep a close eye on your email inbox (including your spam or promotions folder) so you don't miss our message.
+
+    Best regards,
+
+    Human Resouces Team, 
+    {company}
+    """
+
+    print("Sending mail...")
+
+    # Create email with attachment
+    email = EmailMessage(subject, message, sender_email, [vacancy_application.email], connection=connection)
+    email.send()
+    
+    print("Mail Sent")
+
 
 
 def create_vacancy_application(request, vacancy_id):
@@ -3967,6 +4101,7 @@ def create_vacancy_application(request, vacancy_id):
             vacancy_application.vacancy = vacancy
             vacancy_application.tenant = request.tenant
             vacancy_application.save()
+            send_vacancy_aapplication_received(request, vacancy_application.id)
             return render(request, 'hr/vacancy_application_success.html', {'name':vacancy_application.first_name, 'vacancy': vacancy})
     else:
         form = VacancyApplicationForm()

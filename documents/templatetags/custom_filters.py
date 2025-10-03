@@ -130,7 +130,7 @@ def union(list1, list2):
     return result
 
 @register.filter
-def obj_count(value):
+def page_obj_count(value):
     try:
         return value.paginator.count
     except AttributeError:

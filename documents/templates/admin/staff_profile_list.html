@@ -7,7 +7,7 @@
         <div class="card-header d-flex justify-content-between align-items-center">
             <h4 class="card-title mb-0">
                 <i class="fas fa-user-tie me-2 text-primary" aria-hidden="true"></i>
-                Staff Profiles ({{ staff_profiles|obj_count }})
+                Staff Profiles ({{ staff_profiles|page_obj_count }})
             </h4>
             <div class="mb-3">
                 <a href="{% url 'create_staff_profile' %}" class="btn btn-success">Add Staff Profile</a>
