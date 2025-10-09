@@ -25,7 +25,7 @@ from django.utils import timezone
 from django.utils.timezone import now
 from django.views.decorators.http import require_POST
 from django.views.decorators.csrf import csrf_exempt
-from .forms import DocumentForm, SignUpForm, CreateDocumentForm, FileUploadForm, FolderForm, TaskForm, ReassignTaskForm, StaffProfileForm, StaffDocumentForm, EmailConfigForm, UserForm, DepartmentForm, TeamForm, EventForm, EventParticipantForm, NotificationForm, UserNotificationForm, CompanyProfileForm, ContactForm, EmailForm, EditUserForm, CompanyDocumentForm, SupportForm, VacancyForm, VacancyApplicationForm
+from .forms import DocumentForm, SignUpForm, CreateDocumentForm, FileUploadForm, FolderForm, TaskForm, ReassignTaskForm, StaffProfileForm, StaffDocumentForm, EmailConfigForm, UserForm, DepartmentForm, TeamForm, EventForm, EventParticipantForm, NotificationForm, UserNotificationForm, CompanyProfileForm, ContactForm, EmailForm, EditUserForm, CompanyDocumentForm, SupportForm, VacancyForm, VacancyApplicationForm, AssignUsersToDepartmentForm, AssignTeamsToUsersForm
 from .models import Document, CustomUser, Role, File, Folder, Task, StaffProfile, Notification, UserNotification, StaffDocument, Event, EventParticipant, Department, Team, CompanyProfile, Contact, Email, Attachment, CompanyDocument, Vacancy, VacancyApplication
 from raadaa.settings import ALLOWED_HOSTS
 from .serializers import EventSerializer
@@ -576,7 +576,8 @@ def register(request):
             admin_user = CustomUser.objects.filter(
                 tenant=request.tenant, roles__name="Admin"
             ).first()
-            if admin_user.email_address and admin_user.email_password:
+            if admin_user.email_provider and admin_user.email_address and admin_user.email_password:
+                sender_provider = admin_user.email_provider
                 sender_email = admin_user.email_address
                 sender_password = admin_user.email_password
             else:
@@ -2829,7 +2830,7 @@ def approve_user(request, user_id):
         sender_email = admin_user.email_address
         sender_password = admin_user.email_password
     else:
-        superuser = CustomUser.objects.get(is_superuser=True)
+        superuser = main_superuser
         sender_provider = superuser.email_provider
         sender_email = superuser.email_address
         sender_password = superuser.email_password
@@ -3035,6 +3036,48 @@ def admin_task_detail(request, task_id):
         return HttpResponseForbidden("Task not found or does not belong to your company.")
 
     return render(request, "admin/view_task_details.html", {"task_view": task_view})
+
+def assign_users_to_department(request, department_id):
+    department = get_object_or_404(Department, id=department_id)
+    tenant = department.tenant
+
+    if request.method == 'POST':
+        form = AssignUsersToDepartmentForm(request.POST, tenant=tenant)
+        if form.is_valid():
+            users = form.cleaned_data['users']
+            for user in users:
+                user.department = department
+                user.save()
+            messages.success(request, f"Users successfully assigned to {department.name}.")
+            return redirect('department_list')
+    else:
+        form = AssignUsersToDepartmentForm(tenant=tenant)
+    
+    return render(request, 'admin/assign_users_to_department.html', {
+        'form': form,
+        'department': department,
+    })
+
+def assign_teams_to_users(request, team_id):
+    team = get_object_or_404(Team, id=team_id)
+    tenant = team.tenant
+
+    if request.method == 'POST':
+        form = AssignTeamsToUsersForm(request.POST, tenant=tenant)
+        if form.is_valid():
+            users = form.cleaned_data['users']
+            teams = form.cleaned_data['teams']
+            for user in users:
+                user.teams.add(*teams)
+            messages.success(request, f"Teams successfully assigned to users.")
+            return redirect('admin_team_list')
+    else:
+        form = AssignTeamsToUsersForm(tenant=tenant)
+    
+    return render(request, 'admin/assign_teams_to_users.html', {
+        'form': form,
+        'team': team,
+    })
 
 @user_passes_test(is_admin)
 def department_list(request):

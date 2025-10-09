@@ -4,7 +4,8 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from documents import views
+from documents import views as dv
+from tenants import views as tv
 from documents.views import register, home, approve_document, send_approved_email, delete_document, view_my_profile
 from documents.views import edit_my_profile, staff_directory, view_staff_profile, staff_list, notifications_view
 from documents.views import dismiss_notification, add_staff_document, delete_staff_document, email_config, calendar_view
@@ -63,7 +64,7 @@ urlpatterns = [
     path('notifications/dismiss/', dismiss_notification, name='dismiss_notification'),
     path('notifications/dismiss-all/', dismiss_all_notifications, name='dismiss_all_notifications'),
     path('dashboard/email-config/', email_config, name='email_config'),
-    path("dashboard/email-config/success/", views.email_config_success_view, name="email_config_success"),
+    path("dashboard/email-config/success/", dv.email_config_success_view, name="email_config_success"),
     path('api/', include(router.urls)),
     path('api/events/<int:event_id>/respond/', EventParticipantResponseView.as_view(), name='event_participant_response'),
     path('calendar/', calendar_view, name='calendar'),
@@ -78,7 +79,7 @@ urlpatterns = [
     path('dashboard/contacts/delete/<int:contact_id>/', delete_contact, name='delete_contact'),
     path('dashboard/emails/', email_list, name='email_list'),
     path('dashboard/emails/<int:email_id>', email_detail, name='email_detail'),
-    path('dashboard/emails/<int:email_id>/delete-email-attachment/<int:attachment_id>/', views.delete_email_attachment, name='delete_email_attachment'),
+    path('dashboard/emails/<int:email_id>/delete-email-attachment/<int:attachment_id>/', dv.delete_email_attachment, name='delete_email_attachment'),
     path('dashboard/emails/save-draft/', save_draft, name='save_draft'),
     path('dashboard/emails/send/', send_email, name='send_email'),
     path('contacts/search/', contact_search, name='contact_search'),
@@ -136,6 +137,9 @@ urlpatterns = [
     path('admins/teams/create/', create_team, name='create_team'),
     path('admins/teams/edit/<int:team_id>/', edit_team, name='edit_team'),
     path('admins/teams/delete/<int:team_id>/', delete_team, name='delete_team'),
+    # New URLs for assigning users and teams
+    path('department/<int:department_id>/assign-users/', dv.assign_users_to_department, name='assign_users_to_department'),
+    path('team/<int:team_id>/assign-teams/', dv.assign_teams_to_users, name='assign_teams_to_users'),
     # Staff Profile URLs
     path('admins/staff-profiles/', staff_profile_list, name='staff_profile_list'),
     path('admins/staff-profiles/create/', create_staff_profile, name='create_staff_profile'),
@@ -168,28 +172,35 @@ urlpatterns = [
     path('company-profile/', view_company_profile, name='view_company_profile'),
     path('contact-support/', contact_support, name='contact_support'),
     # Password Reset URLs
-    path('forgot-password/', views.forgot_password, name='forgot_password'),
-    path('reset-password/<uidb64>/<token>/', views.reset_password, name='reset_password'),
-    path('password-reset-success/', views.password_reset_success, name='password_reset_success'),
-    path('password-reset-sent', views.password_reset_sent, name="password_reset_sent"),
+    path('forgot-password/', dv.forgot_password, name='forgot_password'),
+    path('reset-password/<uidb64>/<token>/', dv.reset_password, name='reset_password'),
+    path('password-reset-success/', dv.password_reset_success, name='password_reset_success'),
+    path('password-reset-sent', dv.password_reset_sent, name="password_reset_sent"),
     # HR Vacancies
-    path('hr/', views.hr_dashboard, name='hr_dashboard'),
-    path('vacancy/', views.vacancy_list, name='vacancy_list'),
-    path('vacancy/create/', views.create_vacancy, name='create_vacancy'),
-    path('vacancy/<int:vacancy_id>/', views.vacancy_detail, name='vacancy_detail'),
-    path('vacancy/edit/<int:vacancy_id>/', views.edit_vacancy, name='edit_vacancy'),
-    path('vacancy/delete/<int:vacancy_id>/', views.delete_vacancy, name='delete_vacancy'),
-    path('vacancy/share/<int:vacancy_id>/', views.share_vacancy, name='share_vacancy'),
-    path('vacancy/withdraw/<int:vacancy_id>/', views.withdraw_vacancy, name='withdraw_vacancy'),
-    path('vacancy/post/<uuid:token>/', views.vacancy_post, name='vacancy_post'),
+    path('hr/', dv.hr_dashboard, name='hr_dashboard'),
+    path('vacancy/', dv.vacancy_list, name='vacancy_list'),
+    path('vacancy/create/', dv.create_vacancy, name='create_vacancy'),
+    path('vacancy/<int:vacancy_id>/', dv.vacancy_detail, name='vacancy_detail'),
+    path('vacancy/edit/<int:vacancy_id>/', dv.edit_vacancy, name='edit_vacancy'),
+    path('vacancy/delete/<int:vacancy_id>/', dv.delete_vacancy, name='delete_vacancy'),
+    path('vacancy/share/<int:vacancy_id>/', dv.share_vacancy, name='share_vacancy'),
+    path('vacancy/withdraw/<int:vacancy_id>/', dv.withdraw_vacancy, name='withdraw_vacancy'),
+    path('vacancy/post/<uuid:token>/', dv.vacancy_post, name='vacancy_post'),
     # Vacancy Applications
-    path('vacancy/apply/<int:vacancy_id>/', views.create_vacancy_application, name='apply_vacancy'),
-    path('vacancy/applications/', views.vacancy_application_list, name='vacancy_application_list'),
-    path('vacancy/applications/<int:vacancy_id>/', views.applications_per_vacancy, name='applications_per_vacancy'),
-    path('vacancy/applications/<int:vacancy_id>/<int:application_id>/', views.vacancy_application_detail, name='vacancy_application_detail'),
-    path('vacancy/applications/<int:vacancy_id>/<int:application_id>/delete/', views.delete_vacancy_application, name='delete_vacancy_app'),
-    path('vacancy/applications/<int:application_id>/accept/', views.accept_vac_app, name='accept_vac_app'),
-    path('vacancy/applications/<int:application_id>/reject/', views.reject_vac_app, name='reject_vac_app'),
+    path('vacancy/apply/<int:vacancy_id>/', dv.create_vacancy_application, name='apply_vacancy'),
+    path('vacancy/applications/', dv.vacancy_application_list, name='vacancy_application_list'),
+    path('vacancy/applications/<int:vacancy_id>/', dv.applications_per_vacancy, name='applications_per_vacancy'),
+    path('vacancy/applications/<int:vacancy_id>/<int:application_id>/', dv.vacancy_application_detail, name='vacancy_application_detail'),
+    path('vacancy/applications/<int:vacancy_id>/<int:application_id>/delete/', dv.delete_vacancy_application, name='delete_vacancy_app'),
+    path('vacancy/applications/<int:application_id>/accept/', dv.accept_vac_app, name='accept_vac_app'),
+    path('vacancy/applications/<int:application_id>/reject/', dv.reject_vac_app, name='reject_vac_app'),
+
+    # Tracking Dashboard
+    path('tracking/', tv.tracking_dashboard, name='tracking_dashboard'),
+    path('tracking/task/', tv.track_tasks, name='track_task'),
+    path('tracking/folder-file/', tv.track_folder_file, name='track_folder_file'),
+    path('tracking/vacancy/', tv.track_vacancy, name="track_vacancy"),
+    path('tracking/users/', tv.track_user, name='track_user'),
 
     path('.well-known/<path:path>', handle_well_known),  # Handle .well-known requests
 ]

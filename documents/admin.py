@@ -15,13 +15,17 @@ class CustomUserAdmin(UserAdmin):
     list_filter = ("tenant", "roles", "is_staff", "is_active")
 
 class SessionAdmin(admin.ModelAdmin):
-        def _session_data(self, obj):
-            return obj.get_decoded()
+    def _session_data(self, obj):
+        return obj.get_decoded()
 
-        list_display = ['session_key', '_session_data', 'expire_date']
-        list_filter = ['expire_date']
-        readonly_fields = ['_session_data']
-        exclude = ['session_data'] # Exclude the raw session_data field
+    list_display = ['session_key', '_session_data', 'expire_date']
+    list_filter = ['expire_date']
+    readonly_fields = ['_session_data']
+    exclude = ['session_data'] # Exclude the raw session_data field
+
+class FolderAdmin(admin.ModelAdmin):
+    list_display = ['name', 'parent', 'tenant', 'is_public', 'is_shared', 'created_by', 'share_time_end']
+    list_filter = ['parent', 'is_public', 'is_shared', 'tenant']
 
 class StaffDocumentInline(admin.TabularInline):
     model = StaffDocument
@@ -42,7 +46,7 @@ admin.site.register(UserNotification)
 admin.site.register(CompanyProfile)
 admin.site.register(Contact)
 admin.site.register(Email)
-admin.site.register(Folder)
+admin.site.register(Folder, FolderAdmin)
 admin.site.register(File)
 admin.site.register(Attachment)
 admin.site.register(Vacancy)

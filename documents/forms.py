@@ -436,6 +436,38 @@ class TeamForm(forms.ModelForm):
                 self.fields['department'].queryset = Department.objects.none()
                 self.fields['team_leader'].queryset = CustomUser.objects.none()
 
+class AssignUsersToDepartmentForm(forms.Form):
+    users = forms.ModelMultipleChoiceField(
+        queryset=CustomUser.objects.all(),
+        widget=forms.CheckboxSelectMultiple,
+        label="Select Users"
+    )
+
+    def __init__(self, *args, **kwargs):
+        tenant = kwargs.pop('tenant', None)
+        super().__init__(*args, **kwargs)
+        if tenant:
+            self.fields['users'].queryset = CustomUser.objects.filter(tenant=tenant)
+
+class AssignTeamsToUsersForm(forms.Form):
+    users = forms.ModelMultipleChoiceField(
+        queryset=CustomUser.objects.all(),
+        widget=forms.CheckboxSelectMultiple,
+        label="Select Users"
+    )
+    teams = forms.ModelMultipleChoiceField(
+        queryset=Team.objects.all(),
+        widget=forms.CheckboxSelectMultiple,
+        label="Select Teams"
+    )
+
+    def __init__(self, *args, **kwargs):
+        tenant = kwargs.pop('tenant', None)
+        super().__init__(*args, **kwargs)
+        if tenant:
+            self.fields['users'].queryset = CustomUser.objects.filter(tenant=tenant)
+            self.fields['teams'].queryset = Team.objects.filter(tenant=tenant)
+
 class EventForm(forms.ModelForm):
     class Meta:
         model = Event

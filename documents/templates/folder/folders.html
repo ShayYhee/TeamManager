@@ -141,7 +141,7 @@
                                                                 </button>
                                                             </p>
                                                         {% endif %}
-                                                        {% if file.uploaded_by == request.user %}
+                                                        {% if file.uploaded_by == request.user or file.uploaded_by == None %}
                                                             <div class="dropdown position-absolute top-0 end-0 p-2">
                                                                 <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="File Options">
                                                                     <i class="fas fa-ellipsis-v"></i>
@@ -282,7 +282,7 @@
                                                                 </button>
                                                             </p>
                                                         {% endif %}
-                                                        {% if file.uploaded_by == request.user %}
+                                                        {% if file.uploaded_by == request.user or file.uploaded_by == None %}
                                                             <div class="dropdown position-absolute top-0 end-0 p-2">
                                                                 <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="File Options">
                                                                     <i class="fas fa-ellipsis-v"></i>
