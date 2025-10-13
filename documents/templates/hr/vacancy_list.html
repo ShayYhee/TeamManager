@@ -28,7 +28,7 @@
                     <table class="table table-hover table-bordered align-middle">
                         <thead class="table-light">
                             <tr>
-                                <th>ID</th>
+                                <th>No.</th>
                                 <th>Title</th>
                                 <th>Location</th>
                                 <th>Status</th>
@@ -40,7 +40,7 @@
                         <tbody id="vacancyTableBody">
                             {% for vacancy in vacancies %}
                                 <tr>
-                                    <td>{{ vacancy.id }}</td>
+                                    <td>{{ forloop.counter }}</td>
                                     <td><a href="{%url 'vacancy_detail' vacancy.id %}">{{ vacancy.title }}</a></td>
                                     <td>{% if vacancy.city %}
                                             {{ vacancy.city }},

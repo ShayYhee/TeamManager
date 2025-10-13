@@ -28,7 +28,7 @@
                 <table class="table table-hover table-bordered align-middle">
                     <thead class="table-light">
                         <tr>
-                            <th scope="col">ID</th>
+                            <th scope="col">No.</th>
                             <th scope="col">Event</th>
                             <th scope="col">User</th>
                             <th scope="col">Response</th>
@@ -39,7 +39,7 @@
                     <tbody id="eventParticipantTableBody">
                         {% for participant in participants %}
                         <tr>
-                            <td>{{ participant.id }}</td>
+                            <td>{{ forloop.counter }}</td>
                             <td><a href="{% url 'edit_event_participant' event_participant_id=participant.id %}">{{ participant.event.title }}</a></td>
                             <td>{{ participant.user.username|default:'—' }}</td>
                             <td>{{ participant.response|default:'—' }}</td>

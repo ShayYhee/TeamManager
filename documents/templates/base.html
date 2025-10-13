@@ -407,6 +407,7 @@
             <a href="{% url 'tenant_list' %}" {% if request.path == '/tenants/list/' %}class="active"{% endif %}><i class="fas fa-user-shield"></i>Tenants</a>
             <a href="{% url 'tracking_dashboard' %}" {% if request.path == '/tracking/' %}class="active"{% endif %}><i class="fas fa-chart-line"></i> Tracking</a>
             <a href="{% url 'admin:index' %}" {% if request.path|slice:":7" == '/admin/' %}class="active"{% endif %}><i class="fas fa-key"></i> Admin Panel</a>
+            <a href="{% url 'email_config' %}" {% if request.path == '/dashboard/email-config/' %}class="active"{% endif %}><i class="fas fa-cog"></i> Settings</a>
         {% elif user.tenant.slug == 'track' %}
             <div class="close-sidebar" id="close-sidebar" onclick="toggleSidebar()">
                 <i class="fa fa-window-close"></i>

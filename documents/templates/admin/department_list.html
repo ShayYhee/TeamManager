@@ -28,7 +28,7 @@
                 <table class="table table-hover table-bordered align-middle">
                     <thead class="table-light">
                         <tr>
-                            <th scope="col">ID</th>
+                            <th scope="col">No.</th>
                             <th scope="col">Name</th>
                             <th scope="col">HOD</th>
                             <th scope="col">Members</th>
@@ -38,7 +38,7 @@
                     <tbody id="departmentTableBody">
                         {% for department in departments %}
                         <tr>
-                            <td>{{ department.id }}</td>
+                            <td>{{ forloop.counter }}</td>
                             <td><a href="{% url 'edit_department' department_id=department.id %}">{{ department.name }}</a></td>
                             <td>{{ department.hod|default:'—' }}</td>
                             <td>{{ department.members.count }}</td>

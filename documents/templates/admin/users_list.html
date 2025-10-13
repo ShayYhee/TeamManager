@@ -40,7 +40,7 @@
                 <table class="table table-hover table-bordered align-middle">
                     <thead class="table-light">
                         <tr>
-                            <th scope="col">ID</th>
+                            <th scope="col">No.</th>
                             <th scope="col">Username</th>
                             <th scope="col">Full Name</th>
                             <th scope="col">Phone Number</th>
@@ -57,7 +57,7 @@
                     <tbody id="userTableBody">
                         {% for user in users %}
                         <tr>
-                            <td>{{ user.id }}</td>
+                            <td>{{ forloop.counter }}</td>
                             <td><a href="{% url 'view_user_details' user.id %}">{{ user.username }}</a></td>
                             <td>{{ user.first_name }} {{ user.last_name }}</td>
                             <td>{{ user.phone_number|default:'—' }}</td>

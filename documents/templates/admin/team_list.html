@@ -28,7 +28,7 @@
                 <table class="table table-hover table-bordered align-middle">
                     <thead class="table-light">
                         <tr>
-                            <th scope="col">ID</th>
+                            <th scope="col">No.</th>
                             <th scope="col">Name</th>
                             <th scope="col">Department</th>
                             <th scope="col">Created At</th>
@@ -39,7 +39,7 @@
                     <tbody id="teamTableBody">
                         {% for team in teams %}
                         <tr>
-                            <td>{{ team.id }}</td>
+                            <td>{{ forloop.counter }}</td>
                             <td><a href="{% url 'edit_team' team_id=team.id %}">{{ team.name }}</a></td>
                             <td>{{ team.department.name|default:'—' }}</td>
                             <td>{{ team.created_at|date:"d M Y" }}</td>

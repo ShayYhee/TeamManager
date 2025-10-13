@@ -189,6 +189,8 @@ urlpatterns = [
     # Vacancy Applications
     path('vacancy/apply/<int:vacancy_id>/', dv.create_vacancy_application, name='apply_vacancy'),
     path('vacancy/applications/', dv.vacancy_application_list, name='vacancy_application_list'),
+    path('vacancy/applications/<int:vacancy_id>/accepted/', dv.fetch_accepted_applications, name='fetch_accepted_applications'),
+    path('vacancy/applications/<int:vacancy_id>/rejected', dv.fetch_rejected_applications, name='fetch_rejected_applications'),
     path('vacancy/applications/<int:vacancy_id>/', dv.applications_per_vacancy, name='applications_per_vacancy'),
     path('vacancy/applications/<int:vacancy_id>/<int:application_id>/', dv.vacancy_application_detail, name='vacancy_application_detail'),
     path('vacancy/applications/<int:vacancy_id>/<int:application_id>/delete/', dv.delete_vacancy_application, name='delete_vacancy_app'),

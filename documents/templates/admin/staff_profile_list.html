@@ -28,7 +28,7 @@
                 <table class="table table-hover table-bordered align-middle">
                     <thead class="table-light">
                         <tr>
-                            <th scope="col">ID</th>
+                            <th scope="col">No.</th>
                             <th scope="col">User</th>
                             <th scope="col">Position</th>
                             <th scope="col">Department</th>
@@ -39,7 +39,7 @@
                     <tbody id="staffProfileTableBody">
                         {% for profile in staff_profiles %}
                         <tr>
-                            <td>{{ profile.id }}</td>
+                            <td>{{ forloop.counter }}</td>
                             <td><a href="{% url 'edit_staff_profile' staff_profile_id=profile.id %}">{{ profile.user.username }}</a></td>
                             <td>{{ profile.position|default:'—' }}</td>
                             <td>{{ profile.department.name|default:'—' }}</td>

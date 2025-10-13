@@ -28,22 +28,26 @@
                     <table class="table table-hover table-bordered align-middle">
                         <thead class="table-light">
                             <tr>
+                                <th>No.</th>
                                 <th>Vacancy</th>
                                 <th>No. of Applications</th>
                                 <th>Created By</th>
                                 <th>Created At</th>
-                                <th>View Applications</th>
+                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody id="vacancyTableBody">
                             {% for vacancy in vacancies %}
                                 <tr>
+                                    <td>{{ forloop.counter }}</td>
                                     <td><a href="{%url 'vacancy_detail' vacancy.id %}">{{ vacancy.title }}</a></td>
                                     <td>{{ vacancy.app_count }}</td>
                                     <td>{{ vacancy.created_by.username|default:"N/A" }}</td>
                                     <td>{{ vacancy.created_at }}</td>
                                     <td>
-                                        <a href="{% url 'applications_per_vacancy' vacancy.id %}" class="btn btn-sm btn-primary"><i class="fas fa-eye"></i> View</a>
+                                        <a href="{% url 'applications_per_vacancy' vacancy.id %}" class="btn btn-sm btn-secondary"><i class="fas fa-eye"></i> View Applications</a>
+                                        <a href="{% url 'fetch_accepted_applications' vacancy.id %}" class="btn btn-sm btn-primary"><i class="fas fa-eye"></i> View Accepted</a>
+                                        <a href="{% url 'fetch_rejected_applications' vacancy.id %}" class="btn btn-sm btn-danger"><i class="fas fa-eye"></i> View Rejected</a>
                                     </td>
                                 </tr>
                             {% endfor %}

@@ -926,7 +926,8 @@ function updateTabInputs(tab) {
         .then(data => {
             if (data.success) {
                 $('#renameFolderModal').modal('hide');
-                window.location.href = data.redirect_url || `{% url 'folder_view' %}?tab=${activeTab}`;
+                //window.location.href = data.redirect_url || `{% url 'folder_view' %}?tab=${activeTab}`;
+                window.location.reload();
             } else {
                 errorDiv.textContent = data.errors.name ? data.errors.name.join(' ') : 'An error occurred.';
             }
@@ -947,8 +948,10 @@ function updateTabInputs(tab) {
         const select = document.getElementById('moveFolderSelect');
         select.innerHTML = '<option value="">-- Select Destination --</option>';
         const folders = activeTab === 'public' ?
-            [{% for f in public_folders %}{id: {{ f.id }}, name: '{{ f.name|escapejs }}'}{% if not forloop.last %},{% endif %}{% endfor %}] :
-            [{% for f in personal_folders %}{id: {{ f.id }}, name: '{{ f.name|escapejs }}'}{% if not forloop.last %},{% endif %}{% endfor %}];
+            //[{% for f in public_folders %}{id: {{ f.id }}, name: '{{ f.name|escapejs }}'}{% if not forloop.last %},{% endif %}{% endfor %}] :
+            //[{% for f in personal_folders %}{id: {{ f.id }}, name: '{{ f.name|escapejs }}'}{% if not forloop.last %},{% endif %}{% endfor %}];
+            [{% for f in all_pub %}{id: {{ f.id }}, name: '{{ f.name|escapejs }}'}{% if not forloop.last %},{% endif %}{% endfor %}] :
+            [{% for f in all_per %}{id: {{ f.id }}, name: '{{ f.name|escapejs }}'}{% if not forloop.last %},{% endif %}{% endfor %}];
         folders.forEach(f => {
             if (f.id != folderId) {
                 const option = new Option(f.name, f.id);
@@ -1089,8 +1092,8 @@ function updateTabInputs(tab) {
         const select = document.getElementById('moveFileSelect');
         select.innerHTML = '<option value="">-- Select Destination Folder --</option>';
         const folders = activeTab === 'public' ?
-            [{% for f in public_folders %}{id: {{ f.id }}, name: '{{ f.name|escapejs }}'}{% if not forloop.last %},{% endif %}{% endfor %}] :
-            [{% for f in personal_folders %}{id: {{ f.id }}, name: '{{ f.name|escapejs }}'}{% if not forloop.last %},{% endif %}{% endfor %}];
+            [{% for f in all_pub %}{id: {{ f.id }}, name: '{{ f.name|escapejs }}'}{% if not forloop.last %},{% endif %}{% endfor %}] :
+            [{% for f in all_per %}{id: {{ f.id }}, name: '{{ f.name|escapejs }}'}{% if not forloop.last %},{% endif %}{% endfor %}];
         folders.forEach(f => {
             const option = new Option(f.name, f.id);
             select.appendChild(option);

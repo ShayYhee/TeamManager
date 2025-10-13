@@ -1237,6 +1237,8 @@ def folder_view(request, public_folder_id=None, personal_folder_id=None):
 
     # Get active tab, default to 'public'
     active_tab = request.GET.get('tab', 'public')
+    all_pub = Folder.objects.filter(tenant=request.tenant, is_public=True)
+    all_per = Folder.objects.filter(tenant=request.tenant, is_public=False)
 
     # Public tab context
     public_parent = None
@@ -1327,6 +1329,8 @@ def folder_view(request, public_folder_id=None, personal_folder_id=None):
         'personal_files': personal_files,
         'folder_form': folder_form,
         'file_form': file_form,
+        'all_pub': all_pub,
+        'all_per': all_per,
     })
 
 @login_required
@@ -1359,7 +1363,20 @@ def create_folder(request):
                     return JsonResponse({'success': False, 'errors': 'Parent folder not found.'}, status=400)
             
             folder.save()
-            return JsonResponse({'success': True, 'redirect_url': f'/folders/?tab={active_tab}'})
+            # return JsonResponse({'success': True, 'redirect_url': f'/folders/?tab={active_tab}'})
+            if folder.parent:
+                if folder.is_public:
+                    url_name = 'folder_view_public'
+                    kwargs = {'public_folder_id': folder.parent.id}
+                else:
+                    url_name = 'folder_view_personal'
+                    kwargs = {'personal_folder_id': folder.parent.id}
+            else:
+                url_name = 'folder_view'
+                kwargs = {}
+
+            # return redirect(f"{reverse(url_name, kwargs=kwargs)}?tab={active_tab}")
+            return JsonResponse({'success': True, 'redirect_url': f'{reverse(url_name, kwargs=kwargs)}?tab={active_tab}'})
         else:
             return JsonResponse({'success': False, 'errors': form.errors}, status=400)
     
@@ -1372,8 +1389,21 @@ def delete_folder(request, folder_id):
     folder = get_object_or_404(Folder, id=folder_id, created_by=request.user, tenant=request.tenant)
     if folder.created_by != request.user:
         return HttpResponseForbidden("You are not authorized to delete this folder.")
+    if folder.parent:
+        if folder.is_public:
+            url_name = 'folder_view_public'
+            kwargs = {'public_folder_id': folder.parent.id}
+            active_tab = 'public'
+        else:
+            url_name = 'folder_view_personal'
+            kwargs = {'personal_folder_id': folder.parent.id}
+            active_tab = 'personal'
+    else:
+        url_name = 'folder_view'
+        kwargs = {}
     folder.delete()
-    return JsonResponse({'success': True})
+    return JsonResponse({'success': True, 'redirect_url': f'{reverse(url_name, kwargs=kwargs)}?tab={active_tab}'})
+    # return JsonResponse({'success': True})
     # return JsonResponse({'success': False, 'errors': form.errors}, status=400)
 
 @login_required
@@ -1401,7 +1431,27 @@ def upload_file(request, public_folder_id=None, personal_folder_id=None):
                     return JsonResponse({"success": False, "errors": "Folder not found."}, status=400)
             
             uploaded_file.save()
-            return JsonResponse({"success": True, "redirect_url": f'/folders/?tab={active_tab}'})
+            folder = uploaded_file.folder
+            if folder.parent:
+                if folder.is_public:
+                    url_name = 'folder_view_public'
+                    kwargs = {'public_folder_id': folder.parent.id}
+                    active_tab = 'public'
+                else:
+                    url_name = 'folder_view_personal'
+                    kwargs = {'personal_folder_id': folder.parent.id}
+                    active_tab = 'personal'
+            else:
+                if folder.is_public:
+                    url_name = 'folder_view_public'
+                    kwargs = {'public_folder_id': folder.id}
+                    active_tab = 'public'
+                else:
+                    url_name = 'folder_view_personal'
+                    kwargs = {'personal_folder_id': folder.id}
+                    active_tab = 'personal'
+            # return JsonResponse({"success": True, "redirect_url": f'/folders/?tab={active_tab}'})
+            return JsonResponse({'success': True, 'redirect_url': f'{reverse(url_name, kwargs=kwargs)}?tab={active_tab}'})
         else:
             return JsonResponse({"success": False, "errors": form.errors}, status=400)
     
@@ -1693,7 +1743,21 @@ def move_folder(request, folder_id):
         if new_parent_id:
             folder.parent = Folder.objects.get(id=new_parent_id, tenant=request.tenant)
             folder.save()
-        return JsonResponse({'success': True})
+
+        if folder.parent:
+            if folder.is_public:
+                url_name = 'folder_view_public'
+                kwargs = {'public_folder_id': folder.parent.id}
+                active_tab = 'public'
+            else:
+                url_name = 'folder_view_personal'
+                kwargs = {'personal_folder_id': folder.parent.id}
+                active_tab = 'personal'
+        else:
+            url_name = 'folder_view'
+            kwargs = {}
+        return JsonResponse({'success': True, 'redirect_url': f'{reverse(url_name, kwargs=kwargs)}?tab={active_tab}'})
+        # return JsonResponse({'success': True})
     return JsonResponse({'success': False}, status=400)
 
 
@@ -3695,9 +3759,9 @@ def email_list(request):
         # return HttpResponseForbidden("You are not authorized for this tenant.")
         return render(request, 'error.html', {'message': 'You are not authorized for this company.'})
         
-    email_list = Email.objects.filter(tenant=request.tenant, sender=request.user)
-    email_list_draft = Email.objects.filter(tenant=request.tenant, sender=request.user, sent=False)
-    email_list_sent = Email.objects.filter(tenant=request.tenant, sender=request.user, sent=True)
+    email_list = Email.objects.filter(tenant=request.tenant, sender=request.user).order_by('-created_at')
+    email_list_draft = Email.objects.filter(tenant=request.tenant, sender=request.user, sent=False).order_by('-created_at')
+    email_list_sent = Email.objects.filter(tenant=request.tenant, sender=request.user, sent=True).order_by('-created_at')
     page_number = request.GET.get('page')
     paginator = Paginator(email_list, 10)  # 10 emails per page
     page_obj = paginator.get_page(page_number)
@@ -4200,6 +4264,12 @@ def send_vacancy_accepted_mail(request, application_id):
     candidate_name = vacancy_application.first_name
     company = vacancy_application.tenant
 
+    if hr.email_provider and hr.email_address and hr.email_password:
+        cc = []
+    else:
+        cc = [hr.email]
+    
+    print("CC: ", cc)
 
     if not sender_email or not sender_password:
         return HttpResponseForbidden("Your email credentials are missing. Contact admin.")
@@ -4224,12 +4294,13 @@ def send_vacancy_accepted_mail(request, application_id):
 
     Human Resouces Team, 
     {company}
+    {hr.email}
     """
 
     print("Sending mail...")
 
     # Create email with attachment
-    email = EmailMessage(subject, message, sender_email, [vacancy_application.email], connection=connection)
+    email = EmailMessage(subject=subject, body=message, from_email=sender_email, to=[vacancy_application.email], cc=cc, connection=connection)
     email.send()
     
     print("Mail Sent")
@@ -4249,6 +4320,12 @@ def send_vacancy_rejected_mail(request, application_id):
     candidate_name = vacancy_application.first_name.capitalize()
     company = vacancy_application.tenant.name
 
+    if hr.email_provider and hr.email_address and hr.email_password:
+        cc = []
+    else:
+        cc = [hr.email]
+    
+    print("CC: ", cc)
 
     if not sender_email or not sender_password:
         return HttpResponseForbidden("Your email credentials are missing. Contact admin.")
@@ -4273,53 +4350,16 @@ def send_vacancy_rejected_mail(request, application_id):
 
     Human Resouces Team, 
     {company}
+    {hr.email}
     """
 
     print("Sending mail...")
 
     # Create email with attachment
-    email = EmailMessage(subject, message, sender_email, [vacancy_application.email], connection=connection)
+    email = EmailMessage(subject=subject, body=message, from_email=sender_email, to=[vacancy_application.email], cc=cc, connection=connection)
     email.send()
     
     print("Mail Sent")
-
-@login_required
-@user_passes_test(is_hr)
-def accept_vacancy_application(request, vacancy_id, application_id):
-    if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
-        print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
-        return render(request, 'tenant_error.html', {'error_code': '401','message': 'You are not authorized for this company.'})
-    
-    vacancy = get_object_or_404(Vacancy, id=vacancy_id)
-    vacancy_application = get_object_or_404(VacancyApplication, id=application_id, tenant=request.tenant, vacancy=vacancy)
-    if request.method == 'POST':
-        status = request.POST.get('accepted')
-        if status == 'accepted':
-            vacancy_application.status = status
-            vacancy_application.save()
-            send_vacancy_accepted_mail(request, application_id)
-            return JsonResponse({"success": True, "vacancy_id": vacancy_application.id})
-    
-    return JsonResponse({"success": False, "error": "Method not allowed"}, status=405)
-
-@login_required
-@user_passes_test(is_hr)
-def reject_vacancy_application(request, vacancy_id, application_id):
-    if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
-        print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
-        return render(request, 'tenant_error.html', {'error_code': '401','message': 'You are not authorized for this company.'})
-    
-    vacancy = get_object_or_404(Vacancy, id=vacancy_id)
-    vacancy_application = get_object_or_404(VacancyApplication, id=application_id, tenant=request.tenant, vacancy=vacancy)
-    if request.method == 'POST':
-        status = request.POST.get('rejected')
-        if status == 'rejected':
-            vacancy_application.status = status
-            vacancy_application.save()
-            send_vacancy_rejected_mail(request, application_id)
-            return JsonResponse({"success": True, "vacancy_id": vacancy_application.id})
-    
-    return JsonResponse({"success": False, "error": "Method not allowed"}, status=405)
     
 # non-form accept, reject vacancy application
 @login_required
@@ -4347,3 +4387,31 @@ def reject_vac_app(request, application_id):
     vacancy_application.save()
     send_vacancy_rejected_mail(request, application_id)
     return redirect('vacancy_application_detail', vacancy_id=vacancy_application.vacancy.id, application_id=vacancy_application.id)
+
+@login_required
+@user_passes_test(is_hr)
+def fetch_accepted_applications(request, vacancy_id):
+    if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+        print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
+        return render(request, 'tenant_error.html', {'error_code': '401','message': 'You are not authorized for this company.'})
+    
+    vacancy = get_object_or_404(Vacancy, id=vacancy_id, tenant=request.tenant)
+    applications = VacancyApplication.objects.filter(vacancy=vacancy, status='accepted')
+    paginator = Paginator(applications, 10)  # 10 applications per page
+    page = request.GET.get('page')
+    page_obj = paginator.get_page(page)
+    return render(request, 'hr/accepted_applications.html', {'applications': page_obj, 'vacancy': vacancy})
+
+@login_required
+@user_passes_test(is_hr)
+def fetch_rejected_applications(request, vacancy_id):
+    if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+        print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
+        return render(request, 'tenant_error.html', {'error_code': '401','message': 'You are not authorized for this company.'})
+    
+    vacancy = get_object_or_404(Vacancy, id=vacancy_id, tenant=request.tenant)
+    applications = VacancyApplication.objects.filter(vacancy=vacancy, status='rejected')
+    paginator = Paginator(applications, 10)  # 10 applications per page
+    page = request.GET.get('page')
+    page_obj = paginator.get_page(page)
+    return render(request, 'hr/rejected_applications.html', {'applications': page_obj, 'vacancy': vacancy})
