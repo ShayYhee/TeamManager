@@ -1,0 +1,153 @@
+import logging
+from django.contrib.auth.decorators import login_required
+from Raadaa.documents.forms import ContactForm, SupportForm
+from django.core.mail import EmailMessage
+from Raadaa.documents.models import Contact
+from django.http import HttpResponseForbidden, JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
+from django.core.paginator import Paginator
+
+from Raadaa.documents.viewfuncs.mail_connection import get_email_smtp_connection
+
+
+logger = logging.getLogger(__name__)
+
+@login_required
+def contact_list(request):
+    if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+        print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
+        return HttpResponseForbidden("You are not authorized for this company.")
+    contact_list_dept = Contact.objects.filter(tenant=request.tenant, department=request.user.department, is_public=True)
+    contact_list_personal = Contact.objects.filter(tenant=request.tenant, created_by=request.user)
+    contact_list = contact_list_dept | contact_list_personal
+    paginator = Paginator(contact_list, 10)  # 10 users per page
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    paginator_dept = Paginator(contact_list_dept, 10)  # 10 users per page
+    page_obj_dept = paginator_dept.get_page(page_number)
+    paginator_personal = Paginator(contact_list_personal, 10)  # 10 users per page
+    page_obj_personal = paginator_personal.get_page(page_number)
+    return render(request, 'dashboard/contact_list.html', {'contact_list': page_obj, 'contact_list_dept': page_obj_dept, 'contact_list_personal': page_obj_personal})
+
+@login_required
+def create_contact(request):
+    if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+        print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
+        # return HttpResponseForbidden("You are not authorized for this tenant.")
+        return render(request, 'error.html', {'message': 'You are not authorized for this company.'})
+    if request.method == "POST":
+        form = ContactForm(request.POST)
+        if form.is_valid():
+            contact = form.save(commit=False)
+            contact.tenant = request.tenant
+            contact.department = request.user.department
+            contact.team = request.user.teams.first()
+            contact.created_by = request.user
+            contact.save()
+            return redirect("contact_list")
+    else:
+        form = ContactForm()
+    return render(request, "dashboard/create_contact.html", {"form": form})
+
+@login_required
+def view_contact_detail(request, contact_id):
+    contact = get_object_or_404(Contact, id=contact_id, tenant=request.tenant)
+    data = {
+        'id': contact.id,
+        'name': contact.name,
+        'email': contact.email,
+        'phone': contact.phone or '',
+        'organization': contact.organization or '',
+        'designation': contact.designation or '',
+        'priority': contact.priority or '',
+        'department': contact.department.name if contact.department else None,
+        'team': contact.team.name if contact.team else None,
+        'is_public': contact.is_public,
+        'created_by': contact.created_by.username,
+        'created_at': contact.created_at.isoformat(),
+        'updated_by': contact.updated_by.username if contact.updated_by else None,
+        'updated_at': contact.updated_at.isoformat()
+    }
+    return JsonResponse(data)
+
+@login_required
+def edit_contact(request, contact_id):
+    if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+        print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
+        # return HttpResponseForbidden("You are not authorized for this tenant.")
+        return render(request, 'error.html', {'message': 'You are not authorized for this company.'})
+    contact = get_object_or_404(Contact, id=contact_id, tenant=request.tenant)
+    print(f"Contact to edit: {contact}")
+    if request.method == "POST":
+        form = ContactForm(request.POST, instance=contact)
+        if form.is_valid():
+            contact = form.save(commit=False)
+            contact.tenant = request.tenant
+            contact.updated_by = request.user
+            contact.save()
+            return redirect("contact_list")
+    else:
+        form = ContactForm(instance=contact)
+    return render(request, "dashboard/edit_contact.html", {"form": form})
+
+@login_required
+def delete_contact(request, contact_id):
+    if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+        print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
+        # return HttpResponseForbidden("You are not authorized for this tenant.")
+        return render(request, 'error.html', {'message': 'You are not authorized for this company.'})
+    contact = get_object_or_404(Contact, id=contact_id, tenant=request.tenant)
+    if contact.created_by != request.user:
+        return JsonResponse({'success': False, 'errors': {'folder': ['You can only delete your own contacts']}}, status=403)
+    contact.delete()
+    return redirect("contact_list")
+
+@login_required
+def contact_search(request):
+    query = request.GET.get('q', '')
+    contacts = Contact.objects.filter(
+        tenant=request.user.tenant,  # Assuming tenant-based filtering
+        email__icontains=query
+    )[:10]  # Limit to 10 results
+    results = [{'email': contact.email, 'name': contact.name} for contact in contacts]
+    return JsonResponse(results, safe=False)
+
+def contact_support(request):
+    if request.method == 'POST':
+        print("POST data: %s", dict(request.POST))
+        files = request.FILES.getlist('attachments')
+        print("FILES data: %s", request.FILES)
+        print(("FILES data: %s", [(f.name, f.size, f.content_type) for f in files] if files else "No files received"))
+        form = SupportForm(request.POST, request.FILES)
+        if form.is_valid():
+            try:
+                # Create email
+                email = EmailMessage(
+                    subject=form.cleaned_data['subject'],
+                    body=form.cleaned_data['message'],
+                    from_email=request.user.email_address if request.user.is_authenticated else 'no-reply@teammanager.ng',
+                    to=['faith.osebi@transnetcloud.com'],
+                    connection=get_email_smtp_connection(request.user.email_provider, request.user.email_address, request.user.email_password)
+                )
+                
+                # Handle attachments
+                for f in request.FILES.getlist('attachments'):
+                    print(("Attaching file: %s (size: %s, type: %s)", f.name, f.size, f.content_type))
+                    email.attach(f.name, f.read(), f.content_type)
+
+                # for f in form.cleaned_data.get('attachments', []):
+                #     print(("Attaching file: %s (size: %s, type: %s)", f.name, f.size, f.content_type))
+                #     email.attach(f.name, f.read(), f.content_type)
+                
+                # Send email
+                email.send()
+                return JsonResponse({'success': True})
+            except Exception as e:
+                print(("Email sending error: %s", str(e)))
+                return JsonResponse({'success': False, 'error': str(e)})
+        else:
+            print(("Form errors: %s", form.errors))
+            return JsonResponse({'success': False, 'error': 'Invalid form data'})
+    else:
+        form = SupportForm()
+    return render(request, 'dashboard/contact_support.html', {'form': form})
