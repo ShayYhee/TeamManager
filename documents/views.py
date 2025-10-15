@@ -2,7 +2,7 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.models import User
 from django.contrib.admin.models import LogEntry, CHANGE, ADDITION, DELETION
-from django.contrib.auth import login, get_user_model, logout
+from django.contrib.auth import login, get_user_model, logout # type: ignore
 from django.contrib.auth.signals import user_logged_in
 from django.contrib.auth.tokens import default_token_generator
 from django.contrib.auth.views import LoginView
