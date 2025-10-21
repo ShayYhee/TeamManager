@@ -9,24 +9,64 @@ from django.core.mail import send_mail, EmailMessage
 from django.template.loader import render_to_string
 
 
-# Send Account registration Confirmation
+# # Send Account registration Confirmation
+# def send_reg_confirm(request, user, admin_user, sender_provider, sender_email, sender_password):
+#     connection, error_message = get_email_smtp_connection(sender_provider, sender_email, sender_password)
+#     base_domain = "127.0.0.1:8000" if settings.DEBUG else "teammanager.ng"
+#     protocol = "http" if settings.DEBUG else "https"
+#     login_url = f"{protocol}://{request.tenant.slug}.{base_domain}/accounts/login"
+#     subject = f"Account Pending Approval: {user.username}"
+#     message = f"""
+#     Dear {user.username},
+
+#     Your account has been created and is pending approval. You will be notified once approved. 
+#     Once activated, you can log in at: {login_url}
+
+#     Best regards,  
+#     {admin_user.get_full_name() or admin_user.username}
+#     """
+#     try:
+#         send_mail(subject, message, sender_email, [user.email], connection=connection)
+#     except Exception as e:
+#         print(f"Failed to send email: {e}")
+
 def send_reg_confirm(request, user, admin_user, sender_provider, sender_email, sender_password):
     connection, error_message = get_email_smtp_connection(sender_provider, sender_email, sender_password)
+    
     base_domain = "127.0.0.1:8000" if settings.DEBUG else "teammanager.ng"
     protocol = "http" if settings.DEBUG else "https"
     login_url = f"{protocol}://{request.tenant.slug}.{base_domain}/accounts/login"
-    subject = f"Account Pending Approval: {user.username}"
-    message = f"""
-    Dear {user.username},
 
-    Your account has been created and is pending approval. You will be notified once approved. 
-    Once activated, you can log in at: {login_url}
+    # Prepare context for the template
+    context = {
+        'username': user.username,
+        'full_name': user.get_full_name() or user.username,
+        'admin_name': admin_user.get_full_name() or admin_user.username,
+        'tenant_name': request.tenant.name,
+        'login_url': login_url,
+        'protocol': protocol,
+    }
 
-    Best regards,  
-    {admin_user.get_full_name() or admin_user.username}
-    """
+    # Render HTML content
+    html_content = render_to_string('emails/reg_conf.html', context)
+
+    subject = f"Account Pending Approval - {request.tenant.name}"
+
     try:
-        send_mail(subject, message, sender_email, [user.email], connection=connection)
+        # Create and send HTML email
+        email = EmailMessage(
+            subject=subject,
+            body=html_content,
+            from_email=sender_email,
+            to=[user.email],
+            connection=connection
+        )
+        
+        # Specify that this is HTML email
+        email.content_subtype = "html"
+        
+        email.send()
+        
     except Exception as e:
         print(f"Failed to send email: {e}")
 
