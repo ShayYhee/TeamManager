@@ -3,7 +3,7 @@
 # Create function for Editor documents in editor_docs.py
 
 from django.contrib.auth.decorators import login_required, user_passes_test
-from django.http.response import HttpResponseForbidden
+from django.http import HttpResponseForbidden
 from django.shortcuts import render, redirect, get_object_or_404
 from django.core.paginator import Paginator
 from documents.models import Document, CustomUser

@@ -6,7 +6,7 @@ from bs4 import BeautifulSoup
 from ckeditor_uploader.views import upload as ckeditor_upload
 from documents.forms import CreateDocumentForm
 from documents.models import Folder, File, Document
-from django.http.response import HttpResponseForbidden
+from django.http import HttpResponseForbidden
 from django.core.exceptions import ValidationError
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required

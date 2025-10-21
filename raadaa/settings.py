@@ -16,6 +16,7 @@ from dotenv import load_dotenv
 import dj_database_url
 
 dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
+# dotenv_path = '.env'
 load_dotenv(dotenv_path)
 
 SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'insecure-key-for-dev-only')

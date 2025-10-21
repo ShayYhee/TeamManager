@@ -4,27 +4,32 @@ from documents.models import CustomUser
 from raadaa import settings
 from .mail_connection import get_email_smtp_connection
 from django.shortcuts import render
-from django.http.response import HttpResponseForbidden
+from django.http import HttpResponseForbidden
 from django.core.mail import send_mail, EmailMessage
 
+main_superuser = CustomUser.objects.filter(is_superuser=True).first()
+
 # Send Account registration Confirmation
-def send_reg_confirm(request, user, admin_user, sender_provider, sender_email, sender_password):
+def send_reg_confirm(request, user, admin_user, sender_provider, sender_email, sender_password, sender):
+    sender_password = sender.get_smtp_password()
     connection, error_message = get_email_smtp_connection(sender_provider, sender_email, sender_password)
     base_domain = "127.0.0.1:8000" if settings.DEBUG else "teammanager.ng"
     protocol = "http" if settings.DEBUG else "https"
     login_url = f"{protocol}://{request.tenant.slug}.{base_domain}/accounts/login"
-    subject = f"Account Pending Approval: {user.username}"
+    subject = f"Account Approval: {user.username}"
     message = f"""
     Dear {user.username},
 
-    Your account has been created and is pending approval. You will be notified once approved. 
-    Once activated, you can log in at: {login_url}
+    Your account has been successfully created. 
+    You can log in at: {login_url}
 
     Best regards,  
     {admin_user.get_full_name() or admin_user.username}
+    {admin_user.email}
     """
     try:
-        send_mail(subject, message, sender_email, [user.email], connection=connection)
+        email = EmailMessage(subject, message, sender_email, [user.email], connection=connection, cc=[admin_user.email])
+        email.send()
     except Exception as e:
         print(f"Failed to send email: {e}")
 
@@ -140,4 +145,134 @@ def send_approved_email_client(sender_provider, sender_email, sender_password, d
     # Create email with attachment
     email = EmailMessage(subject, message, sender_email, recipient, cc=cc_list, connection=connection)
     email.attach_file(document.pdf_file.path)  # Attach the PDF
+    email.send()
+
+def send_user_approved_email(request, user, admin_user, sender_provider, sender_email, sender_password):
+
+    # Set up email connection
+    connection, error_message = get_email_smtp_connection(sender_provider, sender_email, sender_password)
+
+    # Generate tenant-specific login URL
+    # Determine base domain based on environment
+    if settings.DEBUG:
+        base_domain = "127.0.0.1:8000"  # Local development
+        protocol = "http"
+    else:
+        base_domain = "teammanager.ng"  # Production
+        protocol = "https"
+
+    # Generate tenant-specific login URL
+    login_url = f"{protocol}://{request.tenant.slug}.{base_domain}/accounts/login"
+
+    # Prepare email
+    subject = f"Account Approval: {user.username}"
+    message = f"""
+    Dear {user.username},
+
+    Your account has been activated. Please click the link below to log in:
+    {login_url}
+
+    Best regards,  
+    {admin_user.get_full_name() or admin_user.username}
+    """
+
+    print("Sending mail...")
+
+    try:
+        # Send email to the user
+        send_mail(
+            subject,
+            message,
+            sender_email,
+            [user.email],
+            connection=connection,
+        )
+    except Exception as e:
+        print(f"Failed to send email: {e}")
+        return HttpResponseForbidden("Failed to send approval email. Contact admin.")
+    
+
+def send_vac_app_received_email(sender_provider, sender_email, sender_password, company, candidate_name, vacancy_application, vacancy):
+    connection, error_message = get_email_smtp_connection(sender_provider, sender_email, sender_password)
+
+    subject = f"Application Received for {vacancy.title} Role"
+    message = f"""
+    Dear {candidate_name},
+
+    You have successfully applied for the {vacancy.title} position at {company}.
+
+    You will receive an email once the hiring manager reviews your application.
+
+    Please be sure to keep a close eye on your email inbox (including your spam or promotions folder) so you don't miss our message.
+
+    Best regards,
+
+    Human Resouces Team, 
+    {company}
+    """
+
+    print("Sending mail...")
+
+    # Create email with attachment
+    email = EmailMessage(subject, message, sender_email, [vacancy_application.email], connection=connection)
+    email.send()
+
+def send_vac_app_accepted_email(sender_provider, sender_email, sender_password, company, candidate_name, hr, cc, vacancy_application, vacancy):
+    connection, error_message = get_email_smtp_connection(sender_provider, sender_email, sender_password)
+
+    subject = f"You're Moving Forward! Next Steps for the {vacancy.title} Role"
+    message = f"""
+    Dear {candidate_name},
+
+    Congratulations! Thank you for your application for the {vacancy.title} position at {company}. We were thoroughly impressed with your background, and we are excited to inform you that you have been selected to move forward in our hiring process!
+
+    Your next step is to stay tuned. Our team is currently coordinating the next phase, and you will be receiving a follow-up email from us shortly with detailed instructions.
+
+    Please be sure to keep a close eye on your email inbox (including your spam or promotions folder) so you don't miss our message.
+
+    We are very much looking forward to connecting with you soon and learning more about how you could contribute to our team at {company}.
+
+    If you have any immediate questions, please feel free to reply to this email.
+
+    Best regards,
+
+    Human Resouces Team, 
+    {company}
+    {hr.email}
+    """
+
+    print("Sending mail...")
+
+    # Create email with attachment
+    email = EmailMessage(subject=subject, body=message, from_email=sender_email, to=[vacancy_application.email], cc=cc, connection=connection)
+    email.send()
+
+def send_vac_app_rejected_email(sender_provider, sender_email, sender_password, company, candidate_name, hr, cc, vacancy_application, vacancy):
+    connection, error_message = get_email_smtp_connection(sender_provider, sender_email, sender_password)
+
+    subject = f"An Update on Your Application for {vacancy.title} Role"
+    message = f"""
+    Dear {candidate_name},
+
+    Thank you for taking the time to apply for the {vacancy.title} position at {company} and for your interest in joining our team.
+
+    We appreciate the opportunity to learn about your skills and accomplishments. After careful review, we have decided to move forward with candidates whose experience more closely aligns with the specific requirements of this role.
+
+    This was a difficult decision due to the high volume of qualified applicants we received.
+
+    We encourage you to keep an eye on our careers page for future opportunities that may be a better fit for your background
+
+    We wish you the very best in your job search and future endeavors.
+
+    Sincerely,
+
+    Human Resouces Team, 
+    {company}
+    {hr.email}
+    """
+
+    print("Sending mail...")
+
+    # Create email with attachment
+    email = EmailMessage(subject=subject, body=message, from_email=sender_email, to=[vacancy_application.email], cc=cc, connection=connection)
     email.send()

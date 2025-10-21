@@ -1,9 +1,9 @@
-from django.contrib.auth.decorators import user_passes_test
-from Raadaa.documents.forms import EditUserForm, UserForm
-from Raadaa.documents.models import CustomUser
-from Raadaa.documents.viewfuncs.mail_connection import get_email_smtp_connection
-from Raadaa.raadaa import settings
-from rba_decorators import is_admin 
+from django.contrib.auth.decorators import user_passes_test, login_required
+from documents.forms import EditUserForm, UserForm
+from documents.models import CustomUser
+from documents.viewfuncs.mail_connection import get_email_smtp_connection
+from raadaa import settings
+from ..rba_decorators import is_admin 
 from django.http import HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.contrib.admin.models import LogEntry, CHANGE, ADDITION, DELETION
@@ -11,6 +11,7 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.mail import send_mail
 from django.core.paginator import Paginator
 from django.core.exceptions import PermissionDenied
+from ..send_mails import send_user_approved_email
 
 main_superuser = CustomUser.objects.filter(is_superuser=True).first()
 
@@ -28,6 +29,7 @@ def users_list(request):
     count = users.count()
     return render(request, "admin/users_list.html", {"users": page_obj, 'count': count})
 
+@login_required
 @user_passes_test(is_admin)
 def create_user(request):
     if request.user.tenant != request.tenant:
@@ -52,6 +54,7 @@ def create_user(request):
         form = UserForm(tenant=request.tenant)
     return render(request, "admin/create_user.html", {"form": form})
 
+@login_required
 @user_passes_test(is_admin)
 def view_user_details(request, user_id):
     # Validate that the admin belongs to the current tenant
@@ -69,6 +72,8 @@ def view_user_details(request, user_id):
         raise PermissionDenied("User not found or does not belong to your company.")
 
     return render(request, "admin/view_user_details.html", {"user_view": user_view, "details": details})
+
+@login_required
 @user_passes_test(is_admin)
 # @user_passes_test(lambda u: u.is_superuser)
 def approve_user(request, user_id):
@@ -86,6 +91,7 @@ def approve_user(request, user_id):
     user.is_active = True
     user.save()
 
+    # Send user approved email
     # Use the admin's email credentials (request.user is already the admin)
     admin_user = request.user
     if admin_user.email_address and admin_user.email_password:
@@ -98,53 +104,14 @@ def approve_user(request, user_id):
         sender_email = superuser.email_address
         sender_password = superuser.email_password
 
-    if not sender_email or not sender_password:
+    if not sender_provider or not sender_email or not sender_password:
         return HttpResponseForbidden("Your email credentials are missing. Contact admin.")
-
-    # Set up email connection
-    connection, error_message = get_email_smtp_connection(sender_provider, sender_email, sender_password)
-
-    # Generate tenant-specific login URL
-    # Determine base domain based on environment
-    if settings.DEBUG:
-        base_domain = "127.0.0.1:8000"  # Local development
-        protocol = "http"
-    else:
-        base_domain = "teammanager.ng"  # Production
-        protocol = "https"
-
-    # Generate tenant-specific login URL
-    login_url = f"{protocol}://{request.tenant.slug}.{base_domain}/accounts/login"
-
-    # Prepare email
-    subject = f"Account Approval: {user.username}"
-    message = f"""
-    Dear {user.username},
-
-    Your account has been activated. Please click the link below to log in:
-    {login_url}
-
-    Best regards,  
-    {admin_user.get_full_name() or admin_user.username}
-    """
-
-    print("Sending mail...")
-
-    try:
-        # Send email to the user
-        send_mail(
-            subject,
-            message,
-            sender_email,
-            [user.email],
-            connection=connection,
-        )
-    except Exception as e:
-        print(f"Failed to send email: {e}")
-        return HttpResponseForbidden("Failed to send approval email. Contact admin.")
+    
+    send_user_approved_email(request, user, admin_user, sender_provider, sender_email, sender_password)
 
     return redirect("users_list")
 
+@login_required
 @user_passes_test(is_admin)
 def edit_user(request, user_id):
     # Validate that the admin belongs to the current tenant
@@ -172,3 +139,20 @@ def edit_user(request, user_id):
     else:
         form = EditUserForm(instance=user, tenant=request.tenant)
     return render(request, "admin/edit_user.html", {"form": form})
+
+@login_required
+@user_passes_test(is_admin)
+def delete_user(request, user_id):
+    # Validate that the admin belongs to the current tenant
+    if request.user.tenant != request.tenant:
+        return HttpResponseForbidden("Unauthorized: Admin does not belong to this company.")
+
+    # Get the user, ensuring they belong to the same tenant
+    user = get_object_or_404(CustomUser, id=user_id, tenant=request.tenant)
+
+    # Prevent admins from deleting themselves
+    if user == request.user:
+        return HttpResponseForbidden("You cannot delete your own account.")
+
+    user.delete()
+    return redirect("users_list")

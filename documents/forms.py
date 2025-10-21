@@ -393,6 +393,13 @@ class EmailConfigForm(forms.ModelForm):
             'email_password': forms.PasswordInput(attrs={'class': 'form-control'}),
         }
 
+    def save(self, commit=True):
+            instance = super().save(commit=False)
+            instance.set_smtp_password(self.cleaned_data['email_password'])
+            if commit:
+                instance.save()
+            return instance
+
 class DepartmentForm(forms.ModelForm):
     class Meta:
         model = Department

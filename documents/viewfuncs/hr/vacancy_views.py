@@ -1,9 +1,9 @@
 from datetime import timezone
 import logging
 from django.contrib.auth.decorators import login_required, user_passes_test
-from Raadaa.documents.forms import VacancyForm
-from Raadaa.documents.models import Vacancy
-from rba_decorators import is_hr
+from documents.forms import VacancyForm
+from documents.models import Vacancy
+from ..rba_decorators import is_hr
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.core.paginator import Paginator

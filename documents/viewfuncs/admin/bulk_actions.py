@@ -1,8 +1,8 @@
 from django.contrib.auth.decorators import user_passes_test
-from Raadaa.documents.models import CustomUser, Document, Folder, File, Task, Department, Team, Event, EventParticipant, StaffProfile, Notification, UserNotification
-from Raadaa.documents.viewfuncs.mail_connection import get_email_smtp_connection
-from Raadaa.raadaa import settings
-from rba_decorators import is_admin 
+from documents.models import CustomUser, Document, Folder, File, Task, Department, Team, Event, EventParticipant, StaffProfile, Notification, UserNotification
+from documents.viewfuncs.mail_connection import get_email_smtp_connection
+from raadaa import settings
+from ..rba_decorators import is_admin 
 from django.http import HttpResponseForbidden
 from django.shortcuts import redirect
 from django.contrib.admin.models import LogEntry, CHANGE, ADDITION, DELETION

@@ -1,11 +1,10 @@
 import logging
 from django.http import HttpResponseRedirect
 from django.shortcuts import render
-from Raadaa.documents.forms import EmailConfigForm
-from Raadaa.documents.models import CustomUser
+from documents.forms import EmailConfigForm
+from documents.models import CustomUser
 from django.contrib.auth.decorators import login_required
-
-from mail_connection import get_email_smtp_connection
+from .mail_connection import get_email_smtp_connection
 
 
 logger = logging.getLogger(__name__)
@@ -28,7 +27,7 @@ def email_config(request):
                 user = request.user
                 user.email_provider = email_provider
                 user.email_address = email_address
-                user.email_password = email_password  # Consider encrypting
+                user.set_smtp_password(email_password)  # Consider encrypting
                 user.save()
                 logger.info(f"Email config saved for {email_address}")
                 return HttpResponseRedirect("/dashboard/email-config/success/")
@@ -69,6 +68,14 @@ def email_config(request):
                     error_context["message"] = (
                         "iCloud requires an app-specific password for third-party apps. "
                         "Please generate one in your Apple ID settings and try again."
+                    )
+                elif email_provider == "zeptomail":
+                    error_context["provider"] = "ZeptoMail"
+                    error_context["help_url"] = "https://www.zoho.com/zeptomail/help/smtp-home.html"
+                    error_context["message"] = (
+                        "Failed to connect to ZeptoMail. Please verify your SendMail Token and ensure the email address "
+                        "(e.g., no-reply@teammanager.ng) is verified in your ZeptoMail dashboard. "
+                        "Check if your account has sufficient credits or is not blocked."
                     )
                 else:
                     error_context["provider"] = email_provider.capitalize()

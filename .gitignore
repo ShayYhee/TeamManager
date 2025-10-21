@@ -8,3 +8,5 @@ terminal.txt
 .DS_Store
 documents/.DS_Store
 tenants/.DS_Store
+.env
+calculate_top_tenants.py

@@ -1,6 +1,6 @@
 from django.contrib.auth.decorators import user_passes_test
-from Raadaa.documents.models import File
-from rba_decorators import is_admin 
+from documents.models import File
+from ..rba_decorators import is_admin 
 from django.http import HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.core.paginator import Paginator

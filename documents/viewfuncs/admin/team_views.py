@@ -1,7 +1,7 @@
 from django.contrib.auth.decorators import user_passes_test
-from Raadaa.documents.models import Team
-from Raadaa.documents.forms import AssignTeamsToUsersForm, TeamForm
-from rba_decorators import is_admin 
+from documents.models import Team
+from documents.forms import AssignTeamsToUsersForm, TeamForm
+from ..rba_decorators import is_admin 
 from django.http import HttpResponseForbidden
 from django.shortcuts import redirect, render, get_object_or_404
 from django.core.paginator import Paginator

@@ -1,12 +1,35 @@
 import logging
 from django.contrib.auth.decorators import login_required, user_passes_test
-from Raadaa.documents.forms import CompanyDocumentForm
-from Raadaa.documents.models import CompanyProfile, CompanyDocument, StaffDocument, StaffProfile
+from documents.forms import CompanyDocumentForm, CompanyProfileForm
+from documents.models import CompanyProfile, CompanyDocument, StaffProfile, StaffDocument
 from django.http import HttpResponseForbidden, JsonResponse
-from rba_decorators import is_admin 
-from django.shortcuts import get_object_or_404
+from ..rba_decorators import is_admin 
+from django.shortcuts import redirect, render, get_object_or_404
 
 logger = logging.getLogger(__name__)
+
+
+@login_required
+@user_passes_test(is_admin)
+def edit_company_profile(request):
+    if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
+        logger.error(f"Unauthorized access by user {request.user.username}: tenant mismatch")
+        return HttpResponseForbidden("You are not authorized for this company.")
+    
+    company_profile, created = CompanyProfile.objects.get_or_create(
+        tenant=request.tenant,
+        defaults={'company_name': request.tenant.name}
+    )
+    
+    if request.method == "POST":
+        form = CompanyProfileForm(request.POST, request.FILES, instance=company_profile)
+        if form.is_valid():
+            form.save()
+            return redirect("view_company_profile")
+    else:
+        form = CompanyProfileForm(instance=company_profile)
+        document_form = CompanyDocumentForm()
+    return render(request, "admin/edit_company_profile.html", {"form": form, 'profile': company_profile, 'document_form': document_form})
 
 @login_required
 @user_passes_test(is_admin)
@@ -60,3 +83,4 @@ def delete_company_document(request, document_id):
         return JsonResponse({'success': False, 'error': 'Document not found or not owned by user'}, status=404)
     except Exception as e:
         return JsonResponse({'success': False, 'error': str(e)}, status=500)
+
