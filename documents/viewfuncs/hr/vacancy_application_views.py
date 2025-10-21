@@ -9,6 +9,7 @@ from django.http import HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.core.paginator import Paginator
 from django.db.models import Count
+from django.template.loader import render_to_string
 from ..send_mails import send_vac_app_received_email, send_vac_app_accepted_email, send_vac_app_rejected_email
 
 
@@ -39,7 +40,7 @@ def send_vacancy_application_received(request, application_id):
     vacancy_application = get_object_or_404(VacancyApplication, id=application_id, tenant=request.tenant)
     vacancy = vacancy_application.vacancy
     users = CustomUser.objects.filter(tenant=request.tenant, is_active=True)
-    hrs=[]
+    hrs = []
     for user in users:
         if is_hr(user):
             hrs.append(user)
@@ -49,7 +50,6 @@ def send_vacancy_application_received(request, application_id):
     sender_password = hr.email_password if hr.email_password else SUPERUSER_EMAIL_PASSWORD
     candidate_name = vacancy_application.first_name
     company = vacancy_application.tenant.name
-
 
     if not sender_email or not sender_password:
         return HttpResponseForbidden("Your email credentials are missing. Contact admin.")
@@ -122,11 +122,12 @@ def send_vacancy_accepted_mail(request, application_id):
     if not is_hr(hr):
         print(f"Unauthorized access by user {request.user.username}. Only HRs can perform this action")
         return render(request, 'tenant_error.html', {'error_code': '403','message': 'Only HRs can perform this action.'})
+    
     sender_provider = hr.email_provider if hr.email_provider else SUPERUSER_EMAIL_PROVIDER
     sender_email = hr.email_address if hr.email_address else SUPERUSER_EMAIL_ADDRESS
     sender_password = hr.email_password if hr.email_password else SUPERUSER_EMAIL_PASSWORD
     candidate_name = vacancy_application.first_name
-    company = vacancy_application.tenant
+    company = vacancy_application.tenant.name
 
     if hr.email_provider and hr.email_address and hr.email_password:
         cc = []
@@ -142,7 +143,6 @@ def send_vacancy_accepted_mail(request, application_id):
     send_vac_app_accepted_email(sender_provider, sender_email, sender_password, company, candidate_name, hr, cc, vacancy_application, vacancy)
     
     print("Mail Sent")
-
 
 def send_vacancy_rejected_mail(request, application_id):
     vacancy_application = get_object_or_404(VacancyApplication, id=application_id, tenant=request.tenant)
