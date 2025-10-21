@@ -6,6 +6,8 @@ from .mail_connection import get_email_smtp_connection
 from django.shortcuts import render
 from django.http.response import HttpResponseForbidden
 from django.core.mail import send_mail, EmailMessage
+from django.template.loader import render_to_string
+
 
 # Send Account registration Confirmation
 def send_reg_confirm(request, user, admin_user, sender_provider, sender_email, sender_password):
@@ -29,30 +31,88 @@ def send_reg_confirm(request, user, admin_user, sender_provider, sender_email, s
         print(f"Failed to send email: {e}")
 
 # Template document approval
+# def send_approval_request(document, sender_provider, sender_email, sender_password, bdm_emails):
+#     connection, error_message = get_email_smtp_connection(sender_provider, sender_email, sender_password)
+
+#     subject = f"Approval Request: {document.company_name}"
+#     message = f"""
+#     Dear BDM,
+
+#     A new document for {document.company_name} has been created by {document.created_by.get_full_name()}.
+#     Please review and approve it.
+
+#     Best regards,  
+#     {document.created_by.get_full_name()}
+#     """
+
+#     print("Sending mail...")
+
+#     # Create email with attachment
+#     email = EmailMessage(subject, message, sender_email, list(bdm_emails), connection=connection)
+#     email.attach_file(document.pdf_file.path)  # Attach the PDF
+#     email.send()
+    
+#     print("Mail Sent")
+
 def send_approval_request(document, sender_provider, sender_email, sender_password, bdm_emails):
     connection, error_message = get_email_smtp_connection(sender_provider, sender_email, sender_password)
 
+    # Prepare context for the template
+    context = {
+        'company_name': document.company_name,
+        'creator_name': document.created_by.get_full_name(),
+        'creator_title': getattr(document.created_by, 'title', ''),
+        'created_date': document.created_at.strftime('%B %d, %Y'),
+        'document_type': getattr(document, 'document_type', ''),
+    }
+
+    # Render HTML content
+    html_content = render_to_string('emails/approval_request.html', context)
+
     subject = f"Approval Request: {document.company_name}"
-    message = f"""
-    Dear BDM,
-
-    A new document for {document.company_name} has been created by {document.created_by.get_full_name()}.
-    Please review and approve it.
-
-    Best regards,  
-    {document.created_by.get_full_name()}
-    """
 
     print("Sending mail...")
 
-    # Create email with attachment
-    email = EmailMessage(subject, message, sender_email, list(bdm_emails), connection=connection)
-    email.attach_file(document.pdf_file.path)  # Attach the PDF
+    # Create email with HTML content and attachment
+    email = EmailMessage(
+        subject=subject,
+        body=html_content,  # HTML content as the body
+        from_email=sender_email,
+        to=list(bdm_emails),
+        connection=connection
+    )
+    
+    # Specify that this is HTML email
+    email.content_subtype = "html"
+    
+    # Attach the PDF file
+    email.attach_file(document.pdf_file.path)
+    
     email.send()
     
     print("Mail Sent")
 
 # Send Template document approved email
+# def send_doc_approved_bdm(request, document, sender_provider, sender_email, sender_password):
+#     # Configure SMTP settings dynamically
+#     connection, error_message = get_email_smtp_connection(sender_provider, sender_email, sender_password)
+
+#     # Ensure the document's creator belongs to the same tenant
+#     if document.created_by.tenant != request.tenant:
+#         return HttpResponseForbidden("Invalid document creator for this company.")
+
+#     # Send email notification to the BDA
+#     subject = f"Document Approved for {request.tenant.name}"
+#     message = (
+#         f"Hello {document.created_by.username},\n\n"
+#         f"Your document '{document.company_name} _ {document.document_type}' "
+#         f"has been approved by {request.user.username} for tenant {request.tenant.name}."
+#     )
+
+#     email = EmailMessage(subject, message, sender_email, [document.created_by.email], connection=connection)
+#     email.attach_file(document.pdf_file.path)  # Attach the PDF
+#     email.send()
+
 def send_doc_approved_bdm(request, document, sender_provider, sender_email, sender_password):
     # Configure SMTP settings dynamically
     connection, error_message = get_email_smtp_connection(sender_provider, sender_email, sender_password)
@@ -61,83 +121,140 @@ def send_doc_approved_bdm(request, document, sender_provider, sender_email, send
     if document.created_by.tenant != request.tenant:
         return HttpResponseForbidden("Invalid document creator for this company.")
 
-    # Send email notification to the BDA
-    subject = f"Document Approved for {request.tenant.name}"
-    message = (
-        f"Hello {document.created_by.username},\n\n"
-        f"Your document '{document.company_name} _ {document.document_type}' "
-        f"has been approved by {request.user.username} for tenant {request.tenant.name}."
-    )
+    # Prepare context for the template
+    context = {
+        'creator_name': document.created_by.get_full_name() or document.created_by.username,
+        'approver_name': request.user.get_full_name() or request.user.username,
+        'company_name': document.company_name,
+        'tenant_name': request.tenant.name,
+        'document_type': getattr(document, 'document_type', ''),
+    }
 
-    email = EmailMessage(subject, message, sender_email, [document.created_by.email], connection=connection)
-    email.attach_file(document.pdf_file.path)  # Attach the PDF
+    # Render HTML content
+    html_content = render_to_string('emails/document_approved.html', context)
+
+    subject = f"Document Approved for {request.tenant.name}"
+
+    # Create and send HTML email
+    email = EmailMessage(
+        subject=subject,
+        body=html_content,
+        from_email=sender_email,
+        to=[document.created_by.email],
+        connection=connection
+    )
+    
+    # Specify that this is HTML email
+    email.content_subtype = "html"
+    
+    # Attach the PDF file
+    email.attach_file(document.pdf_file.path)
+    
     email.send()
 
 
+
+# def send_approved_email_client(sender_provider, sender_email, sender_password, document, recipient, cc_list):
+#     # Configure SMTP settings dynamically
+#     connection, error_message = get_email_smtp_connection(sender_provider, sender_email, sender_password)
+
+#     # Email subject based on document type
+#     subject = (
+#         f"{document.company_name} - Approved by AWS"
+#         if document.document_type == "approval"
+#         else f"{document.company_name} - SLA"
+#     )
+
+#     # Email body based on document type
+#     if document.document_type == "approval":
+#         message = f"""
+#         Dear Sir,
+
+#         Trust this email finds you well.
+
+#         We are pleased to inform you that your projects have been officially approved by Amazon Web Services - AWS, under AWS Cloud Growth Services.
+
+#         Congratulations on this accomplishment which shows your business has great potential to scale and thrive on AWS platform.  
+#         This is a great achievement, and we are excited for you to proceed to the next phase.  
+#         Please find the attached document for your reference which contains the relevant details for the next steps.
+
+#         If you have any questions or need further clarification, please feel free to reach out to me.  
+#         Once again, congratulations and we look forward to the continued success of your projects.
+
+#         Thank you.
+
+#         Best Regards,  
+#         {document.created_by.get_full_name()} | Executive Assistant  
+#         Transnet Cloud  
+#         Mob: {document.created_by.phone_number}  
+#         No 35 Ajose Adeogun Street Utako, Abuja  
+#         Email: {document.created_by.email}  
+#         Website: www.transnetcloud.com
+#         """
+#     else:  # SLA Document
+#         message = f"""
+#         Dear {document.company_name},
+
+#         Trust this email finds you well.
+
+#         Thank you for availing us your time and attention during our last meeting.  
+#         We are delighted to move forward with your project on AWS to the next phase, be rest assured we will provide you with the necessary support your business needs to scale.
+
+#         Please find attached the Service Level Agreement (SLA) document for your review. Kindly take a moment to go through the terms, and if they align with your expectations, we would appreciate you signing and returning the document at your earliest convenience.
+
+#         Should you have any questions or require further clarification, please do not hesitate to reach out. Our team is readily available to assist you.
+
+#         Thank you for choosing Transnet Cloud as your trusted partner.  
+
+#         We look forward to a successful partnership.
+
+#         Best Regards,  
+#         {document.created_by.get_full_name()} | Executive Assistant  
+#         Transnet Cloud  
+#         Mob: {document.created_by.phone_number}  
+#         No 35 Ajose Adeogun Street Utako, Abuja  
+#         Email: {document.created_by.email}  
+#         Website: www.transnetcloud.com
+#         """
+
+#     # Create email with attachment
+#     email = EmailMessage(subject, message, sender_email, recipient, cc=cc_list, connection=connection)
+#     email.attach_file(document.pdf_file.path)  # Attach the PDF
+#     email.send()
+
+
 def send_approved_email_client(sender_provider, sender_email, sender_password, document, recipient, cc_list):
-    # Configure SMTP settings dynamically
     connection, error_message = get_email_smtp_connection(sender_provider, sender_email, sender_password)
 
-    # Email subject based on document type
-    subject = (
-        f"{document.company_name} - Approved by AWS"
-        if document.document_type == "approval"
-        else f"{document.company_name} - SLA"
-    )
+    context = {
+        'company_name': document.company_name,
+        'creator_name': document.created_by.get_full_name(),
+        'creator_title': 'Executive Assistant',
+        'phone_number': getattr(document.created_by, 'phone_number', ''),
+        'creator_email': document.created_by.email,
+        'document_type': document.document_type,
+    }
 
-    # Email body based on document type
     if document.document_type == "approval":
-        message = f"""
-        Dear Sir,
-
-        Trust this email finds you well.
-
-        We are pleased to inform you that your projects have been officially approved by Amazon Web Services - AWS, under AWS Cloud Growth Services.
-
-        Congratulations on this accomplishment which shows your business has great potential to scale and thrive on AWS platform.  
-        This is a great achievement, and we are excited for you to proceed to the next phase.  
-        Please find the attached document for your reference which contains the relevant details for the next steps.
-
-        If you have any questions or need further clarification, please feel free to reach out to me.  
-        Once again, congratulations and we look forward to the continued success of your projects.
-
-        Thank you.
-
-        Best Regards,  
-        {document.created_by.get_full_name()} | Executive Assistant  
-        Transnet Cloud  
-        Mob: {document.created_by.phone_number}  
-        No 35 Ajose Adeogun Street Utako, Abuja  
-        Email: {document.created_by.email}  
-        Website: www.transnetcloud.com
-        """
+        template_name = 'emails/aws_approval_client.html'
+        subject = f"{document.company_name} - Approved by AWS"
     else:  # SLA Document
-        message = f"""
-        Dear {document.company_name},
+        template_name = 'emails/sla_document_client.html'
+        subject = f"{document.company_name} - SLA"
 
-        Trust this email finds you well.
+    html_content = render_to_string(template_name, context)
 
-        Thank you for availing us your time and attention during our last meeting.  
-        We are delighted to move forward with your project on AWS to the next phase, be rest assured we will provide you with the necessary support your business needs to scale.
-
-        Please find attached the Service Level Agreement (SLA) document for your review. Kindly take a moment to go through the terms, and if they align with your expectations, we would appreciate you signing and returning the document at your earliest convenience.
-
-        Should you have any questions or require further clarification, please do not hesitate to reach out. Our team is readily available to assist you.
-
-        Thank you for choosing Transnet Cloud as your trusted partner.  
-
-        We look forward to a successful partnership.
-
-        Best Regards,  
-        {document.created_by.get_full_name()} | Executive Assistant  
-        Transnet Cloud  
-        Mob: {document.created_by.phone_number}  
-        No 35 Ajose Adeogun Street Utako, Abuja  
-        Email: {document.created_by.email}  
-        Website: www.transnetcloud.com
-        """
-
-    # Create email with attachment
-    email = EmailMessage(subject, message, sender_email, recipient, cc=cc_list, connection=connection)
-    email.attach_file(document.pdf_file.path)  # Attach the PDF
+    email = EmailMessage(
+        subject=subject,
+        body=html_content,
+        from_email=sender_email,
+        to=recipient,
+        cc=cc_list,
+        connection=connection
+    )
+    
+    email.content_subtype = "html"
+    
+    email.attach_file(document.pdf_file.path)
+    
     email.send()
