@@ -177,8 +177,8 @@ def create_document(request):
                             )
                             public_pdf_file.save()
 
-                            print("Sending email for uploaded PDF")
-                            send_approval_request(document)
+                            # print("Sending email for uploaded PDF")
+                            # send_approval_request(document, sender_provider, sender_email, sender_password, bdm_emails)
                             continue
 
                     pdf_filename = f"{base_filename}.pdf"
@@ -272,7 +272,7 @@ def create_document(request):
 
                     sender_provider = document.created_by.email_provider
                     sender_email = document.created_by.email_address
-                    sender_password = document.created_by.email_password
+                    sender_password = document.created_by.get_smtp_password()
 
                     if not sender_email or not sender_password:
                         return HttpResponseForbidden("Your email credentials are missing. Contact admin.")
@@ -313,7 +313,7 @@ def approve_document(request, document_id):
     # Ensure the BDM has SMTP credentials (or use tenant-specific SMTP settings)
     sender_provider = request.user.email_provider
     sender_email = request.user.email_address
-    sender_password = request.user.email_password
+    sender_password = request.user.get_smtp_password()
 
     if not sender_email or not sender_password:
         return HttpResponseForbidden("Your email credentials are missing. Contact admin.")
@@ -356,7 +356,7 @@ def send_approved_email(request, document_id):
     # Get sender credentials from the logged-in 
     sender_provider = request.user.email_provider
     sender_email = request.user.email_address
-    sender_password = request.user.email_password
+    sender_password = request.user.get_smtp_password()
 
     if not sender_email or not sender_password:
         return HttpResponseForbidden("Your email credentials are missing. Contact admin.")

@@ -46,13 +46,13 @@ def register(request):
             if admin_user.email_provider and admin_user.email_address and admin_user.email_password:
                 sender_provider = admin_user.email_provider
                 sender_email = admin_user.email_address
-                sender_password = admin_user.email_password
+                sender_password = admin_user.get_smtp_password()
                 sender = admin_user
             else:
                 superuser = CustomUser.objects.filter(is_superuser=True).first()
                 sender_provider = superuser.email_provider
                 sender_email = superuser.email_address
-                sender_password = superuser.email_password
+                sender_password = superuser.get_smtp_password()
                 sender = superuser
             if sender_email and sender_password:
                 # Send confirmation email

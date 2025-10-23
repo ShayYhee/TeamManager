@@ -19,7 +19,7 @@ main_superuser = CustomUser.objects.filter(is_superuser=True).first()
 
 SUPERUSER_EMAIL_PROVIDER = main_superuser.email_provider
 SUPERUSER_EMAIL_ADDRESS = main_superuser.email_address
-SUPERUSER_EMAIL_PASSWORD = main_superuser.email_password
+SUPERUSER_EMAIL_PASSWORD = main_superuser.get_smtp_password()
 
 @login_required
 @user_passes_test(is_hr)
@@ -39,15 +39,11 @@ def vacancy_application_list(request):
 def send_vacancy_application_received(request, application_id):
     vacancy_application = get_object_or_404(VacancyApplication, id=application_id, tenant=request.tenant)
     vacancy = vacancy_application.vacancy
-    users = CustomUser.objects.filter(tenant=request.tenant, is_active=True)
-    hrs = []
-    for user in users:
-        if is_hr(user):
-            hrs.append(user)
+    hrs = CustomUser.objects.filter(tenant=request.tenant, is_active=True, roles__name='HR')
     hr = hrs[0]
     sender_provider = hr.email_provider if hr.email_provider else SUPERUSER_EMAIL_PROVIDER
     sender_email = hr.email_address if hr.email_address else SUPERUSER_EMAIL_ADDRESS
-    sender_password = hr.email_password if hr.email_password else SUPERUSER_EMAIL_PASSWORD
+    sender_password = hr.email_password if hr.get_smtp_password() else SUPERUSER_EMAIL_PASSWORD
     candidate_name = vacancy_application.first_name
     company = vacancy_application.tenant.name
 
@@ -58,8 +54,6 @@ def send_vacancy_application_received(request, application_id):
     send_vac_app_received_email(sender_provider, sender_email, sender_password, company, candidate_name, vacancy_application, vacancy)
     
     print("Mail Sent")
-
-
 
 def create_vacancy_application(request, vacancy_id):
     vacancy = get_object_or_404(Vacancy, id=vacancy_id)
@@ -125,7 +119,7 @@ def send_vacancy_accepted_mail(request, application_id):
     
     sender_provider = hr.email_provider if hr.email_provider else SUPERUSER_EMAIL_PROVIDER
     sender_email = hr.email_address if hr.email_address else SUPERUSER_EMAIL_ADDRESS
-    sender_password = hr.email_password if hr.email_password else SUPERUSER_EMAIL_PASSWORD
+    sender_password = hr.email_password if hr.get_smtp_password() else SUPERUSER_EMAIL_PASSWORD
     candidate_name = vacancy_application.first_name
     company = vacancy_application.tenant.name
 
@@ -154,7 +148,7 @@ def send_vacancy_rejected_mail(request, application_id):
     
     sender_provider = hr.email_provider if hr.email_provider else SUPERUSER_EMAIL_PROVIDER
     sender_email = hr.email_address if hr.email_address else SUPERUSER_EMAIL_ADDRESS
-    sender_password = hr.email_password if hr.email_password else SUPERUSER_EMAIL_PASSWORD
+    sender_password = hr.email_password if hr.get_smtp_password() else SUPERUSER_EMAIL_PASSWORD
     candidate_name = vacancy_application.first_name.capitalize()
     company = vacancy_application.tenant.name
 

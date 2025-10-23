@@ -170,12 +170,12 @@ def approve_user(request, user_id):
     if admin_user.email_address and admin_user.email_password:
         sender_provider = admin_user.email_provider
         sender_email = admin_user.email_address
-        sender_password = admin_user.email_password
+        sender_password = admin_user.get_smtp_password()
     else:
         superuser = main_superuser
         sender_provider = superuser.email_provider
         sender_email = superuser.email_address
-        sender_password = superuser.email_password
+        sender_password = superuser.get_smtp_password()
 
     if not sender_provider or not sender_email or not sender_password:
         return HttpResponseForbidden("Your email credentials are missing. Contact admin.")

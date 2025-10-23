@@ -101,6 +101,9 @@ def send_reg_confirm(request, user, admin_user, sender_provider, sender_email, s
 def send_approval_request(document, sender_provider, sender_email, sender_password, bdm_emails):
     connection, error_message = get_email_smtp_connection(sender_provider, sender_email, sender_password)
 
+    base_domain = "127.0.0.1:8000" if settings.DEBUG else "teammanager.ng"
+    protocol = "http" if settings.DEBUG else "https"
+    document_link = f"{protocol}://{document.tenant.slug}.{base_domain}/media/documents/pdf/{document.pdf_file.url}"
     # Prepare context for the template
     context = {
         'company_name': document.company_name,
@@ -108,6 +111,7 @@ def send_approval_request(document, sender_provider, sender_email, sender_passwo
         'creator_title': getattr(document.created_by, 'title', ''),
         'created_date': document.created_at.strftime('%B %d, %Y'),
         'document_type': getattr(document, 'document_type', ''),
+        'document_link': document_link,
     }
 
     # Render HTML content
@@ -161,6 +165,10 @@ def send_doc_approved_bdm(request, document, sender_provider, sender_email, send
     # Configure SMTP settings dynamically
     connection, error_message = get_email_smtp_connection(sender_provider, sender_email, sender_password)
 
+    base_domain = "127.0.0.1:8000" if settings.DEBUG else "teammanager.ng"
+    protocol = "http" if settings.DEBUG else "https"
+    document_link = f"{protocol}://{document.tenant.slug}.{base_domain}/media/documents/pdf/{document.pdf_file.url}"
+
     # Ensure the document's creator belongs to the same tenant
     if document.created_by.tenant != request.tenant:
         return HttpResponseForbidden("Invalid document creator for this company.")
@@ -172,6 +180,7 @@ def send_doc_approved_bdm(request, document, sender_provider, sender_email, send
         'company_name': document.company_name,
         'tenant_name': request.tenant.name,
         'document_type': getattr(document, 'document_type', ''),
+        'document_link': document_link,
     }
 
     # Render HTML content
@@ -349,39 +358,31 @@ def send_approved_email_client(sender_provider, sender_email, sender_password, d
 
 
 def send_user_approved_email(request, user, admin_user, sender_provider, sender_email, sender_password):
-    # Set up email connection
     connection, error_message = get_email_smtp_connection(sender_provider, sender_email, sender_password)
+    if error_message:
+        print(f"SMTP Error: {error_message}")
+        return HttpResponseForbidden("Email service unavailable.")
 
     # Generate tenant-specific login URL
-    if settings.DEBUG:
-        base_domain = "127.0.0.1:8000"  # Local development
-        protocol = "http"
-    else:
-        base_domain = "teammanager.ng"  # Production
-        protocol = "https"
-
-    # Generate tenant-specific login URL
+    protocol = "http" if settings.DEBUG else "https"
+    base_domain = "127.0.0.1:8000" if settings.DEBUG else "teammanager.ng"
     login_url = f"{protocol}://{request.tenant.slug}.{base_domain}/accounts/login"
 
-    # Prepare context for the template
     context = {
         'username': user.username,
         'full_name': user.get_full_name() or user.username,
         'admin_name': admin_user.get_full_name() or admin_user.username,
         'tenant_name': request.tenant.name,
         'login_url': login_url,
-        'protocol': protocol,
+        'user': user,  # for footer email link
     }
 
-    # Render HTML content
     html_content = render_to_string('emails/user_approved.html', context)
-
     subject = f"Account Approved - Welcome to {request.tenant.name}!"
 
-    print("Sending mail...")
+    print("Sending approval email...")
 
     try:
-        # Create and send HTML email
         email = EmailMessage(
             subject=subject,
             body=html_content,
@@ -389,12 +390,9 @@ def send_user_approved_email(request, user, admin_user, sender_provider, sender_
             to=[user.email],
             connection=connection
         )
-        
-        # Specify that this is HTML email
         email.content_subtype = "html"
-        
         email.send()
-        
+        print("Approval email sent successfully.")
     except Exception as e:
         print(f"Failed to send email: {e}")
         return HttpResponseForbidden("Failed to send approval email. Contact admin.")
@@ -453,35 +451,37 @@ def send_user_approved_email(request, user, admin_user, sender_provider, sender_
 
 def send_vac_app_received_email(sender_provider, sender_email, sender_password, company, candidate_name, vacancy_application, vacancy):
     connection, error_message = get_email_smtp_connection(sender_provider, sender_email, sender_password)
+    if error_message:
+        print(f"SMTP Connection Failed: {error_message}")
+        return  # Or raise/log as needed
 
-    # Prepare context for the template
     context = {
         'candidate_name': candidate_name,
         'vacancy_title': vacancy.title,
         'company_name': company,
         'application_date': vacancy_application.created_at.strftime('%B %d, %Y'),
+        'vacancy_application': vacancy_application,  # For ID in footer
     }
 
-    # Render HTML content
     html_content = render_to_string('emails/application_received.html', context)
-
     subject = f"Application Received for {vacancy.title} Role"
 
-    print("Sending mail...")
+    print(f"Sending application confirmation to {vacancy_application.email}...")
 
-    # Create and send HTML email
-    email = EmailMessage(
-        subject=subject,
-        body=html_content,
-        from_email=sender_email,
-        to=[vacancy_application.email],
-        connection=connection
-    )
-    
-    # Specify that this is HTML email
-    email.content_subtype = "html"
-    
-    email.send()
+    try:
+        email = EmailMessage(
+            subject=subject,
+            body=html_content,
+            from_email=sender_email,
+            to=[vacancy_application.email],
+            connection=connection
+        )
+        email.content_subtype = "html"
+        email.send()
+        print("Application received email sent successfully.")
+    except Exception as e:
+        print(f"Failed to send email: {e}")
+        # Optionally log or notify admin
 
 # def send_vac_app_accepted_email(sender_provider, sender_email, sender_password, company, candidate_name, hr, cc, vacancy_application, vacancy):
 #     connection, error_message = get_email_smtp_connection(sender_provider, sender_email, sender_password)
@@ -515,37 +515,39 @@ def send_vac_app_received_email(sender_provider, sender_email, sender_password, 
 
 def send_vac_app_accepted_email(sender_provider, sender_email, sender_password, company, candidate_name, hr, cc, vacancy_application, vacancy):
     connection, error_message = get_email_smtp_connection(sender_provider, sender_email, sender_password)
+    if error_message:
+        print(f"SMTP Error: {error_message}")
+        return  # Handle gracefully
 
-    # Prepare context for the template
     context = {
         'candidate_name': candidate_name,
         'vacancy_title': vacancy.title,
         'company_name': company,
         'hr_email': hr.email,
         'hr_name': hr.get_full_name() or hr.username,
+        'vacancy_application': vacancy_application,  # For ID
     }
 
-    # Render HTML content
     html_content = render_to_string('emails/application_accepted.html', context)
-
     subject = f"You're Moving Forward! Next Steps for the {vacancy.title} Role"
 
-    print("Sending mail...")
+    print(f"Sending acceptance email to {vacancy_application.email}...")
 
-    # Create and send HTML email
-    email = EmailMessage(
-        subject=subject,
-        body=html_content,
-        from_email=sender_email,
-        to=[vacancy_application.email],
-        cc=cc,
-        connection=connection
-    )
-    
-    # Specify that this is HTML email
-    email.content_subtype = "html"
-    
-    email.send()
+    try:
+        email = EmailMessage(
+            subject=subject,
+            body=html_content,
+            from_email=sender_email,
+            to=[vacancy_application.email],
+            cc=cc or [],
+            connection=connection
+        )
+        email.content_subtype = "html"
+        email.send()
+        print("Acceptance email sent successfully.")
+    except Exception as e:
+        print(f"Email failed: {e}")
+        # Log or notify admin
 
 # def send_vac_app_rejected_email(sender_provider, sender_email, sender_password, company, candidate_name, hr, cc, vacancy_application, vacancy):
 #     connection, error_message = get_email_smtp_connection(sender_provider, sender_email, sender_password)
@@ -579,34 +581,35 @@ def send_vac_app_accepted_email(sender_provider, sender_email, sender_password, 
 
 def send_vac_app_rejected_email(sender_provider, sender_email, sender_password, company, candidate_name, hr, cc, vacancy_application, vacancy):
     connection, error_message = get_email_smtp_connection(sender_provider, sender_email, sender_password)
+    if error_message:
+        print(f"SMTP Error: {error_message}")
+        return
 
-    # Prepare context for the template
     context = {
         'candidate_name': candidate_name,
         'vacancy_title': vacancy.title,
         'company_name': company,
         'hr_email': hr.email,
         'hr_name': hr.get_full_name() or hr.username,
+        'vacancy_application': vacancy_application,  # For ID
     }
 
-    # Render HTML content
     html_content = render_to_string('emails/application_rejected.html', context)
-
     subject = f"An Update on Your Application for {vacancy.title} Role"
 
-    print("Sending mail...")
+    print(f"Sending rejection email to {vacancy_application.email}...")
 
-    # Create and send HTML email
-    email = EmailMessage(
-        subject=subject,
-        body=html_content,
-        from_email=sender_email,
-        to=[vacancy_application.email],
-        cc=cc,
-        connection=connection
-    )
-    
-    # Specify that this is HTML email
-    email.content_subtype = "html"
-    
-    email.send()
+    try:
+        email = EmailMessage(
+            subject=subject,
+            body=html_content,
+            from_email=sender_email,
+            to=[vacancy_application.email],
+            cc=cc or [],
+            connection=connection
+        )
+        email.content_subtype = "html"
+        email.send()
+        print("Rejection email sent.")
+    except Exception as e:
+        print(f"Email failed: {e}")
