@@ -11,7 +11,7 @@ from cryptography.fernet import Fernet
 from tenants.models import Tenant
 
 # Generate or load encryption key for SMTP password
-ENCRYPTION_KEY = settings.SECRET_KEY
+ENCRYPTION_KEY = settings.FERNET_KEY
 print(f"DJANGO_SECRET_KEY: {ENCRYPTION_KEY}")
 cipher = Fernet(key=ENCRYPTION_KEY)
 
