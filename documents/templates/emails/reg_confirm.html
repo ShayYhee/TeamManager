@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Account Approved {{user_name}}</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            line-height: 1.6;
+            color: #333333;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #ffc107 0%, #ffb300 100%);
+            color: white;
+            padding: 30px 20px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: bold;
+        }
+        .content {
+            padding: 30px;
+        }
+        .greeting {
+            font-size: 16px;
+            margin-bottom: 20px;
+            color: #555;
+        }
+        .status-message {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 5px;
+            padding: 25px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .status-message h3 {
+            margin: 0 0 15px 0;
+            color: #856404;
+            font-size: 20px;
+        }
+        .account-details {
+            background-color: #f8f9fa;
+            border-left: 4px solid #ffc107;
+            padding: 20px;
+            margin: 25px 0;
+            border-radius: 4px;
+        }
+        .account-details h3 {
+            margin-top: 0;
+            color: #333;
+            font-size: 18px;
+        }
+        .detail-item {
+            margin-bottom: 10px;
+            display: flex;
+        }
+        .detail-label {
+            font-weight: bold;
+            min-width: 120px;
+            color: #555;
+        }
+        .detail-value {
+            color: #333;
+        }
+        .next-steps {
+            background-color: #e7f3ff;
+            border: 1px solid #b3d9ff;
+            border-radius: 5px;
+            padding: 20px;
+            margin: 25px 0;
+        }
+        .next-steps h4 {
+            margin-top: 0;
+            color: #004085;
+        }
+        .steps-list {
+            list-style-type: none;
+            padding-left: 0;
+        }
+        .steps-list li {
+            margin-bottom: 12px;
+            padding-left: 30px;
+            position: relative;
+        }
+        .steps-list li:before {
+            content: "⏳";
+            position: absolute;
+            left: 0;
+            font-size: 16px;
+        }
+        .login-info {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            border-radius: 5px;
+            padding: 20px;
+            margin: 25px 0;
+            text-align: center;
+        }
+        .login-info h4 {
+            margin-top: 0;
+            color: #155724;
+        }
+        .signature {
+            margin-top: 30px;
+            padding-top: 30px;
+            border-top: 1px solid #e9ecef;
+        }
+        .footer {
+            background-color: #f8f9fa;
+            padding: 20px;
+            text-align: center;
+            border-top: 1px solid #e9ecef;
+            color: #6c757d;
+            font-size: 14px;
+        }
+        .status-badge {
+            display: inline-block;
+            background-color: #51ff07ff;
+            color: #212529;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        @media only screen and (max-width: 600px) {
+            .container {
+                margin: 10px;
+                border-radius: 0;
+            }
+            .content {
+                padding: 20px;
+            }
+            .detail-item {
+                flex-direction: column;
+            }
+            .detail-label {
+                min-width: auto;
+                margin-bottom: 5px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⏰ Account Successfully Created</h1>
+        </div>
+        
+        <div class="content">
+            <div class="greeting">
+                <p>Dear <strong>{{ user_name }}</strong>,</p>
+            </div>
+
+            <div class="status-message">
+                <h3>📋 Registration Received - Account Approved</h3>
+                <p>Your account has been successfully created and your staff profile created.</p>
+            </div>
+
+            <div class="account-details">
+                <h3>Account Information</h3>
+                <div class="detail-item">
+                    <span class="detail-label">Username:</span>
+                    <span class="detail-value">{{ user_name }}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Company:</span>
+                    <span class="detail-value">{{ tenant_name }}</span>
+                </div>
+                <div class="detail-item">
+                    <span class="detail-label">Status:</span>
+                    <span class="detail-value">Approved <span class="status-badge">!!!</span></span>
+                </div>
+            </div>
+
+            <div class="login-info">
+                <h4>🔑 Login Information</h4>
+                <p>You can log in at:</p>
+                <p style="background-color: white; padding: 10px; border-radius: 5px; font-family: monospace; word-break: break-all;">
+                    {{ login_url }}
+                </p>
+                <p style="font-size: 14px; margin-top: 10px;">We'll notify you as soon as your account is activated.</p>
+            </div>
+
+            <div class="next-steps">
+                <h4>🔄 What's Next?</h4>
+                <p>After logging in, you can do the following: </p>
+                <ul class="steps-list">
+                    <li><strong>Staff Profile:</strong> Update your <a href={{ my_profile }}>profile</a> with necessary details</li>
+                    <li><strong>SMTP Email:</strong> Go to <a href={{ email_config }}>Settings</a> and setup up your email, this would enable you send mails, and related features. </li>
+                    <li><strong>Organization Profile:</strong> Checkout your <a href={{ comp_profile }}>Organization profile</a></li>
+                    <li><strong>Enjoy:</strong> Now you can streamline your office processes!</li>
+                </ul>
+            </div>
+
+            <p>If you have any urgent questions, please contact your system administrator.</p>
+
+            <div class="signature">
+                <p>Best regards,</p>
+                <p><strong>{{ admin_name }}</strong></p>
+                <p style="color: #666; font-size: 14px;">System Administrator<br>{{ tenant_name }}</p>
+                <p><strong>{{ admin_email }}</strong></p>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>This is an automated registration confirmation message.</p>
+            <p>Please do not reply to this email.</p>
+        </div>
+    </div>
+</body>
+</html>

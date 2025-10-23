@@ -12,28 +12,68 @@ from django.template.loader import render_to_string
 main_superuser = CustomUser.objects.filter(is_superuser=True).first()
 
 # Send Account registration Confirmation
+# def send_reg_confirm(request, user, admin_user, sender_provider, sender_email, sender_password, sender):
+#     sender_password = sender.get_smtp_password()
+#     connection, error_message = get_email_smtp_connection(sender_provider, sender_email, sender_password)
+#     base_domain = "127.0.0.1:8000" if settings.DEBUG else "teammanager.ng"
+#     protocol = "http" if settings.DEBUG else "https"
+#     login_url = f"{protocol}://{request.tenant.slug}.{base_domain}/accounts/login"
+#     subject = f"Account Approval: {user.username}"
+#     message = f"""
+#     Dear {user.username},
+
+#     Your account has been successfully created. 
+#     You can log in at: {login_url}
+
+#     Best regards,  
+#     {admin_user.get_full_name() or admin_user.username}
+#     {admin_user.email}
+#     """
+#     try:
+#         email = EmailMessage(subject, message, sender_email, [user.email], connection=connection, cc=[admin_user.email])
+#         email.send()
+#     except Exception as e:
+#         print(f"Failed to send email: {e}")
+
 def send_reg_confirm(request, user, admin_user, sender_provider, sender_email, sender_password, sender):
     sender_password = sender.get_smtp_password()
+    # Configure SMTP settings dynamically
     connection, error_message = get_email_smtp_connection(sender_provider, sender_email, sender_password)
+
     base_domain = "127.0.0.1:8000" if settings.DEBUG else "teammanager.ng"
     protocol = "http" if settings.DEBUG else "https"
     login_url = f"{protocol}://{request.tenant.slug}.{base_domain}/accounts/login"
-    subject = f"Account Approval: {user.username}"
-    message = f"""
-    Dear {user.username},
 
-    Your account has been successfully created. 
-    You can log in at: {login_url}
+    # Prepare context for the template
+    context = {
+        'user_name': user.username,
+        'login_url': login_url,
+        'tenant_name': request.tenant.name,
+        'admin_name': admin_user.get_full_name() or admin_user.username,
+        'admin_email': admin_user.email,
+        'my_profile': f"{protocol}://{request.tenant.slug}.{base_domain}/dashboard/my-profile",
+        'comp_profile': f"{protocol}://{request.tenant.slug}.{base_domain}/company-profile",
+        'email_config': f"{protocol}://{request.tenant.slug}.{base_domain}/dashboard/email-config"
+    }
 
-    Best regards,  
-    {admin_user.get_full_name() or admin_user.username}
-    {admin_user.email}
-    """
-    try:
-        email = EmailMessage(subject, message, sender_email, [user.email], connection=connection, cc=[admin_user.email])
-        email.send()
-    except Exception as e:
-        print(f"Failed to send email: {e}")
+    # Render HTML content
+    html_content = render_to_string('emails/reg_confirm.html', context)
+
+    subject = f"Account Approved: {user.username}"
+
+    # Create and send HTML email
+    email = EmailMessage(
+        subject=subject,
+        body=html_content,
+        from_email=sender_email,
+        to=[user.email],
+        connection=connection
+    )
+    
+    # Specify that this is HTML email
+    email.content_subtype = "html"
+    
+    email.send()
 
 # Template document approval
 # def send_approval_request(document, sender_provider, sender_email, sender_password, bdm_emails):
