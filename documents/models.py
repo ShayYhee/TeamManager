@@ -11,8 +11,9 @@ from cryptography.fernet import Fernet
 from tenants.models import Tenant
 
 # Generate or load encryption key for SMTP password
-ENCRYPTION_KEY = os.getenv('ENCRYPTION_KEY', Fernet.generate_key())
-cipher = Fernet(ENCRYPTION_KEY)
+ENCRYPTION_KEY = settings.SECRET_KEY
+print(f"DJANGO_SECRET_KEY: {ENCRYPTION_KEY}")
+cipher = Fernet(key=ENCRYPTION_KEY)
 
 def upload_to_documents_word(instance, filename):
     tenant_name = instance.tenant.name
@@ -87,6 +88,7 @@ class CustomUser(AbstractUser):
         ('outlook', 'Outlook'),
         ('zoho', 'Zoho'),
         ('icloud', 'iCloud'),
+        ('zeptomail', 'ZeptoMail'),
     ]
     tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, blank=True, null=True, related_name="customuser")
     roles = models.ManyToManyField(Role, blank=True)
@@ -94,21 +96,28 @@ class CustomUser(AbstractUser):
     teams = models.ManyToManyField('Team', blank=True, related_name='members')
     phone_number = models.CharField(max_length=15, blank=True, null=True)
     email_address = models.EmailField(blank=True, null=True, help_text="Email address for email provider. To enable email sending.")
-    email_password = models.CharField(max_length=255, blank=True, null=True, help_text="Password for email provider. To enable email sending.")  # Encrypted SMTP password
+    email_password = models.CharField(max_length=1000, blank=True, null=True, help_text="Password for email provider or Send Token for Zepto Mail. To enable email sending.")  # Encrypted SMTP password
     email_provider = models.CharField(max_length=20, choices=EMAIL_PROVIDERS, blank=True, null=True)
 
     def set_smtp_password(self, password):
-        """Encrypt and store SMTP password."""
-        if password:
-            self.email_password = cipher.encrypt(password.encode()).decode()
-        else:
-            self.email_password = None
+        """Encrypt and store SMTP password or SendMail Token."""
+        try:
+            if password:
+                self.email_password = cipher.encrypt(password.encode()).decode()
+            else:
+                self.email_password = None
+        except Exception as e:
+            raise ValueError(f"Encryption failed: {str(e)}")
 
     def get_smtp_password(self):
-        """Decrypt and return SMTP password."""
-        if self.email_password:
-            return cipher.decrypt(self.email_password.encode()).decode()
-        return None
+        """Decrypt and return SMTP password or SendMail Token."""
+        try:
+            if self.email_password:
+                print("Encoded Password:", self.email_password)
+                return cipher.decrypt(self.email_password.encode()).decode()
+            return None
+        except Exception as e:
+            raise ValueError(f"Decryption failed: {str(e)}")
 
     def clean(self):
         """Validate SMTP credentials."""

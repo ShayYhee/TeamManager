@@ -47,14 +47,16 @@ def register(request):
                 sender_provider = admin_user.email_provider
                 sender_email = admin_user.email_address
                 sender_password = admin_user.email_password
+                sender = admin_user
             else:
-                superuser = CustomUser.objects.get(is_superuser=True)
+                superuser = CustomUser.objects.filter(is_superuser=True).first()
                 sender_provider = superuser.email_provider
                 sender_email = superuser.email_address
                 sender_password = superuser.email_password
+                sender = superuser
             if sender_email and sender_password:
                 # Send confirmation email
-                send_reg_confirm(request, user, admin_user, sender_provider, sender_email, sender_password)
+                send_reg_confirm(request, user, admin_user, sender_provider, sender_email, sender_password, sender)
 
             # Log error or notify admin, but proceed with registration
             return redirect("account_activation_sent")

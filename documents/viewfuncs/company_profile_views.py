@@ -1,6 +1,6 @@
 import logging
 from django.contrib.auth.decorators import login_required
-from Raadaa.documents.models import CompanyProfile, CustomUser, Department, Team
+from documents.models import CompanyProfile, CustomUser, Department, Team
 from django.http import HttpResponseForbidden, HttpResponse
 from django.shortcuts import render
 

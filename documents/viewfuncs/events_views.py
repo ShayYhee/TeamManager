@@ -1,12 +1,13 @@
 from django.db import models
 from rest_framework.authtoken.models import Token
 from rest_framework.response import Response
-from models import Event, CustomUser, EventParticipant
+from documents.models import Event, CustomUser, EventParticipant
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render
 from django.contrib.auth import get_user_model
-from rest_framework import viewsets, permissions
-
+from rest_framework import viewsets, permissions, status
+from documents.serializers import EventSerializer, UserSerializer    
+from rest_framework.views import APIView
 
 
 class EventViewSet(viewsets.ModelViewSet):
@@ -36,7 +37,6 @@ class EventViewSet(viewsets.ModelViewSet):
             return Response({"detail": "You can only delete events you created."}, status=403)
         return super().destroy(request, *args, **kwargs)
 
-from documents.serializers import EventSerializer, UserSerializer
 class UserViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = CustomUser.objects.all()
     serializer_class = UserSerializer
@@ -45,9 +45,6 @@ class UserViewSet(viewsets.ReadOnlyModelViewSet):
     def get_queryset(self):
         # Filter users by tenant
         return CustomUser.objects.filter(tenant=self.request.tenant)
-    
-from rest_framework.views import APIView
-from rest_framework import status
 
 class EventParticipantResponseView(APIView):
     permission_classes = [permissions.IsAuthenticated]

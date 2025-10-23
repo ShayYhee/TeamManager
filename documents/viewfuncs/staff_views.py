@@ -3,9 +3,9 @@ import logging
 from django.contrib.auth.decorators import user_passes_test, login_required
 from django.http import HttpResponse, HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, render
-from models import Department, StaffDocument, StaffProfile
-from forms import StaffDocumentForm
-from rba_decorators import is_admin 
+from documents.models import Department, StaffDocument, StaffProfile
+from documents.forms import StaffDocumentForm
+from .rba_decorators import is_admin 
 from django.db.models import Q
 from django.core.paginator import Paginator
 from django.views.decorators.http import require_POST

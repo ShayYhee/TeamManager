@@ -2,8 +2,8 @@ import logging
 
 from django.http import HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
-from models import StaffProfile
-from forms import StaffDocumentForm, StaffProfileForm
+from documents.models import StaffProfile
+from documents.forms import StaffDocumentForm, StaffProfileForm
 from django.contrib.auth.decorators import login_required
 
 

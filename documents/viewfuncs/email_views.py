@@ -1,15 +1,15 @@
 from datetime import timezone
 import logging
 from django.contrib.auth.decorators import login_required
-from Raadaa.documents.forms import EmailForm
-from Raadaa.documents.models import Email, Attachment
+from documents.forms import EmailForm
+from documents.models import Email, Attachment
 from django.http import HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.core.paginator import Paginator
 from django.core.mail import EmailMessage
 
 
-from Raadaa.documents.viewfuncs.mail_connection import get_email_smtp_connection
+from documents.viewfuncs.mail_connection import get_email_smtp_connection
 
 
 logger = logging.getLogger(__name__)
