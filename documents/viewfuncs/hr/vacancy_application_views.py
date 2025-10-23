@@ -209,10 +209,13 @@ def fetch_accepted_applications(request, vacancy_id):
     
     vacancy = get_object_or_404(Vacancy, id=vacancy_id, tenant=request.tenant)
     applications = VacancyApplication.objects.filter(vacancy=vacancy, status='accepted')
+    emails = []
+    for app in applications:
+        emails.append(app.email)
     paginator = Paginator(applications, 10)  # 10 applications per page
     page = request.GET.get('page')
     page_obj = paginator.get_page(page)
-    return render(request, 'hr/accepted_applications.html', {'applications': page_obj, 'vacancy': vacancy})
+    return render(request, 'hr/accepted_applications.html', {'applications': page_obj, 'vacancy': vacancy, 'emails': emails})
 
 @login_required
 @user_passes_test(is_hr)
@@ -223,7 +226,10 @@ def fetch_rejected_applications(request, vacancy_id):
     
     vacancy = get_object_or_404(Vacancy, id=vacancy_id, tenant=request.tenant)
     applications = VacancyApplication.objects.filter(vacancy=vacancy, status='rejected')
+    emails = []
+    for app in applications:
+        emails.append(app.email)
     paginator = Paginator(applications, 10)  # 10 applications per page
     page = request.GET.get('page')
     page_obj = paginator.get_page(page)
-    return render(request, 'hr/rejected_applications.html', {'applications': page_obj, 'vacancy': vacancy})
+    return render(request, 'hr/rejected_applications.html', {'applications': page_obj, 'vacancy': vacancy, 'emails': emails})

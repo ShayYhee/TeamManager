@@ -28,6 +28,7 @@ def vacancy_list(request):
                     vacancy.shareable_link = request.build_absolute_uri(vacancy.get_shareable_link())
                 else:
                     vacancy.shareable_link = None
+                    vacancy.status = "withdrawn"
             else:
                 vacancy.shareable_link = request.build_absolute_uri(vacancy.get_shareable_link())
         else:
