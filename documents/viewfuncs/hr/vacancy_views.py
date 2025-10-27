@@ -1,4 +1,4 @@
-from datetime import timezone
+from django.utils import timezone
 import logging
 from django.contrib.auth.decorators import login_required, user_passes_test
 from documents.forms import VacancyForm
@@ -80,15 +80,28 @@ def edit_vacancy(request, vacancy_id):
     return render(request, 'hr/edit_vacancy.html', {'form': form})
 
 @login_required
-@user_passes_test(is_hr)
 def vacancy_detail(request, vacancy_id):
     if not hasattr(request, 'tenant') or request.user.tenant != request.tenant:
         print(f"Unauthorized access by user {request.user.username}: tenant mismatch")
         return render(request, 'tenant_error.html', {'error_code': '401','message': 'You are not authorized for this company.'})
     
     vacancy = get_object_or_404(Vacancy, id=vacancy_id, tenant=request.tenant)
+    now = timezone.now()
+    if vacancy.is_shared and vacancy.share_time and vacancy.share_time <= now:
+        if vacancy.share_time_end:
+            if now <= vacancy.share_time_end:
+                vacancy.shareable_link = request.build_absolute_uri(vacancy.get_shareable_link())
+            else:
+                vacancy.shareable_link = None
+                vacancy.status = "withdrawn"
+        else:
+            vacancy.shareable_link = request.build_absolute_uri(vacancy.get_shareable_link())
+    else:
+        vacancy.shareable_link = None
+
+    hr = is_hr(request.user)
     
-    return render(request, 'hr/vacancy_detail.html', {'vacancy': vacancy})
+    return render(request, 'hr/vacancy_detail.html', {'vacancy': vacancy, 'is_hr': hr})
 
 @login_required
 @user_passes_test(is_hr)
