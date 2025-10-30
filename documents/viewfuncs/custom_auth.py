@@ -3,7 +3,7 @@
 
 from raadaa import settings
 from documents.models import CustomUser, StaffProfile
-from documents.forms import ForgotPasswordForm, ResetPasswordForm, SignUpForm
+from documents.forms import ForgotPasswordForm, ResetPasswordForm, SignUpForm, CustomLoginForm
 from django.contrib.auth import logout, get_user_model
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.contrib.auth.views import LoginView
@@ -22,6 +22,8 @@ def register(request):
         form = SignUpForm(request.POST)
         if form.is_valid():
             user = form.save(commit=False)
+            user.email = form.cleaned_data["email"]
+            user.username = form.cleaned_data["email"]
             user.set_password(form.cleaned_data["password"])
             # user.is_active = False
             user.is_active = True
@@ -69,17 +71,61 @@ def account_activation_sent(request):
     return render(request, "registration/account_activation_sent.html")
 
 # Custom Login
+# class CustomLoginView(LoginView):
+#     def form_valid(self, form):
+#         # Authenticate and log in the user
+#         response = super().form_valid(form)  # Logs in the user
+#         user = self.request.user
+
+#         # If superuser, allow staying on base domain
+#         if user.is_superuser:
+#             return response
+
+#         # For non-superusers, redirect to their tenant's login URL
+#         expected_subdomain = (
+#             user.tenant.slug
+#             if hasattr(user, 'tenant') and user.tenant
+#             else None
+#         )
+#         if expected_subdomain is None:
+#             return HttpResponseForbidden("You are not associated with this company. Please ensure your subdomain is correct or contact faith.osebi@transnetcloud.com")
+#         base_domain = "localhost:8000" if settings.DEBUG else "teammanager.ng"
+#         protocol = "http" if settings.DEBUG else "https"
+#         tenant_login_url = f"{protocol}://{expected_subdomain}.{base_domain}/accounts/login"
+
+#         # Redirect to tenant-specific login URL
+#         return redirect(tenant_login_url)
+
+#     def get(self, request, *args, **kwargs):
+#         # If already authenticated, redirect to home or tenant URL
+#         if request.user.is_authenticated:
+#             if request.user.is_superuser:
+#                 return redirect(settings.LOGIN_REDIRECT_URL or '/')
+#             expected_subdomain = (
+#                 request.user.tenant.slug
+#                 if hasattr(request.user, 'tenant') and request.user.tenant
+#                 else None
+#             )
+#             if expected_subdomain is None:
+#                 return HttpResponseForbidden("You are not associated with this company. Please ensure your subdomain is correct or contact faith.osebi@transnetcloud.com")
+#             base_domain = "localhost:8000" if settings.DEBUG else "teammanager.ng"
+#             protocol = "http" if settings.DEBUG else "https"
+#             return redirect(f"{protocol}://{expected_subdomain}.{base_domain}/")
+#         return super().get(request, *args, **kwargs)
+
+
 class CustomLoginView(LoginView):
+    form_class = CustomLoginForm
+    template_name = 'registration/login.html'  # Make sure to use your template
+
     def form_valid(self, form):
-        # Authenticate and log in the user
-        response = super().form_valid(form)  # Logs in the user
+        # The rest of your existing logic remains the same
+        response = super().form_valid(form)
         user = self.request.user
 
-        # If superuser, allow staying on base domain
         if user.is_superuser:
             return response
 
-        # For non-superusers, redirect to their tenant's login URL
         expected_subdomain = (
             user.tenant.slug
             if hasattr(user, 'tenant') and user.tenant
@@ -87,15 +133,15 @@ class CustomLoginView(LoginView):
         )
         if expected_subdomain is None:
             return HttpResponseForbidden("You are not associated with this company. Please ensure your subdomain is correct or contact faith.osebi@transnetcloud.com")
+        
         base_domain = "localhost:8000" if settings.DEBUG else "teammanager.ng"
         protocol = "http" if settings.DEBUG else "https"
         tenant_login_url = f"{protocol}://{expected_subdomain}.{base_domain}/accounts/login"
 
-        # Redirect to tenant-specific login URL
         return redirect(tenant_login_url)
 
     def get(self, request, *args, **kwargs):
-        # If already authenticated, redirect to home or tenant URL
+        # Your existing get method logic remains the same
         if request.user.is_authenticated:
             if request.user.is_superuser:
                 return redirect(settings.LOGIN_REDIRECT_URL or '/')
@@ -110,7 +156,8 @@ class CustomLoginView(LoginView):
             protocol = "http" if settings.DEBUG else "https"
             return redirect(f"{protocol}://{expected_subdomain}.{base_domain}/")
         return super().get(request, *args, **kwargs)
-    
+
+
 # Fetch Tenant URL for redirecting users
 def get_tenant_url(request):
     if hasattr(request, 'user') and request.user.is_authenticated:

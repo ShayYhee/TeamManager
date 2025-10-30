@@ -14,6 +14,9 @@ from django.core.exceptions import ValidationError
 from django.core.mail import send_mail, get_connection
 from django_countries.fields import CountryField
 from django.urls import reverse
+from django.contrib.auth import authenticate
+from django.contrib.auth.forms import AuthenticationForm
+
 
 User = get_user_model()
 
@@ -116,7 +119,7 @@ class SignUpForm(forms.ModelForm):
     
     class Meta:
         model = User
-        fields = ["first_name", "last_name", "username", "email", "password"]
+        fields = ["first_name", "last_name", "email", "password"]
 
     def clean(self):
         cleaned_data = super().clean()
@@ -124,14 +127,74 @@ class SignUpForm(forms.ModelForm):
         password_confirm = cleaned_data.get("password_confirm")
         first_name = cleaned_data.get("first_name")
         last_name = cleaned_data.get("last_name")
+        email = cleaned_data['email']
         if password and password_confirm and password != password_confirm:
             raise forms.ValidationError("Passwords do not match")
         if not first_name:
             raise forms.ValidationError("Please Enter First Name")
         if not last_name:
             raise forms.ValidationError("Please Enter Last Name")
+        if CustomUser.objects.filter(email=email).exists():
+            raise forms.ValidationError("This email is already in use.")
         return cleaned_data
-    
+
+class CustomLoginForm(AuthenticationForm):
+    username = forms.CharField(
+        label="Username or Email",
+        widget=forms.TextInput(attrs={
+            'autofocus': True,
+            'placeholder': 'Enter your username or email'
+        })
+    )
+
+    def clean_username(self):
+        username = self.cleaned_data.get('username')
+        if not username:
+            raise ValidationError("Please enter your username or email.")
+        return username
+
+    def clean(self):
+        username = self.cleaned_data.get('username')
+        password = self.cleaned_data.get('password')
+
+        if username and password:
+            # Normalize the input (strip whitespace, convert to lowercase if emails are case-insensitive)
+            username = username.strip()
+            
+            # Determine if the input is an email
+            is_email = '@' in username
+            
+            if is_email:
+                # Try to find user by email
+                try:
+                    user_obj = User.objects.filter(email__iexact=username).first()
+                    if user_obj:
+                        # Authenticate with the actual username
+                        self.user_cache = authenticate(
+                            self.request, 
+                            username=user_obj.username, 
+                            password=password
+                        )
+                    else:
+                        self.user_cache = None
+                except User.MultipleObjectsReturned:
+                    # Handle case where multiple users have the same email
+                    self.user_cache = None
+            else:
+                # Try authentication with username directly
+                self.user_cache = authenticate(
+                    self.request, 
+                    username=username, 
+                    password=password
+                )
+
+            if self.user_cache is None:
+                raise self.get_invalid_login_error()
+            
+            self.confirm_login_allowed(self.user_cache)
+
+        return self.cleaned_data
+
 class UserForm(forms.ModelForm):
     password = forms.CharField(widget=forms.PasswordInput(attrs={"class": "form-control"}))
     password_confirm = forms.CharField(widget=forms.PasswordInput(attrs={"class": "form-control"}))
