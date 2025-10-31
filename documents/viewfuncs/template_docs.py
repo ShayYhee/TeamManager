@@ -270,14 +270,16 @@ def create_document(request):
                         'message': 'Unauthorized: User does not belong to the document\'s company.'
                     }, status=403)
 
-                    sender_provider = document.created_by.email_provider
-                    sender_email = document.created_by.email_address
-                    sender_password = document.created_by.get_smtp_password()
+                    # sender_provider = document.created_by.email_provider
+                    # sender_email = document.created_by.email_address
+                    # sender_password = document.created_by.get_smtp_password()
 
-                    if not sender_email or not sender_password:
+                    sender = document.created_by
+
+                    if not sender.email_address or not sender.email_password:
                         return HttpResponseForbidden("Your email credentials are missing. Contact admin.")
                     print("Sending email")
-                    send_approval_request(document, sender_provider, sender_email, sender_password, bdm_emails)
+                    send_approval_request(document, sender.email_provider, sender.email_address, sender.email_password, bdm_emails, sender)
 
             print("Redirecting to document_list")
             return redirect("document_list")

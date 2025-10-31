@@ -30,8 +30,16 @@
                         <!-- Public Folders -->
                         <div class="tab-pane fade {% if active_tab == 'public' %}show active{% endif %}" id="public" role="tabpanel" aria-labelledby="public-tab">
                             <div class="card-header bg-transparent d-flex align-items-center justify-content-between">
-                                <h2 class="mb-0"><i class="fas fa-folder-open me-2" style="color: rgba(211, 182, 76, 0.89);"></i> {{ public_parent.name|default:"Public" }} <span class="badge ms-1">{{ public_folders.count|add:public_files.count }}</span></h2>
-                                {% if public_parent.created_by == request.user %}
+                                <h2 class="mb-0">
+                                    <i class="fas fa-folder-open me-2" style="color: rgba(211, 182, 76, 0.89);"></i>
+                                    {% if public_parent %}
+                                        {{ public_parent.name }}
+                                    {% else %}
+                                        Public
+                                    {% endif %}
+                                    <span class="badge ms-1">{{ public_folders.count|add:public_files.count }}</span>
+                                </h2>
+                                {% if public_parent and public_parent.created_by == request.user %}
                                     <div class="dropdown position-absolute end-0 p-2">
                                         <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Folder Options">
                                             <i class="fas fa-ellipsis-v"></i>
@@ -44,7 +52,7 @@
                                         </ul>
                                     </div>
                                 {% endif %}
-                                {% if public_parent.parent %}
+                                {% if public_parent and public_parent.parent %}
                                     <a href="{% url 'folder_view_public' public_parent.parent.id %}?tab=public" class="btn btn-outline-secondary btn-sm" title="Back to {{ public_parent.parent.name }}">
                                         <i class="fas fa-arrow-left me-1"></i> Back
                                     </a>
@@ -55,7 +63,7 @@
                                 {% endif %}
                             </div>
                             <div class="card-body">
-                                {% if public_parent.description %}
+                                {% if publc_parent and public_parent.description %}
                                 <div class="description-bar mb-2">
                                     <span class="text-primary"><strong>Folder Info:</strong> {{ public_parent.description }}</span>
                                 </div>
@@ -171,8 +179,16 @@
                         <!-- Personal Folders -->
                         <div class="tab-pane fade {% if active_tab == 'personal' %}show active{% endif %}" id="personal" role="tabpanel" aria-labelledby="personal-tab">
                             <div class="card-header bg-transparent d-flex align-items-center justify-content-between">
-                                <h2 class="mb-0"><i class="fas fa-folder-open me-2" style="color: rgba(211, 182, 76, 0.89);"></i> {{ personal_parent.name|default:"Personal" }} <span class="badge ms-1">{{ personal_folders.count|add:personal_files.count }}</span></h2>
-                                {% if personal_parent.created_by == request.user %}
+                                <h2 class="mb-0">
+                                    <i class="fas fa-folder-open me-2" style="color: rgba(211, 182, 76, 0.89);"></i>
+                                    {% if personal_parent %}
+                                        {{ personal_parent.name }}
+                                    {% else %}
+                                        Personal
+                                    {% endif %}
+                                    <span class="badge ms-1">{{ personal_folders.count|add:personal_files.count }}</span>
+                                </h2>
+                                {% if personal_parent and personal_parent.created_by == request.user %}
                                     <div class="dropdown position-absolute end-0 p-2">
                                         <button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Folder Options">
                                             <i class="fas fa-ellipsis-v"></i>
@@ -185,7 +201,7 @@
                                         </ul>
                                     </div>
                                 {% endif %}
-                                {% if personal_parent.parent %}
+                                {% if personal_parent and personal_parent.parent %}
                                     <a href="{% url 'folder_view_personal' personal_parent.parent.id %}?tab=personal" class="btn btn-outline-secondary btn-sm" title="Back to {{ personal_parent.parent.name }}">
                                         <i class="fas fa-arrow-left me-1"></i> Back
                                     </a>
@@ -196,7 +212,7 @@
                                 {% endif %}
                             </div>
                             <div class="card-body">
-                                {% if personal_parent.description %}
+                                {% if personal_parent and personal_parent.description %}
                                 <div class="description-bar mb-2">
                                     <span class="text-primary"><strong>Folder Info:</strong> {{ personal_parent.description }}</span>
                                 </div>

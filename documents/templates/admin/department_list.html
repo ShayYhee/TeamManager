@@ -41,7 +41,7 @@
                             <td>{{ forloop.counter }}</td>
                             <td><a href="{% url 'edit_department' department_id=department.id %}">{{ department.name }}</a></td>
                             <td>{{ department.hod|default:'—' }}</td>
-                            <td>{{ department.members.count }}</td>
+                            <td><a href="{% url 'department_members' department.id %}">{{ department.members.count }}</a></td>
                             <td>
                                 <a href="{% url 'edit_department' department_id=department.id %}" class="btn btn-outline-primary btn-sm me-1" title="Edit Department">
                                     <i class="fas fa-edit me-1"></i> Edit

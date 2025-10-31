@@ -7,23 +7,23 @@ from django.shortcuts import redirect, render, get_object_or_404
 from django.core.paginator import Paginator
 from django.contrib import messages
 
-def assign_teams_to_users(request, team_id):
-    team = get_object_or_404(Team, id=team_id)
-    tenant = team.tenant
+def assign_users_to_team(request, team_id):
+    team = get_object_or_404(Team, id=team_id, tenant=request.tenant)
+    tenant = request.tenant
 
     if request.method == 'POST':
         form = AssignTeamsToUsersForm(request.POST, tenant=tenant)
         if form.is_valid():
             users = form.cleaned_data['users']
-            teams = form.cleaned_data['teams']
+            # teams = form.cleaned_data['teams']
             for user in users:
-                user.teams.add(*teams)
+                user.teams.add(team)
             messages.success(request, f"Teams successfully assigned to users.")
             return redirect('admin_team_list')
     else:
         form = AssignTeamsToUsersForm(tenant=tenant)
     
-    return render(request, 'admin/assign_teams_to_users.html', {
+    return render(request, 'admin/assign_users_to_team.html', {
         'form': form,
         'team': team,
     })

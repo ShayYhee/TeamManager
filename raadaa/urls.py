@@ -119,6 +119,7 @@ urlpatterns = [
     path("admins/dashboard/", admin_dashboard, name="admin_dashboard"),
     path('admins/bulk-delete/<str:model_name>/', bulk_delete, name='bulk_delete'),
     # Users URLs
+    path('users-search/', dv.user_search, name='user_search'),
     path('admins/users/bulk-action/', bulk_action_users, name='bulk_action_users'),
     path('admins/users/list/', users_list, name='users_list'),
     path('admins/users/create/', create_user, name='create_user'),
@@ -132,6 +133,7 @@ urlpatterns = [
     path('admins/departments/create/', create_department, name='create_department'),
     path('admins/departments/edit/<int:department_id>/', edit_department, name='edit_department'),
     path('admins/departments/delete/<int:department_id>/', delete_department, name='delete_department'),
+    path('admins/department/members/<int:department_id>/', dv.department_members, name='department_members'),
     # Team URLs
     path('admins/teams/', admin_team_list, name='admin_team_list'),
     path('admins/teams/create/', create_team, name='create_team'),
@@ -139,7 +141,7 @@ urlpatterns = [
     path('admins/teams/delete/<int:team_id>/', delete_team, name='delete_team'),
     # New URLs for assigning users and teams
     path('department/<int:department_id>/assign-users/', dv.assign_users_to_department, name='assign_users_to_department'),
-    path('team/<int:team_id>/assign-teams/', dv.assign_teams_to_users, name='assign_teams_to_users'),
+    path('team/<int:team_id>/assign-teams/', dv.assign_users_to_team, name='assign_teams_to_users'),
     # Staff Profile URLs
     path('admins/staff-profiles/', staff_profile_list, name='staff_profile_list'),
     path('admins/staff-profiles/create/', create_staff_profile, name='create_staff_profile'),
