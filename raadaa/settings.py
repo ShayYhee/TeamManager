@@ -43,7 +43,7 @@ ALLOWED_HOSTS = (
         'transnet-cloud.localhost',
         'raadaa.localhost',
         'miniago.localhost',
-        '13.61.189.68',  # Add test host IP
+        '13.61.189.68', # Add test host IP
     ]
 )
 
