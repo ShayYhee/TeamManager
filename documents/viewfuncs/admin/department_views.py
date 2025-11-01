@@ -1,8 +1,8 @@
-from django.contrib.auth.decorators import user_passes_test
-from documents.models import Department
+from django.contrib.auth.decorators import user_passes_test, login_required
+from documents.models import Department, CustomUser
 from documents.forms import AssignUsersToDepartmentForm, DepartmentForm
 from ..rba_decorators import is_admin 
-from django.http import HttpResponseForbidden
+from django.http import HttpResponseForbidden, JsonResponse
 from django.shortcuts import redirect, render, get_object_or_404
 from django.core.paginator import Paginator
 from django.contrib import messages
@@ -29,6 +29,10 @@ def assign_users_to_department(request, department_id):
         'department': department,
     })
 
+def department_members(request, department_id):
+    department = get_object_or_404(Department, id=department_id, tenant=request.tenant)
+    members = CustomUser.objects.filter(department=department)
+    return render(request, 'admin/department_members.html', {'department': department, 'members': members})
 
 @user_passes_test(is_admin)
 def department_list(request):

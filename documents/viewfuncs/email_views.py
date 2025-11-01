@@ -2,7 +2,7 @@ from datetime import timezone
 import logging
 from django.contrib.auth.decorators import login_required
 from documents.forms import EmailForm
-from documents.models import Email, Attachment
+from documents.models import Email, Attachment, CustomUser
 from django.http import HttpResponseForbidden, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.core.paginator import Paginator
@@ -128,6 +128,13 @@ def send_email(request):
     sender_email = request.user.email_address
     sender_password = request.user.email_password
     connection, error_message = get_email_smtp_connection(sender_provider,sender_email, sender_password)
+
+    # superuser = CustomUser.objects.get(is_superuser=True)
+    # if not connection:
+    #     sender_provider = superuser.email_provider
+    #     sender_email = superuser.email_address
+    #     sender_password = superuser.email_password
+    #     connection, error_message = get_email_smtp_connection(sender_provider,sender_email, sender_password)
 
     if request.method == 'POST':
         form = EmailForm(request.POST, request.FILES)

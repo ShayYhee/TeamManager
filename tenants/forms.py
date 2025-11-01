@@ -8,13 +8,13 @@ class TenantApplicationForm(forms.ModelForm):
 
     class Meta:
         model = TenantApplication
-        fields = ['username', 'email', 'password', 'confirm_password', 'organization_name', 'slug']
+        fields = ['email', 'password', 'confirm_password', 'organization_name', 'slug']
 
-    def clean_username(self):
-        username = self.cleaned_data['username']
-        if CustomUser.objects.filter(username=username).exists():
-            raise forms.ValidationError("This username is already taken.")
-        return username
+    # def clean_username(self):
+    #     username = self.cleaned_data['username']
+    #     if CustomUser.objects.filter(username=username).exists():
+    #         raise forms.ValidationError("This username is already taken.")
+    #     return username
 
     def clean_email(self):
         email = self.cleaned_data['email']

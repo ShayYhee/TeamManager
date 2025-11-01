@@ -1,6 +1,7 @@
 from django import forms
 from django.forms import modelformset_factory
 from .models import Document, User, CustomUser, Folder, File, Task, StaffProfile, StaffDocument, Department, Team, Role, Event, EventParticipant, Notification, UserNotification, CompanyProfile, Contact, Email, Attachment, CompanyDocument #, Vacancy, VacancyApplication
+from .viewfuncs.mail_connection import get_email_smtp_connection
 from tenants.models import Tenant
 from ckeditor.widgets import CKEditorWidget
 from ckeditor_uploader.widgets import CKEditorUploadingWidget
@@ -14,6 +15,9 @@ from django.core.exceptions import ValidationError
 from django.core.mail import send_mail, get_connection
 from django_countries.fields import CountryField
 from django.urls import reverse
+from django.contrib.auth import authenticate
+from django.contrib.auth.forms import AuthenticationForm
+
 
 User = get_user_model()
 
@@ -116,7 +120,7 @@ class SignUpForm(forms.ModelForm):
     
     class Meta:
         model = User
-        fields = ["first_name", "last_name", "username", "email", "password"]
+        fields = ["first_name", "last_name", "email", "password"]
 
     def clean(self):
         cleaned_data = super().clean()
@@ -124,14 +128,74 @@ class SignUpForm(forms.ModelForm):
         password_confirm = cleaned_data.get("password_confirm")
         first_name = cleaned_data.get("first_name")
         last_name = cleaned_data.get("last_name")
+        email = cleaned_data['email']
         if password and password_confirm and password != password_confirm:
             raise forms.ValidationError("Passwords do not match")
         if not first_name:
             raise forms.ValidationError("Please Enter First Name")
         if not last_name:
             raise forms.ValidationError("Please Enter Last Name")
+        if CustomUser.objects.filter(email=email).exists():
+            raise forms.ValidationError("This email is already in use.")
         return cleaned_data
-    
+
+class CustomLoginForm(AuthenticationForm):
+    username = forms.CharField(
+        label="Username or Email",
+        widget=forms.TextInput(attrs={
+            'autofocus': True,
+            'placeholder': 'Enter your username or email'
+        })
+    )
+
+    def clean_username(self):
+        username = self.cleaned_data.get('username')
+        if not username:
+            raise ValidationError("Please enter your username or email.")
+        return username
+
+    def clean(self):
+        username = self.cleaned_data.get('username')
+        password = self.cleaned_data.get('password')
+
+        if username and password:
+            # Normalize the input (strip whitespace, convert to lowercase if emails are case-insensitive)
+            username = username.strip()
+            
+            # Determine if the input is an email
+            is_email = '@' in username
+            
+            if is_email:
+                # Try to find user by email
+                try:
+                    user_obj = User.objects.filter(email__iexact=username).first()
+                    if user_obj:
+                        # Authenticate with the actual username
+                        self.user_cache = authenticate(
+                            self.request, 
+                            username=user_obj.username, 
+                            password=password
+                        )
+                    else:
+                        self.user_cache = None
+                except User.MultipleObjectsReturned:
+                    # Handle case where multiple users have the same email
+                    self.user_cache = None
+            else:
+                # Try authentication with username directly
+                self.user_cache = authenticate(
+                    self.request, 
+                    username=username, 
+                    password=password
+                )
+
+            if self.user_cache is None:
+                raise self.get_invalid_login_error()
+            
+            self.confirm_login_allowed(self.user_cache)
+
+        return self.cleaned_data
+
 class UserForm(forms.ModelForm):
     password = forms.CharField(widget=forms.PasswordInput(attrs={"class": "form-control"}))
     password_confirm = forms.CharField(widget=forms.PasswordInput(attrs={"class": "form-control"}))
@@ -181,6 +245,11 @@ class UserForm(forms.ModelForm):
         return cleaned_data
 
 class EditUserForm(forms.ModelForm):
+    roles = forms.ModelMultipleChoiceField(
+        queryset=Role.objects.all(),
+        widget=forms.CheckboxSelectMultiple,
+        required=False  # Set to True if selection is mandatory
+    )
     class Meta:
         model = CustomUser
         fields = ['username', 'first_name', 'last_name', 'email', 
@@ -192,7 +261,7 @@ class EditUserForm(forms.ModelForm):
             'last_name': forms.TextInput(attrs={'class': 'form-control'}),
             'email': forms.EmailInput(attrs={'class': 'form-control'}),
             'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'roles': forms.SelectMultiple(attrs={'class': 'form-control'}),
+            # 'roles': forms.SelectMultiple(attrs={'class': 'form-control'}),
             'phone_number': forms.TextInput(attrs={'class': 'form-control'}),
             'department': forms.Select(attrs={'class': 'form-control'}),
             'teams': forms.SelectMultiple(attrs={'class': 'form-control'}),
@@ -217,43 +286,36 @@ class ForgotPasswordForm(forms.Form):
             raise ValidationError("No active user found with this email address.")
         return email
 
-    def save(self, request):
-        email = self.cleaned_data['email']
-        user = CustomUser.objects.get(email=email)
-        # Generate token and UID
-        token = default_token_generator.make_token(user)
-        uidb64 = urlsafe_base64_encode(force_bytes(user.pk))
-        # Build reset URL
-        reset_url = request.build_absolute_uri(
-            reverse('reset_password', kwargs={'uidb64': uidb64, 'token': token})
-        )
-        superuser = CustomUser.objects.get(is_superuser=True)
-        sender_email = superuser.email_address
-        sender_password = superuser.email_password
-        if sender_email and sender_password:
-            connection = get_connection(
-                backend="django.core.mail.backends.smtp.EmailBackend",
-                host="smtp.zoho.com",
-                port=587,
-                username=sender_email,
-                password=sender_password,
-                use_tls=True,
-            )
-            # Send email (customize content as needed)
-            subject = 'TeamManager Password Reset Request'
-            message = f"""
-            Hello {user.username},
+    # def save(self, request):
+        # email = self.cleaned_data['email']
+        # user = CustomUser.objects.get(email=email)
+        # # Generate token and UID
+        # token = default_token_generator.make_token(user)
+        # uidb64 = urlsafe_base64_encode(force_bytes(user.pk))
+        # # Build reset URL
+        # reset_url = request.build_absolute_uri(
+        #     reverse('reset_password', kwargs={'uidb64': uidb64, 'token': token})
+        # )
+        # superuser = CustomUser.objects.get(is_superuser=True)
+        # sender_email = superuser.email_address
+        # sender_password = superuser.get_smtp_password()
+        # if sender_email and sender_password:
+        #     connection, error_message = get_email_smtp_connection(superuser.email_provider, sender_email, sender_password)
+        #     # Send email (customize content as needed)
+        #     subject = 'TeamManager Password Reset Request'
+        #     message = f"""
+        #     Hello {user.username},
 
-            You requested a password reset. Click the link below to set a new password:
+        #     You requested a password reset. Click the link below to set a new password:
 
-            {reset_url}
+        #     {reset_url}
 
-            If you didn’t request this, ignore this email.
+        #     If you didn’t request this, ignore this email.
 
-            Thanks,
-            The TeamManager Team
-            """
-            send_mail(subject, message, sender_email, [user.email], connection=connection)
+        #     Thanks,
+        #     The TeamManager Team
+        #     """
+        #     send_mail(subject, message, sender_email, [user.email], connection=connection)
 
 class ResetPasswordForm(SetPasswordForm):
     # Inherits new_password1 and new_password2 fields with validation
@@ -446,8 +508,12 @@ class TeamForm(forms.ModelForm):
 class AssignUsersToDepartmentForm(forms.Form):
     users = forms.ModelMultipleChoiceField(
         queryset=CustomUser.objects.all(),
-        widget=forms.CheckboxSelectMultiple,
-        label="Select Users"
+        widget=forms.SelectMultiple(attrs={'class': 'form-control select2',
+            'data-placeholder': 'Select users',
+            'data-tags': 'true',
+            'data-token-separators': '[",", " "]'}),
+        label="Select Users",
+        required=False
     )
 
     def __init__(self, *args, **kwargs):
@@ -459,21 +525,25 @@ class AssignUsersToDepartmentForm(forms.Form):
 class AssignTeamsToUsersForm(forms.Form):
     users = forms.ModelMultipleChoiceField(
         queryset=CustomUser.objects.all(),
-        widget=forms.CheckboxSelectMultiple,
-        label="Select Users"
+        widget=forms.SelectMultiple(attrs={'class': 'form-control select2',
+            'data-placeholder': 'Select users',
+            'data-tags': 'true',
+            'data-token-separators': '[",", " "]'}),
+        label="Select Users",
+        required=False
     )
-    teams = forms.ModelMultipleChoiceField(
-        queryset=Team.objects.all(),
-        widget=forms.CheckboxSelectMultiple,
-        label="Select Teams"
-    )
+    # teams = forms.ModelMultipleChoiceField(
+    #     queryset=Team.objects.all(),
+    #     widget=forms.CheckboxSelectMultiple,
+    #     label="Select Teams"
+    # )
 
     def __init__(self, *args, **kwargs):
         tenant = kwargs.pop('tenant', None)
         super().__init__(*args, **kwargs)
         if tenant:
             self.fields['users'].queryset = CustomUser.objects.filter(tenant=tenant)
-            self.fields['teams'].queryset = Team.objects.filter(tenant=tenant)
+            # self.fields['teams'].queryset = Team.objects.filter(tenant=tenant)
 
 class EventForm(forms.ModelForm):
     class Meta:

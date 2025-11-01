@@ -48,7 +48,7 @@ class EmailAdmin(admin.ModelAdmin):
     list_filter = ['tenant', 'created_at']
 
 class VacancyAdmin(admin.ModelAdmin):
-    list_display = ['tenant', 'title', 'country', 'status', 'is_shared', 'created_by', 'created_at']
+    list_display = ['tenant', 'title', 'country', 'status', 'is_shared', 'created_by', 'created_at', 'share_token']
     list_filter = ['tenant', 'status', 'country', 'is_shared', 'created_at']
 
 class VacancyApplicationAdmin(admin.ModelAdmin):

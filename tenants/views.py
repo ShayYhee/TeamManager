@@ -26,6 +26,7 @@ def apply_for_tenant(request):
         if form.is_valid():
             application = form.save(commit=False)
             application.status = 'approved'
+            application.username = form.cleaned_data["email"]
             application.save()
             
             try:

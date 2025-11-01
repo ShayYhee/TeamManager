@@ -26,11 +26,17 @@
         {% endif %}
     </p>
     <p><strong><i class="fas fa-info-circle"></i> Status:</strong> {{ vacancy.get_status_display }}</p>
-    <p><strong><i class="fas fa-link"></i> Shareable Link:</strong> 
-        <a href="{{ vacancy.shareable_link }}" id="shareable-link">{{ vacancy.shareable_link }}</a>
-        <button class="btn btn-sm btn-info" onclick="navigator.clipboard.writeText(document.getElementById('shareable-link').href).then(() => alert('Link copied to clipboard!'));"><i class="fas fa-copy"></i> Copy Link</button>
-    </p>
-    <a href="{% url 'vacancy_list' %}" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Back to Vacancies</a>
-    <a href="{% url 'edit_vacancy' vacancy.id %}" class="btn btn-sm btn-primary"><i class="fas fa-edit"></i> Edit</a>
+    {% if vacancy.is_shared and vacancy.shareable_link %}
+        <p><strong><i class="fas fa-link"></i> Shareable Link:</strong> 
+            <a href="{{ vacancy.shareable_link }}" id="shareable-link">{{ vacancy.shareable_link }}</a>
+            <button class="btn btn-sm btn-info" onclick="navigator.clipboard.writeText(document.getElementById('shareable-link').href).then(() => alert('Link copied to clipboard!'));"><i class="fas fa-copy"></i> Copy Link</button>
+        </p>
+    {% endif %}
+    {% if is_hr %}
+        <a href="{% url 'vacancy_list' %}" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Back to Vacancies</a>
+        <a href="{% url 'edit_vacancy' vacancy.id %}" class="btn btn-sm btn-primary"><i class="fas fa-edit"></i> Edit</a>
+    {% else %}
+        <button type="button" onclick="history.back()" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Back</button>
+    {% endif %}
 </div>
 {% endblock %}

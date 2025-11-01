@@ -1,0 +1,9 @@
+{% extends 'base.html'%}
+{% block title %}{{ team.name }} Team Members{% endblock %}
+{% block content %}
+<h2>{{ team.name }} Team Members</h2>
+<button type="button" onclick="history.back()" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Back</button>
+{% for member in members %}
+    <p>{{member}}</p>
+{%endfor%}
+{%endblock%}
