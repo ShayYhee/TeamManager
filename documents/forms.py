@@ -286,34 +286,6 @@ class ForgotPasswordForm(forms.Form):
             raise ValidationError("No active user found with this email address.")
         return email
 
-<<<<<<< HEAD
-    def save(self, request):
-        email = self.cleaned_data['email']
-        user = CustomUser.objects.get(email=email)
-        # Generate token and UID
-        token = default_token_generator.make_token(user)
-        uidb64 = urlsafe_base64_encode(force_bytes(user.pk))
-        # Build reset URL
-        reset_url = request.build_absolute_uri(
-            reverse('reset_password', kwargs={'uidb64': uidb64, 'token': token})
-        )
-        superuser = CustomUser.objects.get(is_superuser=True)
-        sender_email = superuser.email_address
-        sender_password = superuser.get_smtp_password()
-        if sender_email and sender_password:
-            connection = get_connection(
-                backend="django.core.mail.backends.smtp.EmailBackend",
-                host="smtp.zoho.com",
-                port=587,
-                username=sender_email,
-                password=sender_password,
-                use_tls=True,
-            )
-            # Send email (customize content as needed)
-            subject = 'TeamManager Password Reset Request'
-            message = f"""
-            Hello {user.username},
-=======
     # def save(self, request):
         # email = self.cleaned_data['email']
         # user = CustomUser.objects.get(email=email)
@@ -333,7 +305,6 @@ class ForgotPasswordForm(forms.Form):
         #     subject = 'TeamManager Password Reset Request'
         #     message = f"""
         #     Hello {user.username},
->>>>>>> dc34482cf131ac25e7bfc3aafc51125d57f750aa
 
         #     You requested a password reset. Click the link below to set a new password:
 
