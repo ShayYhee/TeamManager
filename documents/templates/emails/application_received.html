@@ -63,10 +63,10 @@
               </p>
 
               <!-- Tip Box -->
-              <!-- <div style="background-color: #fffbeb; border: 1px dashed #dd6b20; border-radius: 10px; padding: 16px 20px; margin: 28px 0; text-align: center; font-size: 15px; color: #92400e;">
+              {% comment %} <div style="background-color: #fffbeb; border: 1px dashed #dd6b20; border-radius: 10px; padding: 16px 20px; margin: 28px 0; text-align: center; font-size: 15px; color: #92400e;">
                 <p style="margin: 0; font-weight: 600;">Pro Tip:</p>
                 <p style="margin: 6px 0 0;">Add <strong>careers@{{ company_name|lower|cut:" "|regex_replace:"[^a-z0-9]":"" }}.com</strong> to your contacts to ensure delivery.</p>
-              </div> -->
+              </div> {% endcomment %}
 
               <p style="margin: 28px 0 0; font-size: 15px; color: #6b7280; line-height: 1.6;">
                 <em>This is an automated confirmation. Please do not reply to this email.</em>
@@ -82,7 +82,7 @@
               </p>
               <p style="margin: 0; font-size: 13px;">
                 {{ company_name }}<br>
-                © {{ "now"|date:"Y" }} All rights reserved.
+                © {{ now }} All rights reserved.
               </p>
             </td>
           </tr>

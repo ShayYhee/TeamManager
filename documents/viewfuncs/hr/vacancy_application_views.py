@@ -41,6 +41,7 @@ def send_vacancy_application_received(request, application_id):
     vacancy = vacancy_application.vacancy
     hrs = CustomUser.objects.filter(tenant=request.tenant, is_active=True, roles__name='HR')
     hr = hrs[0]
+    sender = hr
     sender_provider = hr.email_provider if hr.email_provider else SUPERUSER_EMAIL_PROVIDER
     sender_email = hr.email_address if hr.email_address else SUPERUSER_EMAIL_ADDRESS
     sender_password = hr.email_password if hr.get_smtp_password() else SUPERUSER_EMAIL_PASSWORD
@@ -51,7 +52,7 @@ def send_vacancy_application_received(request, application_id):
         return HttpResponseForbidden("Your email credentials are missing. Contact admin.")
 
     # Send application received email
-    send_vac_app_received_email(sender_provider, sender_email, sender_password, company, candidate_name, vacancy_application, vacancy)
+    send_vac_app_received_email(sender_provider, sender_email, sender_password, company, candidate_name, vacancy_application, vacancy, sender)
     
     print("Mail Sent")
 

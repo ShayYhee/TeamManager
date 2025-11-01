@@ -10,9 +10,11 @@ from django.contrib.auth.views import LoginView
 from django.http import HttpResponseForbidden
 from django.shortcuts import render, redirect
 from django.utils.encoding import force_bytes, force_str
-from django.utils.http import urlsafe_base64_decode
+from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
+from django.urls import reverse
 from django.contrib.auth.tokens import default_token_generator
-from .send_mails import send_reg_confirm
+from .send_mails import send_reg_confirm, send_password_reset_email
+from .mail_connection import get_email_smtp_connection
 from django.contrib.auth.forms import SetPasswordForm
 
 
@@ -47,20 +49,8 @@ def register(request):
             admin_user = CustomUser.objects.filter(
                 tenant=request.tenant, roles__name="Admin"
             ).first()
-            if admin_user.email_provider and admin_user.email_address and admin_user.email_password:
-                sender_provider = admin_user.email_provider
-                sender_email = admin_user.email_address
-                sender_password = admin_user.get_smtp_password()
-                sender = admin_user
-            else:
-                superuser = CustomUser.objects.filter(is_superuser=True).first()
-                sender_provider = superuser.email_provider
-                sender_email = superuser.email_address
-                sender_password = superuser.get_smtp_password()
-                sender = superuser
-            if sender_email and sender_password:
-                # Send confirmation email
-                send_reg_confirm(request, user, admin_user, sender_provider, sender_email, sender_password, sender)
+            superuser = CustomUser.objects.filter(is_superuser=True).first()
+            send_reg_confirm(request, user, admin_user, superuser)
 
             # Log error or notify admin, but proceed with registration
             return redirect("account_activation_sent")
@@ -185,7 +175,18 @@ def forgot_password(request):
     if request.method == 'POST':
         form = ForgotPasswordForm(request.POST)
         if form.is_valid():
-            form.save(request)
+            # form.save(commit=False)
+            email = form.cleaned_data['email']
+            user = CustomUser.objects.get(email=email)
+            # Generate token and UID
+            token = default_token_generator.make_token(user)
+            uidb64 = urlsafe_base64_encode(force_bytes(user.pk))
+            # Build reset URL
+            reset_url = request.build_absolute_uri(
+                reverse('reset_password', kwargs={'uidb64': uidb64, 'token': token})
+            )
+            superuser = CustomUser.objects.get(is_superuser=True)
+            send_password_reset_email(user, reset_url, superuser)
             return redirect('password_reset_sent')  # Or a 'email sent' page if you want to add one
     else:
         form = ForgotPasswordForm()

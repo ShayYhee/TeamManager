@@ -7,38 +7,13 @@ from django.shortcuts import render
 from django.http import HttpResponseForbidden
 from django.core.mail import send_mail, EmailMessage
 from django.template.loader import render_to_string
+from django.utils import timezone
 
 
 main_superuser = CustomUser.objects.filter(is_superuser=True).first()
 
 # Send Account registration Confirmation
-# def send_reg_confirm(request, user, admin_user, sender_provider, sender_email, sender_password, sender):
-#     sender_password = sender.get_smtp_password()
-#     connection, error_message = get_email_smtp_connection(sender_provider, sender_email, sender_password)
-#     base_domain = "127.0.0.1:8000" if settings.DEBUG else "teammanager.ng"
-#     protocol = "http" if settings.DEBUG else "https"
-#     login_url = f"{protocol}://{request.tenant.slug}.{base_domain}/accounts/login"
-#     subject = f"Account Approval: {user.username}"
-#     message = f"""
-#     Dear {user.username},
-
-#     Your account has been successfully created. 
-#     You can log in at: {login_url}
-
-#     Best regards,  
-#     {admin_user.get_full_name() or admin_user.username}
-#     {admin_user.email}
-#     """
-#     try:
-#         email = EmailMessage(subject, message, sender_email, [user.email], connection=connection, cc=[admin_user.email])
-#         email.send()
-#     except Exception as e:
-#         print(f"Failed to send email: {e}")
-
-def send_reg_confirm(request, user, admin_user, sender_provider, sender_email, sender_password, sender):
-    sender_password = sender.get_smtp_password()
-    # Configure SMTP settings dynamically
-    connection, error_message = get_email_smtp_connection(sender_provider, sender_email, sender_password)    
+def send_reg_confirm(request, user, admin_user, superuser):
     base_domain = "127.0.0.1:8000" if settings.DEBUG else "teammanager.ng"
     protocol = "http" if settings.DEBUG else "https"
     login_url = f"{protocol}://{request.tenant.slug}.{base_domain}/accounts/login"
@@ -59,20 +34,79 @@ def send_reg_confirm(request, user, admin_user, sender_provider, sender_email, s
     html_content = render_to_string('emails/reg_confirm.html', context)
 
     subject = f"Account Approved: {user.username}"
+    if admin_user.email_provider and admin_user.email_address and admin_user.email_password:
+        sender_password = admin_user.get_smtp_password()
+        connection, error_message = get_email_smtp_connection(admin_user.email_provider, admin_user.email_address, sender_password)
+        if connection:
+            try:
+                # Create and send HTML email
+                email = EmailMessage(
+                    subject=subject,
+                    body=html_content,
+                    from_email=admin_user.email_address,
+                    to=[user.email],
+                    connection=connection
+                )
+                # Specify that this is HTML email
+                email.content_subtype = "html"
+                email.send()
+                print("Email sent successfully via admin_user")
+                return  # Success — exit early
+            except Exception as e:
+                print(f"Failed to send via admin_user: {e}")
+                connection = None  # Force fallback
+        else:
+            print(f"SMTP Connection Failed for admin_user: {error_message}")
 
-    # Create and send HTML email
-    email = EmailMessage(
-        subject=subject,
-        body=html_content,
-        from_email=sender_email,
-        to=[user.email],
-        connection=connection
-    )
-    
-    # Specify that this is HTML email
-    email.content_subtype = "html"
-    
-    email.send()
+    if superuser.email_provider and superuser.email_address and superuser.email_password:
+        sender_password = superuser.get_smtp_password()
+        connection, error_message = get_email_smtp_connection(superuser.email_provider, superuser.email_address, sender_password)
+        if connection:
+            try:
+                # Create and send HTML email
+                email = EmailMessage(
+                    subject=subject,
+                    body=html_content,
+                    from_email=superuser.email_address,
+                    to=[user.email],
+                    cc=[admin_user.email],
+                    connection=connection
+                )
+                # Specify that this is HTML email
+                email.content_subtype = "html"
+                email.send()
+                print("Email sent successfully via superuser")
+                return  # Success — exit early
+            except Exception as e:
+                print(f"Failed to send via superuser: {e}")
+                connection = None  # Force fallback
+        else:
+            print(f"SMTP Connection Failed for superuser: {error_message}")
+
+    print("Email sent failed")
+
+# Send Password Reset
+def send_password_reset_email(user, reset_url, superuser):
+    sender_password = superuser.get_smtp_password()
+    if superuser.email_provider and superuser.email_address and sender_password:
+        connection, error_message = get_email_smtp_connection(superuser.email_provider, superuser.email_address, sender_password)
+        # Send email (customize content as needed)
+        subject = 'TeamManager Password Reset Request'
+        message = f"""
+        Hello {user.username},
+
+        You requested a password reset. Click the link below to set a new password:
+
+        {reset_url}
+
+        If you didn’t request this, ignore this email.
+
+        Thanks,
+        The TeamManager Team
+        """
+        email = EmailMessage(subject=subject, body=message, from_email=superuser.email_address, to=[user.email], connection=connection)
+        email.send()
+        # send_mail(subject, message, superuser.email_address, [user.email], connection=connection)
 
 # Template document approval
 # def send_approval_request(document, sender_provider, sender_email, sender_password, bdm_emails):
@@ -98,7 +132,8 @@ def send_reg_confirm(request, user, admin_user, sender_provider, sender_email, s
     
 #     print("Mail Sent")
 
-def send_approval_request(document, sender_provider, sender_email, sender_password, bdm_emails):
+def send_approval_request(document, sender_provider, sender_email, sender_password, bdm_emails, sender):
+    sender_password = sender.get_smtp_password()
     connection, error_message = get_email_smtp_connection(sender_provider, sender_email, sender_password)
 
     base_domain = "127.0.0.1:8000" if settings.DEBUG else "teammanager.ng"
@@ -449,11 +484,14 @@ def send_user_approved_email(request, user, admin_user, sender_provider, sender_
 #     email = EmailMessage(subject, message, sender_email, [vacancy_application.email], connection=connection)
 #     email.send()
 
-def send_vac_app_received_email(sender_provider, sender_email, sender_password, company, candidate_name, vacancy_application, vacancy):
+def send_vac_app_received_email(sender_provider, sender_email, sender_password, company, candidate_name, vacancy_application, vacancy, sender):
+    sender_password = sender.get_smtp_password()
     connection, error_message = get_email_smtp_connection(sender_provider, sender_email, sender_password)
     if error_message:
         print(f"SMTP Connection Failed: {error_message}")
         return  # Or raise/log as needed
+    
+    now = timezone.now()
 
     context = {
         'candidate_name': candidate_name,
@@ -461,6 +499,7 @@ def send_vac_app_received_email(sender_provider, sender_email, sender_password, 
         'company_name': company,
         'application_date': vacancy_application.created_at.strftime('%B %d, %Y'),
         'vacancy_application': vacancy_application,  # For ID in footer
+        'year': now.year,
     }
 
     html_content = render_to_string('emails/application_received.html', context)

@@ -101,13 +101,3 @@ def delete_contact(request, contact_id):
         return JsonResponse({'success': False, 'errors': {'folder': ['You can only delete your own contacts']}}, status=403)
     contact.delete()
     return redirect("contact_list")
-
-@login_required
-def contact_search(request):
-    query = request.GET.get('q', '')
-    contacts = Contact.objects.filter(
-        tenant=request.user.tenant,  # Assuming tenant-based filtering
-        email__icontains=query
-    )[:10]  # Limit to 10 results
-    results = [{'email': contact.email, 'name': contact.name} for contact in contacts]
-    return JsonResponse(results, safe=False)
