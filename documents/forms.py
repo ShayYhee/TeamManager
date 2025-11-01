@@ -292,7 +292,7 @@ class ForgotPasswordForm(forms.Form):
         )
         superuser = CustomUser.objects.get(is_superuser=True)
         sender_email = superuser.email_address
-        sender_password = superuser.email_password
+        sender_password = superuser.get_smtp_password()
         if sender_email and sender_password:
             connection = get_connection(
                 backend="django.core.mail.backends.smtp.EmailBackend",
