@@ -3,8 +3,8 @@
 
 from raadaa import settings
 from documents.models import CustomUser, StaffProfile
-from documents.forms import ForgotPasswordForm, ResetPasswordForm, SignUpForm, CustomLoginForm
-from django.contrib.auth import logout, get_user_model
+from documents.forms import ForgotPasswordForm, SignUpForm, CustomLoginForm
+from django.contrib.auth import logout, get_user_model, update_session_auth_hash
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.contrib.auth.views import LoginView
 from django.http import HttpResponseForbidden
@@ -15,6 +15,8 @@ from django.urls import reverse
 from django.contrib.auth.tokens import default_token_generator
 from .send_mails import send_reg_confirm, send_password_reset_email
 from .mail_connection import get_email_smtp_connection
+from django.contrib.auth.forms import SetPasswordForm
+
 
 User = get_user_model()
 
@@ -191,6 +193,28 @@ def forgot_password(request):
     return render(request, 'registration/forgot_password.html', {'form': form})
 
 # Reset password view
+# def reset_password(request, uidb64, token):
+#     try:
+#         uid = force_str(urlsafe_base64_decode(uidb64))
+#         user = User.objects.get(pk=uid)
+#     except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+#         user = None
+
+#     if user and default_token_generator.check_token(user, token):
+#         if request.method == 'POST':
+#             form = ResetPasswordForm(user, request.POST)
+#             if form.is_valid():
+#                 form.save()
+#                 return redirect('password_reset_success')
+#         else:
+#             form = ResetPasswordForm(user)
+#         return render(request, 'registration/reset_password.html', {'form': form})
+#     else:
+#         # Invalid link (expired or tampered)
+#         return render(request, 'registration/reset_password.html', {'error': 'Invalid or expired reset link.'})
+
+
+
 def reset_password(request, uidb64, token):
     try:
         uid = force_str(urlsafe_base64_decode(uidb64))
@@ -198,22 +222,35 @@ def reset_password(request, uidb64, token):
     except (TypeError, ValueError, OverflowError, User.DoesNotExist):
         user = None
 
-    if user and default_token_generator.check_token(user, token):
+    # Check if user exists and token is valid
+    if user is not None and default_token_generator.check_token(user, token):
         if request.method == 'POST':
-            form = ResetPasswordForm(user, request.POST)
+            form = SetPasswordForm(user, request.POST)
             if form.is_valid():
                 form.save()
+                # Update session auth hash if user is logged in
+                update_session_auth_hash(request, form.user)
                 return redirect('password_reset_success')
         else:
-            form = ResetPasswordForm(user)
-        return render(request, 'registration/reset_password.html', {'form': form})
+            form = SetPasswordForm(user)
+        
+        context = {
+            'form': form,
+            'validlink': True
+        }
+        return render(request, 'registration/reset_password.html', context)
     else:
-        # Invalid link (expired or tampered)
-        return render(request, 'registration/reset_password.html', {'error': 'Invalid or expired reset link.'})
+        # Invalid link
+        context = {
+            'form': None,
+            'validlink': False,
+            'error': 'Invalid or expired password reset link. Please request a new one.'
+        }
+        return render(request, 'registration/reset_password.html', context)
 
-# Password reset success view
 def password_reset_success(request):
     return render(request, 'registration/password_reset_success.html')
+
 
 # Password reset sent view
 def password_reset_sent(request):
