@@ -40,7 +40,8 @@
             position: fixed;
             top: 0;
             left: 0;
-            background-color: #1a202c;
+            background-color: #ffffff;
+            color: #1a202c
             padding-top: 20px;
             transition: all 0.3s ease;
             overflow-x: hidden;
@@ -53,7 +54,7 @@
             overflow: hidden;
         }
         .sidebar a {
-            color: #e2e8f0;
+            color: #1a202c;
             display: flex;
             align-items: center;
             padding: 12px 20px;
@@ -74,6 +75,12 @@
         }
         .sidebar a i {
             margin-right: 10px;
+        }
+        body.dark-mode .sidebar {
+            background: #1a202c;
+        }
+        body.dark-mode .sidebar a {
+            color: #ffffff
         }
         .main-content {
             margin-left: 260px;
