@@ -24,6 +24,7 @@ from documents.views import user_notification_list, create_user_notification, ed
 from documents.views import custom_404, custom_403, custom_500, custom_400, post_login_redirect, contact_list, create_contact, edit_contact, delete_contact, view_contact_detail
 from documents.views import email_list, send_email, edit_email, delete_email, email_detail, save_draft, contact_search, CustomLoginView, upload_file_anon
 from documents.views import add_company_document, delete_company_document, shared_file_view, shared_folder_view, contact_support, folder_view, enable_folder_sharing, enable_file_sharing
+from documents.views import job_board
 from documents.views import EventViewSet, UserViewSet, EventParticipantResponseView
 from django.http import HttpResponse
 
@@ -206,6 +207,8 @@ urlpatterns = [
     path('tracking/folder-file/', tv.track_folder_file, name='track_folder_file'),
     path('tracking/vacancy/', tv.track_vacancy, name="track_vacancy"),
     path('tracking/users/', tv.track_user, name='track_user'),
+    path('job-board/', dv.job_board, name='job_board'),
+
 
     path('.well-known/<path:path>', handle_well_known),  # Handle .well-known requests
 ]
