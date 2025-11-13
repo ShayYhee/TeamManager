@@ -12,3 +12,4 @@ tenants/.DS_Store
 calculate_top_tenants.py
 venv
 scripts/
+credentials/

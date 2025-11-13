@@ -898,3 +898,48 @@ class VacancyApplicationForm(forms.ModelForm):
                     raise forms.ValidationError(f"File {cv.name} is too large (max 5MB).")
             return cvs
 
+from documents.models import Interview
+
+class InterviewForm(forms.ModelForm):
+    class Meta:
+        model = Interview
+        fields = [
+            "vacancy",
+            "applications",
+            "interviewers",
+            "is_virtual",
+            "physical_location",
+            "schedule_start",
+            "schedule_end",
+        ]
+        widgets = {
+            "applications": forms.SelectMultiple(attrs={"class": "form-control"}),
+            "interviewers": forms.SelectMultiple(attrs={"class": "form-control"}),
+            "schedule_start": forms.DateTimeInput(attrs={"type": "datetime-local"}),
+            "schedule_end": forms.DateTimeInput(attrs={"type": "datetime-local"}),
+            "physical_location": forms.TextInput(attrs={"placeholder": "Enter physical venue (if applicable)"}),
+        }
+
+    def clean(self):
+        cleaned_data = super().clean()
+        is_virtual = cleaned_data.get("is_virtual")
+        location = cleaned_data.get("physical_location")
+
+        if not is_virtual and not location:
+            raise forms.ValidationError("Please specify a physical location for an in-person interview.")
+        return cleaned_data
+    
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
+
+        if user:
+            tenant = getattr(user, 'tenant', None)
+            if tenant:
+                self.fields['interviewer'].queryset = CustomUser.objects.filter(tenant=tenant)
+                self.fields['vacancy'].queryset = VacancyApplication.objects.filter(tenant=tenant)
+                self.fields['applications'].queryset = VacancyApplication.objects.filter(tenant=tenant, vacancy=self.instance.vacancy)
+            else:
+                self.fields['interviewer'].queryset = CustomUser.objects.none()
+                self.fields['vacancy'].queryset = VacancyApplication.objects.none()
+                self.fields['applications'].queryset = VacancyApplication.objects.none()
