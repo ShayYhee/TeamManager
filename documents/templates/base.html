@@ -449,7 +449,7 @@
                 <a href="{% url 'create_document' %}" {% if request.path == '/documents/create/' %}class="active"{% endif %}><i class="fas fa-bolt"></i> Generate Document</a>
             {% endif %}
             <a href="{% url 'create_from_editor' %}" {% if request.path == '/documents/create-editor/' %}class="active"{% endif %}><i class="fas fa-edit"></i> Document Editor</a>
-            <a href="{% url 'performance_dashboard' %}" {% if request.path == '/dashboard/performance-dashboard/' %}class="active"{% endif %}><i class="fas fa-chart-line" style="color: #ffffff;"></i> Performance</a>
+            <a href="{% url 'performance_dashboard' %}" {% if request.path == '/dashboard/performance-dashboard/' %}class="active"{% endif %}><i class="fas fa-chart-line"></i> Performance</a>
             {% for role in user.roles.all %}
                 {% if role.name == "HOD" %}
                     <a href="{% url 'hod_performance_dashboard' %}" {% if request.path == '/dashboard/hod-performance-dashboard/' %}class="active"{% endif %}><i class="fas fa-chart-bar"></i> Department Performance</a>

@@ -14,7 +14,6 @@ from .viewfuncs.job_board_views import job_board, job_board_filters_view, vacanc
 from .viewfuncs.notification_views import notifications_view, dismiss_notification, dismiss_all_notifications
 from .viewfuncs.performance_dashboard import performance_dashboard, hod_performance_dashboard
 from .viewfuncs.profile_views import view_my_profile, edit_my_profile
-from .viewfuncs.search_funcs import user_search, contact_search
 from .viewfuncs.staff_views import staff_directory, view_staff_profile, staff_list, add_staff_document, delete_staff_document, staff_list, export_staff_csv
 from .viewfuncs.task_views import task_list, task_detail, create_task, update_task_status, reassign_task, delete_task, task_edit, delete_task_document
 from .viewfuncs.template_docs import create_document, approve_document, autocomplete_sales_rep, send_approved_email

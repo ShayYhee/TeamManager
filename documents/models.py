@@ -725,3 +725,61 @@ class VacancyApplication(models.Model):
     status = models.CharField(max_length=20, choices=VACANCY_APPLICATION_STATUS, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+class Interview(models.Model):
+    INTERVIEW_STATUS = [
+        ('scheduled', 'Scheduled'),
+        ('completed', 'Completed'),
+        ('rescheduled', 'Rescheduled'),
+        ('cancelled', 'Cancelled'),
+    ]
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="interviews")
+    vacancy = models.ForeignKey(Vacancy, on_delete=models.CASCADE, related_name="interviews")
+    applications = models.OneToOneField(VacancyApplication, on_delete=models.CASCADE, related_name="interviews")
+    interviewers = models.ManyToManyField(CustomUser, null=True, blank=True, related_name='interviewer_interviews')
+    scheduled_by = models.ForeignKey(CustomUser, on_delete=models.SET_NULL, null=True, blank=True, related_name='scheduled_interviews')
+
+    schedule_start = models.DateTimeField()
+    schedule_end = models.DateTimeField()
+
+    is_virtual = models.BooleanField(default=True)
+    physical_location = models.CharField(max_length=255, blank=True, null=True)
+
+    google_meet_link = models.URLField(blank=True, null=True)
+    google_event_id = models.CharField(max_length=255, blank=True, null=True)
+
+    status = models.CharField(max_length=20, choices=INTERVIEW_STATUS, default='scheduled')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('tenant', 'google_event_id')   # safety
+
+    def clean(self):
+        if not self.is_virtual and not self.physical_location:
+            raise ValidationError("Physical location is required for non-virtual interviews.")
+        if self.schedule_start >= self.schedule_end:
+            raise ValidationError("End time must be after start time.")
+        
+    def save(self, *args, **kwargs):
+        creating = self.pk is None
+        super().save(*args, **kwargs)
+        if creating and self.is_virtual and not self.google_event_id:
+            from .viewfuncs.helper_funcs.google_meet_calendar import create_meet
+            create_meet(self)
+
+    def __str__(self):
+        return f"{self.vacancy} – {self.schedule_start:%Y-%m-%d %H:%M}"
+    
+    # @property
+    # def applicant_list(self):
+    #     return ", ".join([f"{a.first_name} {a.last_name}" for a in self.applications.all()])
+
+class InterviewParticipant(models.Model):
+    interview = models.ForeignKey(Interview, on_delete=models.CASCADE)
+    application = models.ForeignKey(VacancyApplication, on_delete=models.CASCADE)
+    joined_at = models.DateTimeField(null=True, blank=True)
+    left_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        unique_together = ("interview", "application")

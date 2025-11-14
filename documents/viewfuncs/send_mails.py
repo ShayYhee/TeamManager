@@ -90,22 +90,41 @@ def send_password_reset_email(user, reset_url, superuser):
     sender_password = superuser.get_smtp_password()
     if superuser.email_provider and superuser.email_address and sender_password:
         connection, error_message = get_email_smtp_connection(superuser.email_provider, superuser.email_address, sender_password)
+        now = timezone.now().strftime("%Y-%m-%d %H:%M:%S")
+        context = {
+            'reset_url': reset_url,
+            'user_name': user.username,
+            'tenant_name': user.tenant.name,
+            'now': now,
+        }
+
+        html_content = render_to_string('emails/forgot_password.html', context)
         # Send email (customize content as needed)
         subject = 'TeamManager Password Reset Request'
-        message = f"""
-        Hello {user.username},
-
-        You requested a password reset. Click the link below to set a new password:
-
-        {reset_url}
-
-        If you didn’t request this, ignore this email.
-
-        Thanks,
-        The TeamManager Team
-        """
-        email = EmailMessage(subject=subject, body=message, from_email=superuser.email_address, to=[user.email], connection=connection)
+        
+        email = EmailMessage(subject=subject, body=html_content, from_email=superuser.email_address, to=[user.email], connection=connection)
+        email.content_subtype = "html"
         email.send()
+# def send_password_reset_email(user, reset_url, superuser):
+#     sender_password = superuser.get_smtp_password()
+#     if superuser.email_provider and superuser.email_address and sender_password:
+#         connection, error_message = get_email_smtp_connection(superuser.email_provider, superuser.email_address, sender_password)
+#         # Send email (customize content as needed)
+#         subject = 'TeamManager Password Reset Request'
+#         message = f"""
+#         Hello {user.username},
+
+#         You requested a password reset. Click the link below to set a new password:
+
+#         {reset_url}
+
+#         If you didn’t request this, ignore this email.
+
+#         Thanks,
+#         The TeamManager Team
+#         """
+#         email = EmailMessage(subject=subject, body=message, from_email=superuser.email_address, to=[user.email], connection=connection)
+#         email.send()
         # send_mail(subject, message, superuser.email_address, [user.email], connection=connection)
 
 # Template document approval
