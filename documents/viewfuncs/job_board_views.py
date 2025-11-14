@@ -1,6 +1,8 @@
+from django.http import JsonResponse
 from django.shortcuts import render, get_object_or_404
 from django.core.paginator import Paginator
 from django.db.models import Q
+from documents import models
 from documents.models import Vacancy
 
 def job_board(request):
@@ -119,3 +121,57 @@ def get_filter_data(params):
         'search': params.get('search', ''),
         'ordering': params.get('ordering', '-created_at'),
     }
+
+def job_board_filters_view(request):
+    if request.method == 'GET' and request.headers.get('x-requested-with') == 'XMLHttpRequest':
+        try:
+            cities = Vacancy.objects.filter(
+                status='active', 
+                city__isnull=False
+            ).exclude(city='').values_list('city', flat=True).distinct()
+            
+            countries = Vacancy.objects.filter(
+                status='active', 
+                country__isnull=False
+            ).exclude(country='').values_list('country', flat=True).distinct()
+            
+            work_modes = Vacancy.objects.filter(
+                status='active', 
+                work_mode__isnull=False
+            ).exclude(work_mode='').values_list('work_mode', flat=True).distinct()
+            
+            salary_range = Vacancy.objects.filter(status='active').aggregate(
+                min_salary_min=models.Min('min_salary'),
+                max_salary_max=models.Max('max_salary')
+            )
+            
+            return JsonResponse({
+                'success': True,
+                'cities': list(cities),
+                'countries': list(countries),
+                'work_modes': list(work_modes),
+                'salary_range': salary_range,
+            })
+            
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': str(e)
+            }, status=500)
+    
+    return JsonResponse({'success': False, 'error': 'Invalid request'})
+
+def vacancy_detail_view(request, vacancy_id):
+    vacancy = get_object_or_404(Vacancy, id=vacancy_id, status='active')
+    
+    skills_list = []
+    if vacancy.skills:
+        skills_list = [skill.strip() for skill in vacancy.skills.split(',') if skill.strip()]
+    
+    context = {
+        'vacancy': vacancy,
+        'skills_list': skills_list,
+    }
+    
+    return render(request, 'job_board/vacancy_detail.html', context)
+

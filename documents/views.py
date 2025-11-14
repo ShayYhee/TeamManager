@@ -10,7 +10,7 @@ from .viewfuncs.events_views import EventViewSet, UserViewSet, EventParticipantR
 from .viewfuncs.file_views import upload_file, upload_file_anon, delete_file, move_file, rename_file, shared_file_view, enable_file_sharing
 from .viewfuncs.folder_views import folder_view, create_folder, shared_folder_view, enable_folder_sharing, delete_folder, move_folder, rename_folder
 from .viewfuncs.help_views import contact_support
-from .viewfuncs.job_board_views import job_board
+from .viewfuncs.job_board_views import job_board, job_board_filters_view, vacancy_detail_view
 from .viewfuncs.notification_views import notifications_view, dismiss_notification, dismiss_all_notifications
 from .viewfuncs.performance_dashboard import performance_dashboard, hod_performance_dashboard
 from .viewfuncs.profile_views import view_my_profile, edit_my_profile
